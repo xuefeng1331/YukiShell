@@ -523,6 +523,7 @@ var strings = {
     "Round": "圆形",
     "Rounded": "圆角",
     "Running": "正在运行",
+    "Not available on this computer": "此电脑不支持",
     "Save": "存储",
     "Save As…": "存储为…",
     "Save location": "存储位置",

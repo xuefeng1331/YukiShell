@@ -3492,12 +3492,15 @@ Scope {
                             required property var modelData
                             readonly property bool enabledHere: root.bar ? root.bar.ccControls.indexOf(modelData.id) >= 0 : false
                             readonly property bool resizable: (modelData.sizes || []).length > 1
+                            readonly property bool usable: root.bar ? root.bar.ccAvailable(modelData.id) : true
                             t: pal
                             title: I18n.tr(modelData.label)
+                            subtitle: usable ? "" : I18n.tr("Not available on this computer")
+                            opacity: usable ? 1 : 0.5
                             Row {
                                 spacing: 12
                                 SSegmented {
-                                    visible: ccRow.resizable
+                                    visible: ccRow.resizable && ccRow.usable
                                     opacity: ccRow.enabledHere ? 1 : 0.45
                                     t: pal
                                     model: (ccRow.modelData.sizes || []).map(function (z) { return z[0] + "\u00D7" + z[1]; })
@@ -3510,7 +3513,8 @@ Scope {
                                 }
                                 SSwitch {
                                     t: pal
-                                    checked: ccRow.enabledHere
+                                    enabled: ccRow.usable
+                                    checked: ccRow.enabledHere && ccRow.usable
                                     onToggled: v => {
                                         if (!root.bar) return;
                                         var cl = root.bar.ccControls.filter(function (x) { return x !== ccRow.modelData.id; });

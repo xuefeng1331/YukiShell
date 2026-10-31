@@ -523,6 +523,7 @@ var strings = {
     "Round": "원형",
     "Rounded": "둥글게",
     "Running": "실행 중",
+    "Not available on this computer": "이 컴퓨터에서는 사용할 수 없음",
     "Save": "저장",
     "Save As…": "다른 이름으로 저장…",
     "Save location": "저장 위치",

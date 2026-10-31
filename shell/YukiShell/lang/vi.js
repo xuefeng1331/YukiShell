@@ -523,6 +523,7 @@ var strings = {
     "Round": "Tròn",
     "Rounded": "Bo tròn",
     "Running": "Đang chạy",
+    "Not available on this computer": "Không khả dụng trên máy tính này",
     "Save": "Lưu",
     "Save As…": "Lưu thành…",
     "Save location": "Vị trí lưu",

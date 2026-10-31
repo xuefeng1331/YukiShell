@@ -523,6 +523,7 @@ var strings = {
     "Round": "円形",
     "Rounded": "角丸",
     "Running": "実行中",
+    "Not available on this computer": "このコンピュータでは使用できません",
     "Save": "保存",
     "Save As…": "別名で保存…",
     "Save location": "保存場所",

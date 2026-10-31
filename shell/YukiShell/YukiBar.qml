@@ -650,7 +650,27 @@ Scope {
     readonly property real ccCellH: Math.max(40, Math.min(110, ccRowH))
     readonly property real ccGap: Math.max(1, Math.min(20, ccGapPx))
     readonly property real ccSliderGap: ccGap + 4
-    readonly property var ccPlan: ccLayout(ccControls)
+    // Controls this PC can't use (no Wi-Fi card, no Bluetooth adapter, no radio for Airplane Mode) are left out of the grid and the
+    // Add Controls list; they stay in ccControls, so they come back by themselves when the hardware shows up.
+    function ccAvailable(id) {
+        if (id === "wifi") return hasWifi;
+        if (id === "bluetooth") return hasBt;
+        if (id === "airplane") return hasRadios;
+        return true;
+    }
+    readonly property var ccPlan: ccLayout(ccControls.filter(function (id) { return root.ccAvailable(id); }))
+    // Edit Controls works on a copy: Save keeps the changes, Cancel (or closing the Control Center) puts the layout back as it
+    // was. Nothing is written to settings.json while editing.
+    property var ccSnap: null
+    function ccEditBegin() { ccSnap = { c: ccControls.slice(), s: JSON.parse(JSON.stringify(ccSizes)), p: JSON.parse(JSON.stringify(ccPos)) }; }
+    function ccEditSave() { ccSnap = null; saveTimer.restart(); }
+    function ccEditCancel() {
+        if (!ccSnap) return;
+        var o = ccSnap;
+        ccSnap = null;
+        ccControls = o.c; ccSizes = o.s; ccPos = o.p;
+        saveTimer.restart();
+    }
     function ccAdd(id) {
         if (ccControls.indexOf(id) < 0) ccControls = ccControls.concat([id]);
     }
@@ -4181,6 +4201,7 @@ Scope {
     Timer { id: saveTimer; interval: 400; onTriggered: root.saveSettings() }
 
     function saveSettings() {
+        if (ccSnap) return;                                 // Edit Controls is open: saved by its Save button
         var o = {};
         for (var i = 0; i < settingKeys.length; i++) {
             var k = settingKeys[i];
@@ -5452,7 +5473,7 @@ Scope {
                     armed = "";
                     wifiPrompt = "";
                     spHoverLabel = "";
-                    if (pop !== "cc") ccEdit = false;
+                    if (pop !== "cc" && ccEdit) { root.ccEditCancel(); ccEdit = false; }   // closed without Save
                     if (pop !== "cc") ccPage = "";
                     root.notifOpen = (pop === "notif");
                     if (root.notifOpen) root.notifUnread = 0;
@@ -9165,7 +9186,7 @@ Scope {
                                 spacing: 8
                                 Repeater {
                                     id: ccAddRep
-                                    model: root.ccCatalog.filter(function (d) { return root.ccControls.indexOf(d.id) < 0; })
+                                    model: root.ccCatalog.filter(function (d) { return root.ccControls.indexOf(d.id) < 0 && root.ccAvailable(d.id); })
                                     delegate: CCTile {
                                         id: chip
                                         required property var modelData
@@ -9232,10 +9253,19 @@ Scope {
                                     onClicked: root.ccResetLayout()
                                 }
                                 CCPill {
+                                    visible: ui.ccEdit
                                     t: ccPal; gx: ccg
-                                    text: ui.ccEdit ? I18n.tr("Done") : I18n.tr("Edit Controls")
+                                    text: I18n.tr("Cancel")
+                                    onClicked: { root.ccEditCancel(); ui.ccEdit = false; }
+                                }
+                                CCPill {
+                                    t: ccPal; gx: ccg
+                                    text: ui.ccEdit ? I18n.tr("Save") : I18n.tr("Edit Controls")
                                     strong: ui.ccEdit
-                                    onClicked: ui.ccEdit = !ui.ccEdit
+                                    onClicked: {
+                                        if (ui.ccEdit) { root.ccEditSave(); ui.ccEdit = false; }
+                                        else { root.ccEditBegin(); ui.ccEdit = true; }
+                                    }
                                 }
                             }
                         }

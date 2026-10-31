@@ -73,6 +73,7 @@ var strings = {
     "Close Window": "Закрыть окно",
     "Reopen Closed Tab": "Открыть закрытую вкладку",
     "Open…": "Открыть…",
+    "Not available on this computer": "Недоступно на этом компьютере",
     "Save": "Сохранить",
     "Save As…": "Сохранить как…",
     "Print…": "Печать…",
