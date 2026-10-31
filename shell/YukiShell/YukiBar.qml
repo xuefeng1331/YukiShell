@@ -107,8 +107,12 @@ Scope {
     // Readability only ever changes the TEXT: panelDarkMode (glass tint, cards, borders) always follows the Light / Dark setting,
     // while panelTextWhite (text + glyph colour) follows the measured backdrop.
     readonly property bool panelDarkMode: darkMode
-    // with "Tint the interface" on, the panels sit on a deep accent shade in dark mode, so the text stays white there
-    readonly property bool panelTextWhite: (autoContrast && panelTone !== 0 && !accentUi) ? (panelTone === -1) : darkMode
+    // Menus and popovers always have white text and glyphs, like the bar itself: the text used to flip to black when the measured
+    // backdrop (a white window, a bright patch of wallpaper) was bright, which looked like a glitch on the dark glass.
+    readonly property bool panelTextWhite: true
+    // ...so the backdrop is no longer measured at all (assets/tone.sh grabbed the screen for the bar strip and, every 0.7 s,
+    // around an open menu). The code below stays, switched off here; "autoContrast" in settings.json is ignored.
+    readonly property bool toneMeasuring: false
     property color accent: "#eeacbe"
     property bool accentUi: false            // Appearance -> "Tint the interface": glass, panels and cards take a shade of the accent
     // the accent as an icon colour: a little lighter on white-text panels, a little deeper on black-text ones
@@ -262,7 +266,7 @@ Scope {
     // measure a screen rect (logical coords, in a screen scr); inner (optional) = the panel's own rect, left out of the measurement.
     function measureTone(sx, sy, sw, sh) { measureArea(null, Qt.rect(sx, sy, sw, sh), null, true); }
     function measureArea(scr, rect, inner, fresh) {
-        if (!autoContrast) return;
+        if (!toneMeasuring) return;
         var x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         if (scr) {                                           // clamp to the screen (grim refuses areas outside the outputs)
             var x1 = Math.max(scr.x, x), y1 = Math.max(scr.y, y), x2 = Math.min(scr.x + scr.width, x + w), y2 = Math.min(scr.y + scr.height, y + h);
@@ -303,7 +307,7 @@ Scope {
         // the bar's text, glyphs and logo are always white now (barTextDark), so what is behind the bar strip no longer decides
         // anything: it is not measured any more (it was a grim + ImageMagick run every 1.2-4.8 s)
         return;
-        if (!autoContrast || !barEnabled || barToneProc.running) return;
+        if (!toneMeasuring || !barEnabled || barToneProc.running) return;
         var sc = Quickshell.screens && Quickshell.screens.length ? Quickshell.screens[0] : null;
         if (!sc) return;
         barToneProc.command = ["sh", toneScript, "0.25", String(Math.round(sc.x)), String(Math.round(sc.y)), String(Math.max(8, Math.round(sc.width))), String(Math.max(8, Math.round(barH)))];
@@ -323,7 +327,7 @@ Scope {
         function onBarEnabledChanged() { if (root.barEnabled) barToneT.restart(); }
         function onWallpaperAccentChanged() { barToneT.restart(); }
         function onGlassClientsChanged() { barToneT.restart(); }
-        function onAutoContrastChanged() { if (root.autoContrast) barToneT.restart(); else { root.barTone = 0; root.panelTone = 0; } }
+        function onAutoContrastChanged() { root.barTone = 0; root.panelTone = 0; }
     }
     Process {
         id: barToneProc
@@ -9907,11 +9911,11 @@ Scope {
                 return Qt.rect(perScreen.modelData.x + r.x + 64, perScreen.modelData.y + r.y + 64, r.width - 128, r.height - 128);
             }
             function measureLive() {
-                if (!root.autoContrast || ui.pop === "" || !ui.toastScreen) return;
+                if (!root.toneMeasuring || ui.pop === "" || !ui.toastScreen) return;
                 var pr = panelRect();
                 if (pr) root.measureAround(perScreen.modelData, pr, false);
             }
-            Timer { interval: 700; repeat: true; running: root.autoContrast && ui.pop !== "" && ui.toastScreen; onTriggered: spotWin.measureLive() }
+            Timer { interval: 700; repeat: true; running: root.toneMeasuring && ui.pop !== "" && ui.toastScreen; onTriggered: spotWin.measureLive() }
             Timer { id: liveKick; interval: 180; onTriggered: spotWin.measureLive() }
             Connections { target: root; function onGlassClientsChanged() { if (ui.pop !== "") liveKick.restart(); } }
             anchors { left: true; right: true; top: true; bottom: true }
