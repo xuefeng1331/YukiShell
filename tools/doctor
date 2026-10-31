@@ -14,8 +14,8 @@ row required hyprctl        hyprland             "the compositor (the Lua config
 row required qs             quickshell           "runs YukiShell and YukiLock"
 row required kitty          kitty                "terminal, Super+Enter"
 row required fish           fish                 "shell config"
-row optional grim           grim                 "screenshots, auto-contrast, the glass of windows"
-row optional magick         imagemagick          "auto-contrast and the profile-picture crop"
+row optional grim           grim                 "screenshots"
+row optional magick         imagemagick          "the profile-picture crop, a picture as the menu bar logo, light/dark wallpaper blends"
 row optional slurp          slurp                "region screenshots"
 row optional awww           awww                 "wallpapers (awww-daemon is started with the session)"
 row optional mpvpaper       mpvpaper             "animated wallpapers"
@@ -46,11 +46,16 @@ if command -v mpv >/dev/null 2>&1 && ! ls /etc/mpv/scripts/mpris.so /usr/share/m
     printf '  %-8s %-16s pacman -S %-18s %s\n' missing mpv-mpris mpv-mpris "mpv in the Now Playing widget and on the media keys"
     found=1
 fi
+# the input method icon on the menu bar follows Ctrl+Space through a small Python helper that needs PyGObject
+if command -v fcitx5 >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && ! python3 -c "import gi" >/dev/null 2>&1; then
+    printf '  %-8s %-16s pacman -S %-18s %s\n' missing python-gobject python-gobject "the input method icon on the menu bar follows Ctrl+Space"
+    found=1
+fi
 [ "$found" = 0 ] && echo "  everything the rice uses is installed."
 echo
 echo "Checking fonts / session…"
 fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd" || echo "  missing  JetBrainsMono Nerd Font   (pacman -S ttf-jetbrains-mono-nerd)"
 [ -d /usr/share/icons/Bibata-Modern-Classic ] || [ -d "$HOME/.local/share/icons/Bibata-Modern-Classic" ] || echo "  missing  Bibata-Modern-Classic cursor"
-[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua" ] || echo "  MISSING  ~/.config/hypr/hyprland.lua — this rice needs Hyprland's Lua config (tested on 0.56.2); the old hyprland.conf format is not supported"
+[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua" ] || echo "  MISSING  ~/.config/hypr/hyprland.lua — this rice needs Hyprland's Lua config (tested on 0.57); the old hyprland.conf format is not supported"
 [ -d /sys/class/backlight ] && [ -z "$(ls /sys/class/backlight 2>/dev/null)" ] && echo "  note     no laptop backlight: brightness uses the monitor over DDC/CI (ddcutil, i2c-dev module)"
 exit $req_missing

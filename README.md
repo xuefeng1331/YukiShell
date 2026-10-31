@@ -28,10 +28,10 @@ What you get:
 
 Mauve and pink accents, a lot of glass, and an animated wallpaper if you want one.
 
-The current version is **v1.5**: windows open floating, focus follows the pointer onto the desktop and after closing a window, the
-lock screen locks at once with its video playing, a smarter music widget (mpv support, no lyrics), a calendar that grows out of the
-clock, Qt theming without KDE Plasma, and a `yukishell stats` command. See
-[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.5).
+The current version is **v1.6**: one dark look with always-white menu text, workspace numbers in Han, Japanese, Korean or Roman
+numerals, an input method icon that follows `Ctrl+Space`, Liquid Glass in every menu and Settings pop-up, a Control Center editor
+with Save and Cancel, and the Lua folder renamed to `hypr/scripts`. See
+[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.6).
 
 ## Contents
 
@@ -52,7 +52,7 @@ for every part of the desktop, every Settings pane, every command, and troublesh
 
 ## Requirements
 
-I built and test this on **CachyOS** with **Hyprland 0.56.2**, **Quickshell 0.3.2** (Qt 6) and an **NVIDIA** card. Other Arch-based
+I built and test this on **CachyOS** with **Hyprland 0.57**, **Quickshell 0.3.2** (Qt 6) and an **NVIDIA** card. Other Arch-based
 distros should be fine. Package names below are the Arch ones.
 
 **You need these, nothing works without them:**
@@ -70,8 +70,8 @@ distros should be fine. Package names below are the Arch ones.
 
 | Package | What it's for |
 | --- | --- |
-| `grim`, `slurp` | screenshots, auto-contrast, windows showing through the glass |
-| `imagemagick` | auto-contrast, cropping your profile picture |
+| `grim`, `slurp` | screenshots |
+| `imagemagick` | cropping your profile picture, a picture as the menu bar logo, light/dark wallpaper blends |
 | `awww`, `mpvpaper`, `ffmpeg`, `jq` | still and animated wallpapers |
 | `wl-clipboard`, `cliphist` | copying, clipboard history (`Super+V`) |
 | `playerctl`, `cava` | Now Playing widget, media keys, the audio visualizer |
@@ -84,6 +84,7 @@ distros should be fine. Package names below are the Arch ones.
 | `inotify-tools` | wallpaper folders refresh by themselves |
 | `wtype` | typing emoji from Spotlight |
 | `fcitx5`, `fcitx5-bamboo`, `fcitx5-chinese-addons` | Vietnamese and Chinese typing |
+| `python-gobject` | the input method icon on the menu bar follows `Ctrl+Space` right away |
 | `dolphin`, `chromium` | the default file manager and browser (`Super+E`, `Super+W`) |
 | `python-numpy` | only used once, to generate the UI sound effects |
 
@@ -119,6 +120,9 @@ cd ~/hypr-yukishell && git pull && hyprctl reload && yuki-restart
 `hyprctl reload` picks up new shortcuts and the cursor settings, `yuki-restart` the shell. If a release adds new files to link,
 run `./install.sh` again too (the release notes say so). After a Qt update, run `tools/build-plugins` again.
 
+Coming from v1.5 or older? Run `./install.sh` once: the Lua folder moved from `hypr/rice` to `hypr/scripts`, and the installer
+updates the `require` line in your `hyprland.lua` and the old link for you.
+
 ## Before you log in
 
 Two things are personal to my machine and you'll probably want to change them:
@@ -144,7 +148,7 @@ menu bar show each item's shortcut next to it.
 | `Super+Q` | close window |
 | `Super+F` | fullscreen (press again to go back) |
 | `Super+Shift+F` | maximize, keeping the bar and gaps |
-| `Super+Alt+Space` | toggle floating (new windows open floating, centred; Settings → Windows → Open windows floating) |
+| `Super+Alt+Space` | toggle floating (new windows open floating, centred; *Settings → Desktop & Dock → Open windows floating*) |
 | `Super+C` | centre a floating window |
 | `Super+Shift+P` | pin a floating window to every workspace |
 | `Super+M` / `Super+Shift+M` | minimize / show minimized windows |
@@ -190,7 +194,8 @@ There's no key to quit Hyprland, reboot, shut down or force-quit an app. I've hi
 
 ## What's in it
 
-**Liquid Glass everywhere.** The menus, Dock, widgets and Settings are glass that bends and blurs whatever is behind them. If your
+**Liquid Glass everywhere.** The menus, Dock, widgets and Settings (its pop-up menus too) are glass that bends and blurs whatever is
+behind them, always in one dark style with white text, whatever the wallpaper or window behind it. If your
 wallpaper is a video, it plays *inside* the glass too, in sync with the desktop. Windows behind the Dock show through at 60 fps, and
 see-through terminals stay see-through in the glass instead of turning into a dark block.
 
@@ -226,8 +231,9 @@ how frosted all the glass is.
 and choose whether it hides while you type or when idle. There are also focus-follows-mouse, jump-to-window and magnifier switches. GTK,
 Qt/KDE and X apps follow along.
 
-**A Control Center you can rearrange.** Hit *Edit Controls*, drag things wherever you like on the grid and drag the corner to resize them.
-Besides the usual switches there are Lock Screen, Screenshot, Color Picker, Wallpapers, System Settings, a Microphone slider and Power Mode.
+**A Control Center you can rearrange.** Hit *Edit Controls*, drag things wherever you like on the grid and drag the corner to resize them,
+then *Save* (or *Cancel* to put it back the way it was). Besides the usual switches there are Lock Screen, Screenshot, Color Picker,
+Wallpapers, System Settings, a Microphone slider and Power Mode.
 
 **Small things I care about:**
 
@@ -235,7 +241,7 @@ Besides the usual switches there are Lock Screen, Screenshot, Color Picker, Wall
 - Any accent colour you want: presets, a palette, or type a hex / RGB code.
 - Workspace numbers your way: Han (一 二 三), Japanese (イチ ニ サン), Korean (일 이 삼), Roman (I II III), plain 1 2 3, or matching the interface language (*Settings → Menu Bar*).
 - Mouse settings including **acceleration on/off**.
-- Hardware you don't have isn't offered. No Wi-Fi card means no Wi-Fi tile.
+- Hardware you don't have isn't offered. No Wi-Fi card means no Wi-Fi tile, and the Control Center won't let you add one.
 - Wallpapers from as many folders as you like, and new files show up by themselves.
 - Its own picture chooser with big thumbnails, so you don't need zenity or kdialog.
 - `Super+Alt+S` hides the focused window; press it again to hide the next one too. With no window focused (everything hidden, an empty workspace, or the pointer resting on the empty desktop), it brings all hidden windows back exactly how they were: their workspace, floating or tiled, size and position, full screen.
@@ -243,7 +249,8 @@ Besides the usual switches there are Lock Screen, Screenshot, Color Picker, Wall
 **Seven languages.** *Settings → General → Language* switches everything live: English, 简体中文, 繁體中文, 日本語, 한국어, Tiếng Việt and
 Русский. Dates follow the language too, including on the lock screen.
 
-**Typing in other languages.** fcitx5 starts with the session. `Ctrl+Space` turns Vietnamese (Telex, `chaof` → `chào`) or Pinyin on and off.
+**Typing in other languages.** fcitx5 starts with the session. `Ctrl+Space` turns Vietnamese (Telex, `chaof` → `chào`) or Pinyin on and off,
+and the icon on the menu bar shows which one is on (a keyboard, **VI** or **拼**).
 
 ## Configuring it
 
@@ -297,19 +304,58 @@ Open Browser	SUPER + O
 Dashboard	
 ```
 
-### Terminal, launcher and file manager the shell uses
+### Settings files
 
-`~/.config/yukibar/settings.json`:
+Everything in System Settings is saved as JSON, so you can also edit it by hand, copy it to another PC or keep it in your own
+dotfiles. After editing a file, run `yuki-restart` right away: the shell rewrites the file whenever you change a setting, which
+would undo your edit.
+
+| File | What's in it |
+| --- | --- |
+| `~/.config/yukibar/settings.json` | menu bar, Spotlight, Control Center, notifications, Focus, sound, input, cursor, lock screen look, glass, language |
+| `~/.config/yukidock/settings.json` | the Dock: size, magnification, auto-hide, style |
+| `~/.config/yukidock/pinned.json` | the apps kept in the Dock (desktop file ids) |
+| `~/.config/yukiwidgets/settings.json` | the desktop widgets and the weather location |
+
+A few keys you might want, in `~/.config/yukibar/settings.json` (leave out what you don't change):
 
 ```json
 {
   "terminal": "kitty",
   "launcher": "",
-  "filesCmd": "xdg-open \"$HOME\""
+  "filesCmd": "xdg-open \"$HOME\"",
+  "accent": "#eeacbe",
+  "wsNumerals": "han",
+  "language": "auto",
+  "showSeconds": true,
+  "use24h": true,
+  "floatNewWindows": true,
+  "visColor": "white",
+  "screenshotDir": "/home/you/Screenshots"
 }
 ```
 
-Leave `launcher` empty to use Spotlight, or put in `fuzzel`, `rofi -show drun` and so on.
+- `launcher` empty means Spotlight; or put in `fuzzel`, `rofi -show drun` and so on.
+- `wsNumerals`: `han`, `katakana`, `hangul`, `roman`, `numbers`, or `auto` to follow the language.
+- `language`: `auto`, `en`, `zh_CN`, `zh_TW`, `ja`, `ko`, `vi` or `ru`.
+- `visColor` (the audio visualizer): `white`, `art` (the album cover's colour) or `accent`.
+
+And in `~/.config/yukidock/settings.json`:
+
+```json
+{
+  "iconSize": 48,
+  "magnification": 1.5,
+  "hideMode": "windows",
+  "dockStyle": "liquid"
+}
+```
+
+`hideMode` is `smart`, `windows`, `always` or `never`; `dockStyle` is `liquid` or `blur`. The
+[Configuration Files](https://github.com/xuefeng1331/YukiShell/wiki/Configuration-Files) wiki page lists more.
+
+To start over, move a file away (for example `mv ~/.config/yukibar/settings.json{,.old}`) and run `yuki-restart`: the shell comes
+back with its defaults.
 
 ### How see-through the terminal is
 
@@ -465,7 +511,7 @@ tools/check
 
 It syntax-checks the Lua, fish, shell, Python, JSON, JS and QML, and lists any interface text that a language is missing. It takes about ten seconds.
 
-If you're wondering what the shell is spending CPU on: `top -p $(pgrep -f '^qs -c YukiShell')`.
+If you're wondering what the shell is spending CPU on: `yukishell stats`.
 
 Issues and pull requests are welcome.
 
