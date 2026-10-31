@@ -422,7 +422,7 @@ Scope {
     // audio visualizer (the Now Playing widget and the Control Center tile; Settings -> Widgets)
     property bool visOn: true
     property string visStyle: "mirror"          // bars | mirror | wave
-    property string visColor: "art"             // art (from the cover) | white | accent
+    property string visColor: "white"           // art (from the cover) | white | accent
     property real visGain: 2.0                // how tall the bars get
     property int visCount: 128                // how many columns (the music widget and the Control Center tile)
     property real visWidth: 0.7              // bar width as a share of its column (0.2 thin .. 1 touching)
@@ -433,7 +433,7 @@ Scope {
     property string mwVisMode: "ambient"      // visualizer: ambient (a glowing wave along the bottom) | strip (bars behind the controls)
     property bool visInCC: true               // also inside the Control Center's Now Playing tile
     // Control Center: ids of the enabled controls, in order (edit with Control Center -> Edit Controls)
-    property var ccControls: ["nowplaying", "focus", "record", "keepawake", "nightshift", "display", "sound", "micmute", "settings", "wallpapers", "lock"]
+    property var ccControls: ["nowplaying", "focus", "record", "keepawake", "nightshift", "display", "sound", "micmute", "settings", "wallpapers", "lock", "screenshot"]
     property bool ccMigRec: false              // one-time: add the Screen Recording tile to an existing Control Center layout
     property bool recording: false
     property int recSecs: 0
@@ -4263,7 +4263,7 @@ Scope {
             borderApplyT.restart();
             if (root.barStyle === "liquid") root.startGlass();
         }
-        onLoadFailed: { root.ccMigRec = true; root.settingsReady = true; if (root.barStyle === "liquid") root.startGlass(); }
+        onLoadFailed: { root.ccMigRec = true; root.ccMigGame = true; root.settingsReady = true; if (root.barStyle === "liquid") root.startGlass(); }
     }
 
     // --- LIQUID GLASS BACKEND (same pipeline as yukidock) ---

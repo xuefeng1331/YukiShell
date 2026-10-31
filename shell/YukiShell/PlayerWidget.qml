@@ -54,7 +54,7 @@ Item {
     property var visSrc: null
     property bool visOn: false
     property string visStyle: "bars"         // bars | mirror | wave
-    property string visColor: "art"          // art | white | accent
+    property string visColor: "white"        // art | white | accent
     property real visGain: 1.0
     property int visCount: 24                // columns (Settings -> Widgets -> Audio Visualizer)
     property real visWidth: 0.62             // bar width as a share of its column

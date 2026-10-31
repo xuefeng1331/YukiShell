@@ -80,7 +80,7 @@ ShellRoot {
         property string message: ""
         property bool engaged: false
         property bool unlocking: false
-        property string mediaSlot: "top"    // "top" (under the clock) | "bottom" (above the password field)
+        property string mediaSlot: "bottom" // "top" (under the clock) | "bottom" (above the password field)
         property bool capsLock: false
         property bool use24h: true          // YukiShell -> Menu Bar -> "24-hour clock"
         // Settings -> Lock Screen -> Clock (YUKILOCK_CLOCK='{"f":"serif",...}' overrides it, for previews)

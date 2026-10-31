@@ -102,7 +102,7 @@ Scope {
     readonly property var visSrc: hub ? hub.vis : null
     readonly property bool visOn: (hub && hub.bar) ? hub.bar.visOn : false
     readonly property string visStyle: (hub && hub.bar) ? hub.bar.visStyle : "bars"
-    readonly property string visColor: (hub && hub.bar) ? hub.bar.visColor : "art"
+    readonly property string visColor: (hub && hub.bar) ? hub.bar.visColor : "white"
     readonly property real visGain: (hub && hub.bar) ? hub.bar.visGain : 1.0
     readonly property int visCount: (hub && hub.bar) ? hub.bar.visCount : 24
     readonly property real visWidth: (hub && hub.bar) ? hub.bar.visWidth : 0.62
@@ -392,11 +392,11 @@ Scope {
             root.scheduleSave();
             root.refresh();
         }
-        // first start (no settings yet): the Now Playing widget top-left and the weather top-right, both Liquid Glass
+        // first start (no settings yet): a wide Now Playing widget top-left and the weather top-right, both Liquid Glass
         onLoadFailed: {
             var ss = root.screenSize();
             root.applySettings({ widgets: [
-                { id: "wplayer", type: "player", style: "liquid", size: "large", span: "2x2", x: root.gridLeft, y: root.gridTop },
+                { id: "wplayer", type: "player", style: "liquid", size: "medium", span: "3x1", x: root.gridLeft, y: root.gridTop },
                 { id: "wweather", type: "weather", style: "liquid", size: "medium", span: "2x1",
                   x: ss[0] - root.gridRight - root.dims("2x1")[0], y: root.gridTop } ] });
             root.ready = true;
