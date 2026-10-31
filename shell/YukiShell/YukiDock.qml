@@ -3727,7 +3727,7 @@ Scope {
                         SSegmented {
                             t: pal
                             model: ["Cover", "White", "Accent"]
-                            current: ["art", "white", "accent"].indexOf(root.bar ? root.bar.visColor : "art")
+                            current: ["art", "white", "accent"].indexOf(root.bar ? root.bar.visColor : "white")
                             onPicked: i => { if (root.bar) root.bar.visColor = ["art", "white", "accent"][i]; }
                         }
                     }
@@ -3749,9 +3749,9 @@ Scope {
                         SSlider {
                             t: pal
                             from: 8; to: 128; stepSize: 1
-                            value: root.bar ? root.bar.visCount : 64
+                            value: root.bar ? root.bar.visCount : 128
                             leftLabel: "8"; rightLabel: "128"
-                            resetValue: 64
+                            resetValue: 128
                             onMoved: v => { if (root.bar) root.bar.visCount = Math.round(v); }
                         }
                     }
@@ -3761,9 +3761,9 @@ Scope {
                         SSlider {
                             t: pal
                             from: 0.2; to: 1; stepSize: 0.02
-                            value: root.bar ? root.bar.visWidth : 0.5
+                            value: root.bar ? root.bar.visWidth : 0.7
                             leftLabel: I18n.tr("Thin"); rightLabel: I18n.tr("Wide")
-                            resetValue: 0.5
+                            resetValue: 0.7
                             onMoved: v => { if (root.bar) root.bar.visWidth = Math.round(v * 100) / 100; }
                         }
                     }
@@ -3788,9 +3788,9 @@ Scope {
                             active: !!root.bar && root.bar.visOn && prefsWindow.visible
                             demo: !(root.bar && root.bar.player && root.bar.player.isPlaying)
                             style: root.bar ? root.bar.visStyle : "bars"
-                            gain: root.bar ? root.bar.visGain : 1
-                            count: root.bar ? root.bar.visCount : 24
-                            barFill: root.bar ? root.bar.visWidth : 0.62
+                            gain: root.bar ? root.bar.visGain : 2
+                            count: root.bar ? root.bar.visCount : 128
+                            barFill: root.bar ? root.bar.visWidth : 0.7
                             readonly property color base: (root.bar && root.bar.visColor === "accent") ? pal.accent : pal.text
                             colorTop: Qt.rgba(base.r, base.g, base.b, 0.75)
                             colorBottom: Qt.rgba(base.r, base.g, base.b, 0.12)

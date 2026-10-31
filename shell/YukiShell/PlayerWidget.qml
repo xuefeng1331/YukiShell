@@ -55,9 +55,9 @@ Item {
     property bool visOn: false
     property string visStyle: "bars"         // bars | mirror | wave
     property string visColor: "white"        // art | white | accent
-    property real visGain: 1.0
-    property int visCount: 24                // columns (Settings -> Widgets -> Audio Visualizer)
-    property real visWidth: 0.62             // bar width as a share of its column
+    property real visGain: 2.0
+    property int visCount: 128               // columns (Settings -> Widgets -> Audio Visualizer)
+    property real visWidth: 0.7              // bar width as a share of its column
     property color visAccent: "#0A84FF"
     // Settings -> Widgets -> Music Widget
     property real glowAmt: 0.6               // cover glow: the album art lights the card from behind (0 = off)

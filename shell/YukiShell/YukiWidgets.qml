@@ -103,9 +103,9 @@ Scope {
     readonly property bool visOn: (hub && hub.bar) ? hub.bar.visOn : false
     readonly property string visStyle: (hub && hub.bar) ? hub.bar.visStyle : "bars"
     readonly property string visColor: (hub && hub.bar) ? hub.bar.visColor : "white"
-    readonly property real visGain: (hub && hub.bar) ? hub.bar.visGain : 1.0
-    readonly property int visCount: (hub && hub.bar) ? hub.bar.visCount : 24
-    readonly property real visWidth: (hub && hub.bar) ? hub.bar.visWidth : 0.62
+    readonly property real visGain: (hub && hub.bar) ? hub.bar.visGain : 2.0
+    readonly property int visCount: (hub && hub.bar) ? hub.bar.visCount : 128
+    readonly property real visWidth: (hub && hub.bar) ? hub.bar.visWidth : 0.7
     readonly property real mwGlow: (hub && hub.bar) ? hub.bar.mwGlow : 0.6
     readonly property bool mwMotion: (hub && hub.bar) ? hub.bar.mwMotion && !hub.bar.reduceMotion : true
     readonly property string mwBar: (hub && hub.bar) ? hub.bar.mwBar : "slim"
