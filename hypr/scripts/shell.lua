@@ -31,7 +31,6 @@ bind("SUPER + comma",   hl.dsp.exec_cmd(qs .. "notifications open"), "Notificati
 bind("SUPER + A",       hl.dsp.exec_cmd(qs .. "controlcenter toggle"), "Control Center")
 bind("SUPER + ALT + R", hl.dsp.exec_cmd(qs .. "actions recording"), "Start or Stop Screen Recording")
 bind("SUPER + ALT + C", hl.dsp.exec_cmd(qs .. "actions pickColor"), "Pick Color")
-bind("SUPER + ALT + A", hl.dsp.exec_cmd(qs .. "actions darkMode"), "Dark Mode")
 
 -- Hardware keys (laptop buttons too): volume, mute, brightness, media. YukiShell handles them itself and shows its
 -- on-screen display. If the shell is not running, wpctl / brightnessctl do the work instead.

@@ -181,7 +181,6 @@ menu bar show each item's shortcut next to it.
 | `Print` / `Shift+Print` / `Ctrl+Print` | screenshot a region / the screen / a window |
 | `Super+Alt+R` | start / stop screen recording |
 | `Super+Alt+C` | colour picker |
-| `Super+Alt+A` | dark mode on / off |
 | `Super+G` | Game Mode (the shell drops its effects while you play) |
 | `Super+L` | lock |
 | `Super+Shift+R` | restart the shell |

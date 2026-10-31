@@ -44,12 +44,6 @@ Scope {
     property var bar: hub ? hub.bar : null
     Connections {
         target: root.bar
-        function onDarkModeChanged() {
-            if (root.darkMode !== root.bar.darkMode) root.darkMode = root.bar.darkMode;
-        }
-        function onAppearanceModeChanged() {
-            if (root.appearanceMode !== root.bar.appearanceMode) root.appearanceMode = root.bar.appearanceMode;
-        }
     }
     property string userName: Quickshell.env("USER") || ""
 
@@ -123,22 +117,6 @@ Scope {
     readonly property bool captureHold: hub ? hub.captureHold : false     // windows opening / closing: the dock PREVIEW capture stops (source released 0.5 s later); the glass is not affected
     // appearance values shared by Dock and Menu Bar
     function setLook(k, v) { root[k] = v; if (bar) bar[k] = v; }
-    // Appearance: the Menu Bar resolves "auto" (light by day, dark by night) and keeps both windows in step
-    function setAppearance(mode) {
-        if (["light", "dark", "auto"].indexOf(mode) < 0) return;
-        appearanceMode = mode;
-        if (mode === "auto") {
-            var h = new Date().getHours();
-            darkMode = bar && bar.autoIsDark ? bar.autoIsDark() : (h < 7 || h >= 19);
-        } else darkMode = mode === "dark";
-        // Update this window first so its palette reacts immediately, then keep the Menu Bar in sync.
-        if (bar && bar.setAppearance) {
-            bar.setAppearance(mode);
-            appearanceMode = mode;
-            darkMode = bar.darkMode;
-        }
-    }
-
     // --- Config --- Lachowski
     property string monitor: ""          // "" = every monitor, or e.g. "DP-1"
     property int iconSize: 48
@@ -151,10 +129,9 @@ Scope {
     property int cornerRadius: 32
     readonly property real uiS: bar ? bar.uiScale : 1      // UI scale (Settings -> Menu Bar): Settings / About windows follow it
     property int margin: 8
-    property bool darkMode: true
+    readonly property bool darkMode: true      // one look: dark (the Light / Dark / Auto setting was removed)
     // the dock keeps one fixed look (dark): switching the system between Light and Dark does not change its colours
     readonly property bool dockDark: true
-    property string appearanceMode: "dark"      // light | dark | auto (kept in step with the Menu Bar, see setAppearance)
     property string dockStyle: "liquid"   // "blur" = Normal Blur, "liquid" = Liquid Glass
     // Liquid Glass tuning (settings.json): rim = edge highlight, grain = noise, liquid = refraction depth
     property real glassRim: 0.45
@@ -445,84 +422,6 @@ Scope {
         MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: b.clicked() }
     }
 
-    // Light / Dark appearance thumbnail
-    component SThemeTile: Item {
-        id: tile
-        required property var t
-        property bool dark: false
-        property bool split: false            // Auto: left half light, right half dark
-        property bool selected: false
-        property string label: ""
-        signal clicked()
-        width: 88; height: 80
-        readonly property bool leftDark: split ? false : dark
-        // the little desktop picture (left half, or the whole tile)
-        Item {
-            width: 88; height: 56
-            Rectangle { width: 88; height: 56; radius: 8; color: tile.leftDark ? "#141416" : "#D9DDE6" }
-            Rectangle {   // mini window
-                x: 16; y: 8
-                width: 56; height: 32
-                radius: 4
-                color: tile.leftDark ? "#2C2C2E" : "#FFFFFF"
-                Rectangle { x: 0; y: 0; width: 16; height: parent.height; radius: 4; color: tile.leftDark ? "#3A3A3C" : "#E9E9EE" }
-                Rectangle { x: 22; y: 8;  width: 26; height: 4; radius: 2; color: tile.leftDark ? "#5A5A5E" : "#C8C8CE" }
-                Rectangle { x: 22; y: 16; width: 18; height: 4; radius: 2; color: tile.leftDark ? "#48484A" : "#DADADF" }
-                Rectangle { x: 22; y: 24; width: 22; height: 4; radius: 2; color: tile.leftDark ? "#48484A" : "#DADADF" }
-            }
-            Rectangle {   // mini dock
-                x: 28; y: 44
-                width: 32; height: 6
-                radius: 3
-                color: tile.leftDark ? Qt.rgba(1, 1, 1, 0.28) : Qt.rgba(1, 1, 1, 0.75)
-            }
-        }
-        // Auto: the right half is the dark picture
-        Item {
-            visible: tile.split
-            x: 44; width: 44; height: 56
-            clip: true
-            Item {
-                x: -44; width: 88; height: 56
-                Rectangle { width: 88; height: 56; radius: 8; color: true ? "#141416" : "#D9DDE6" }
-                Rectangle {   // mini window
-                    x: 16; y: 8
-                    width: 56; height: 32
-                    radius: 4
-                    color: true ? "#2C2C2E" : "#FFFFFF"
-                    Rectangle { x: 0; y: 0; width: 16; height: parent.height; radius: 4; color: true ? "#3A3A3C" : "#E9E9EE" }
-                    Rectangle { x: 22; y: 8;  width: 26; height: 4; radius: 2; color: true ? "#5A5A5E" : "#C8C8CE" }
-                    Rectangle { x: 22; y: 16; width: 18; height: 4; radius: 2; color: true ? "#48484A" : "#DADADF" }
-                    Rectangle { x: 22; y: 24; width: 22; height: 4; radius: 2; color: true ? "#48484A" : "#DADADF" }
-                }
-                Rectangle {   // mini dock
-                    x: 28; y: 44
-                    width: 32; height: 6
-                    radius: 3
-                    color: true ? Qt.rgba(1, 1, 1, 0.28) : Qt.rgba(1, 1, 1, 0.75)
-                }
-            }
-        }
-        Rectangle {   // outline
-            width: 88; height: 56
-            radius: 8
-            color: "transparent"
-            border.width: 1
-            border.color: tile.t.sep
-        }
-        GlassRing { x: -2; y: -2; width: 92; height: 60; radius: 10; on: tile.selected; dark: tile.t.dark }   // the chosen one
-        Text {
-            y: 64
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: I18n.tr(tile.label)
-            color: tile.t.text
-            font.family: root.fontForWeight(Font.Normal, tile.t.fam)
-            font.pixelSize: 12
-        }
-        MouseArea { anchors.fill: parent; onClicked: tile.clicked() }
-    }
-
-    // Colored rounded-square sidebar icon with a tiny drawn glyph
     component SGlyph: Rectangle {
         id: gl
         property string kind: ""
@@ -704,7 +603,7 @@ Scope {
             { id: "network",    sec: 1, name: "Network",         wg: "ethernet",   c1: "#3D9BFF", c2: "#0A6CFF", keys: "ethernet ip address vpn tailscale connection" },
             // 2 · System
             { id: "general",    sec: 2, name: "General",         glyph: "behavior", c1: "#8E8E93", c2: "#636366", keys: "language shell enable disable dock menu bar panel show hide off on" },
-            { id: "appearance", sec: 2, name: "Appearance",      glyph: "appearance", c1: "#3A3A3C", c2: "#1C1C1E", keys: "theme dark light auto mode accent color glass liquid apple style blur font spotlight top bar menus" },
+            { id: "appearance", sec: 2, name: "Appearance",      glyph: "appearance", c1: "#3A3A3C", c2: "#1C1C1E", keys: "theme accent color glass liquid apple style blur font spotlight top bar menus" },
             { id: "wallpaper",  sec: 2, name: "Wallpaper",       glyph: "wallpaper", c1: "#5AC8FA", c2: "#007AFF", keys: "wallpaper background picture image video animated live motion desktop dynamic" },
             { id: "displays",   sec: 2, name: "Displays",        wg: "sun",        c1: "#3D9BFF", c2: "#0A6CFF", keys: "brightness night shift monitor resolution refresh scale" },
             { id: "battery",    sec: 2, name: (root.bar && !root.bar.hasBattery) ? "Power" : "Battery",         wg: "bolt",       c1: "#4CD964", c2: "#28A745", keys: "power energy charge profile performance game mode gaming fullscreen" },
@@ -2696,29 +2595,6 @@ Scope {
 
                 SCard {
                     t: pal
-                    SRow {
-                        t: pal
-                        title: I18n.tr("Appearance")
-                        subtitle: I18n.tr("Applies to the whole shell.")
-                        Row {
-                            spacing: 14
-                            SThemeTile {
-                                t: pal; label: I18n.tr("Light"); dark: false
-                                selected: root.appearanceMode === "light"
-                                onClicked: root.setAppearance("light")
-                            }
-                            SThemeTile {
-                                t: pal; label: I18n.tr("Dark"); dark: true
-                                selected: root.appearanceMode === "dark"
-                                onClicked: root.setAppearance("dark")
-                            }
-                            SThemeTile {
-                                t: pal; label: I18n.tr("Auto"); split: true
-                                selected: root.appearanceMode === "auto"
-                                onClicked: root.setAppearance("auto")
-                            }
-                        }
-                    }
                     SRow {
                         t: pal
                         title: I18n.tr("Accent color")
@@ -5261,15 +5137,14 @@ Scope {
                         title: I18n.tr("Appearance")
                         subtitle: {
                             var a = root.bar ? root.bar.wallpaperAppearance : "auto";
-                            return a === "auto" ? I18n.tr("Follows Light / Dark Mode")
-                                 : a === "dynamic" ? I18n.tr("Changes through the day: light by day, dark at night, blending at sunrise and sunset")
+                            return a === "dynamic" ? I18n.tr("Changes through the day: light by day, dark at night, blending at sunrise and sunset")
                                  : a === "light" ? I18n.tr("Always the light version") : I18n.tr("Always the dark version");
                         }
                         SSegmented {
                             t: pal
-                            model: ["Automatic", "Light", "Dark", "Dynamic"]
-                            current: ["auto", "light", "dark", "dynamic"].indexOf(root.bar ? root.bar.wallpaperAppearance : "auto")
-                            onPicked: i => { if (root.bar) root.bar.wallpaperAppearance = ["auto", "light", "dark", "dynamic"][i]; }
+                            model: ["Light", "Dark", "Dynamic"]
+                            current: ["light", "dark", "dynamic"].indexOf(root.bar && root.bar.wallpaperAppearance !== "auto" ? root.bar.wallpaperAppearance : "dark")
+                            onPicked: i => { if (root.bar) root.bar.wallpaperAppearance = ["light", "dark", "dynamic"][i]; }
                         }
                     }
                 }
@@ -5697,10 +5572,6 @@ Scope {
     // --- Logic ---
     function openPrefs(pane) {
         if (!settingsEnabled) return;
-        if (bar) {
-            darkMode = bar.darkMode;
-            appearanceMode = bar.appearanceMode;
-        }
         // a closed window opens on the asked pane (General if none) with no history; an open one moves there like a click
         var i = prefsWindow.paneIndex(pane !== undefined && pane !== "" ? pane : "general");
         if (!prefsWindow.visible) prefsWindow.start(i >= 0 ? i : prefsWindow.paneIndex("general"));
@@ -5759,7 +5630,7 @@ Scope {
 
     // --- settings persistence (~/.config/yukidock/settings.json) ---
     readonly property string settingsSig: [dockEnabled, settingsEnabled, iconSize, magnification, magnificationEnabled, spacing, margin,
-        cornerRadius, darkMode, appearanceMode, glassOpacity, glassBlur, glassLiquid, dockStyle, wallpaperPath, String(accent), accentUi, fontFamily, hideMode, hideDelay, monitor,
+        cornerRadius, glassOpacity, glassBlur, glassLiquid, dockStyle, wallpaperPath, String(accent), accentUi, fontFamily, hideMode, hideDelay, monitor,
         showSettings, showLabels, showIndicators, bounceOnLaunch, showThumbs, windowCapture, glassLive, iconTint, iconTintColor, iconTintStrength, pickerThumb].join("|")
     property bool settingsReady: false
     onSettingsSigChanged: if (settingsReady) saveTimer.restart()
@@ -5772,7 +5643,7 @@ Scope {
         var o = {
             dockEnabled: dockEnabled, settingsEnabled: settingsEnabled, iconSize: iconSize, magnification: magnification, magnificationEnabled: magnificationEnabled,
             spacing: spacing, margin: margin, cornerRadius: cornerRadius,
-            darkMode: darkMode, appearanceMode: appearanceMode, glassOpacity: glassOpacity, dockStyle: dockStyle, wallpaperPath: wallpaperPath, glassDebug: glassDebug,
+            glassOpacity: glassOpacity, dockStyle: dockStyle, wallpaperPath: wallpaperPath, glassDebug: glassDebug,
             glassRim: glassRim, glassGrain: glassGrain, glassLiquid: glassLiquid, glassBlur: glassBlur,
             accent: String(accent), accentUi: accentUi, fontFamily: fontFamily,
             hideMode: hideMode, hideDelay: hideDelay, monitor: monitor,
@@ -5786,7 +5657,7 @@ Scope {
     function applySettings(o) {
         if (!o || typeof o !== "object") return;
         var keys = ["dockEnabled", "settingsEnabled", "iconSize", "magnification", "magnificationEnabled", "spacing", "margin", "cornerRadius",
-                    "darkMode", "appearanceMode", "glassOpacity", "dockStyle", "wallpaperPath", "glassDebug", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "accent", "accentUi", "fontFamily", "hideMode", "hideDelay", "monitor",
+                    "glassOpacity", "dockStyle", "wallpaperPath", "glassDebug", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "accent", "accentUi", "fontFamily", "hideMode", "hideDelay", "monitor",
                     "showSettings", "showLabels", "showIndicators", "bounceOnLaunch", "showThumbs", "windowCapture", "glassLive", "iconTint", "iconTintColor", "iconTintStrength", "pickerThumb"];
         for (var i = 0; i < keys.length; i++) {
             if (o[keys[i]] === undefined) continue;

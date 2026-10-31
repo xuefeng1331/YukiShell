@@ -4,7 +4,7 @@
 // liquidglass.frag and apple-logo-*.svg together in ~/.config/quickshell/yukibar/ and run:  qs -c YukiShell
 //
 // Settings live in ~/.config/yukibar/settings.json (Apple menu -> System Settings..., or Control Center -> Edit Controls).
-// On first run, appearance (dark mode, accent, font, glass tuning, wallpaper) is inherited from yukidock's settings.json.
+// On first run, appearance (accent, font, glass tuning, wallpaper) is inherited from yukidock's settings.json.
 //
 // Hyprland (hyprland.conf syntax):
 //   windowrule = float, title:^(yukibar Settings)$
@@ -99,8 +99,9 @@ Scope {
     property bool notificationsEnabled: true // banners + Notification Center (off = no D-Bus daemon at all, so mako/dunst can take over)
     property bool clockAppEnabled: true      // the Clock app (alarms and timers still ring while it is on)
     readonly property bool barLayerNeeded: barEnabled || spotlightEnabled || ccEnabled || notificationsEnabled
-    property bool darkMode: true             // the resolved look (true = dark); follows appearanceMode
-    property string appearanceMode: "dark"   // light | dark | auto (auto = light by day, dark by night)
+    // YukiShell has one look: dark. (The Light / Dark / Auto setting, the Dark Mode toggle and Super+Alt+A were removed; the light
+    // palettes below are left in place but never used.)
+    readonly property bool darkMode: true
     // Panels (top bar menus / popovers, Spotlight, Control Center, notifications) are light or dark by what is BEHIND them
     // (panelTone, measured live, see "Auto contrast" below); the Light / Dark / Auto setting is the fallback while nothing is
     // measured yet and the tie-break when the backdrop is neither clearly bright nor clearly dark.
@@ -323,7 +324,6 @@ Scope {
     Connections {
         target: root
         function onBarHeightChanged() { barToneT.restart(); }
-        function onDarkModeChanged() { root.panelTone = 0; barToneT.restart(); }
         function onBarEnabledChanged() { if (root.barEnabled) barToneT.restart(); }
         function onWallpaperAccentChanged() { barToneT.restart(); }
         function onGlassClientsChanged() { barToneT.restart(); }
@@ -433,7 +433,7 @@ Scope {
     property string mwVisMode: "ambient"      // visualizer: ambient (a glowing wave along the bottom) | strip (bars behind the controls)
     property bool visInCC: true               // also inside the Control Center's Now Playing tile
     // Control Center: ids of the enabled controls, in order (edit with Control Center -> Edit Controls)
-    property var ccControls: ["nowplaying", "focus", "record", "keepawake", "nightshift", "display", "sound", "darkmode", "micmute", "settings", "wallpapers", "lock"]
+    property var ccControls: ["nowplaying", "focus", "record", "keepawake", "nightshift", "display", "sound", "micmute", "settings", "wallpapers", "lock"]
     property bool ccMigRec: false              // one-time: add the Screen Recording tile to an existing Control Center layout
     property bool recording: false
     property int recSecs: 0
@@ -448,7 +448,7 @@ Scope {
     property bool fileSearchPending: false
     property var fileHits: []
 
-    readonly property var settingKeys: ["barEnabled", "darkMode", "appearanceMode", "accent", "accentUi", "fontFamily", "barHeight", "uiScaleAuto", "uiScaleManual", "glassOpacity",
+    readonly property var settingKeys: ["barEnabled", "accent", "accentUi", "fontFamily", "barHeight", "uiScaleAuto", "uiScaleManual", "glassOpacity",
         "barStyle", "barGlass", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "barBgOpacity", "glassRealtime", "liveWallGlass", "wallPauseCovered", "wallUserPaused", "showWallButton", "glassDebug", "wallpaperPath", "use24h", "language", "showDate",
         "showSeconds", "showBatteryPercent", "showTray", "showSearch",
         "spotlightEnabled", "reduceMotion", "ccEnabled", "notificationsEnabled", "clockAppEnabled", "ccStyle", "barLogoMode", "barCustomLogoPath", "barWidgets", "weekStartsMonday", "terminal", "launcher",
@@ -498,7 +498,6 @@ Scope {
         { id: "focus",      label: I18n.tr("Focus"),         glyph: "moon",       w: 2, h: 1, sizes: [[2, 1], [1, 1], [4, 1], [2, 2]] },
         { id: "nightshift", label: I18n.tr("Night Shift"),   glyph: "nightshift", w: 1, h: 1, sizes: [[1, 1], [2, 1], [4, 1], [2, 2]] },
         { id: "keepawake",  label: I18n.tr("Keep Awake"),    glyph: "coffee",     w: 1, h: 1, sizes: [[1, 1], [2, 1], [4, 1], [2, 2]] },
-        { id: "darkmode",   label: I18n.tr("Dark Mode"),     glyph: "contrast",   w: 1, h: 1, sizes: [[1, 1], [2, 1], [4, 1], [2, 2]] },
         { id: "gaming",     label: I18n.tr("Game Mode"),     glyph: "gamepad",    w: 2, h: 1, sizes: [[2, 1], [1, 1], [4, 1], [2, 2]] },
         { id: "record",     label: I18n.tr("Screen Recording"), glyph: "record",  w: 2, h: 1, sizes: [[2, 1], [1, 1], [4, 1], [2, 2]] },
         { id: "nowplaying", label: I18n.tr("Now Playing"),   glyph: "note",       w: 2, h: 2, sizes: [[2, 2], [4, 2]], range: [2, 4, 2, 2] },
@@ -743,8 +742,7 @@ Scope {
     // Auto contrast: see "AUTO CONTRAST" above. panelTone: what is behind the open panel (1 bright, -1 dark, 0 not measured).
     property bool autoContrast: true
     property int panelTone: 0
-    // System look (Settings -> Appearance: Light / Dark / Auto): every panel follows it, like a normal OS, the Control Center
-    // included (ccDark / ccPal are now just aliases of it, no longer measured from what is behind the panel).
+    // The shell's one (dark) look: every panel follows it, the Control Center included (ccDark / ccPal are aliases of it).
     readonly property bool effDark: panelDarkMode      // every panel palette (pal) follows the measured light / dark panel look
     property real dk: effDark ? 1 : 0
     Behavior on dk { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
@@ -770,50 +768,6 @@ Scope {
     Behavior on ccDk { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
     function ccMix(l, d) { return Qt.rgba(l.r + (d.r - l.r) * ccDk, l.g + (d.g - l.g) * ccDk, l.b + (d.b - l.b) * ccDk, l.a + (d.a - l.a) * ccDk); }
 
-    // Appearance: light / dark / auto. darkMode is the resolved look; the Dock window is kept in step.
-    function autoIsDark() { var h = new Date().getHours(); return h < 7 || h >= 19; }
-    function setAppearance(mode) {
-        if (["light", "dark", "auto"].indexOf(mode) < 0) return;
-        appearanceMode = mode;
-        darkMode = mode === "auto" ? autoIsDark() : mode === "dark";
-        try { if (hub && hub.dock) { hub.dock.appearanceMode = mode; hub.dock.darkMode = darkMode; } } catch (e) {}
-        try { if (hub && hub.about) { hub.about.darkMode = darkMode; } } catch (e2) {}
-        Quickshell.execDetached(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", darkMode ? "prefer-dark" : "prefer-light"]);
-    }
-    Timer {
-        interval: 60000; repeat: true; triggeredOnStart: true
-        running: root.appearanceMode === "auto"
-        onTriggered: { var d = root.autoIsDark(); if (d !== root.darkMode) root.setAppearance("auto"); }
-    }
-    Process {
-        id: gsettingsSchemeProc
-        command: ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var s = text.trim();
-                if (s.indexOf("prefer-light") >= 0 && root.darkMode && root.appearanceMode !== "dark") {
-                    root.darkMode = false;
-                    try { if (hub && hub.dock) hub.dock.darkMode = false; } catch(e){}
-                    try { if (hub && hub.about) hub.about.darkMode = false; } catch(e2){}
-                } else if (s.indexOf("prefer-dark") >= 0 && !root.darkMode && root.appearanceMode !== "light") {
-                    root.darkMode = true;
-                    try { if (hub && hub.dock) hub.dock.darkMode = true; } catch(e){}
-                    try { if (hub && hub.about) hub.about.darkMode = true; } catch(e2){}
-                }
-            }
-        }
-    }
-    // read once, then follow `gsettings monitor` (it prints a line only when the scheme changes; it used to be asked every 3 s)
-    Timer {
-        interval: 1500; running: true
-        onTriggered: if (!gsettingsSchemeProc.running) gsettingsSchemeProc.running = true
-    }
-    OwnedProcess {
-        id: gsettingsWatch
-        running: true
-        cmd: ["gsettings", "monitor", "org.gnome.desktop.interface", "color-scheme"]
-        stdout: SplitParser { onRead: line => { if (!gsettingsSchemeProc.running) gsettingsSchemeProc.running = true; } }
-    }
     QtObject {
         id: bpal
         readonly property bool dark: !root.barTextDark
@@ -3746,9 +3700,7 @@ Scope {
                             m.push(mi("Developer Tools", "F12", keys([], "F12")));
                         }
                     }
-                    m.push(msep());
-                }
-                m.push(mchk("Dark Mode", hk("Dark Mode"), root.darkMode, function () { root.setAppearance(root.darkMode ? "light" : "dark"); }));
+                } else m.push(mi("Wallpapers", hk("Wallpapers"), function () { root.wpToggle(); }));
             } else if (name === "window") {
                 if (has) {
                     m.push(mi("Minimize", hk("Minimize Window"), disp('hl.dsp.window.move({ workspace = "special:minimized", follow = false })')));
@@ -3849,7 +3801,6 @@ Scope {
         target: "actions"
         function recording(): void { root.toggleRecording(); }
         function pickColor(): void { root.pickColor(); }
-        function darkMode(): void { root.setAppearance(root.darkMode ? "light" : "dark"); }
     }
     IpcHandler {
         target: "screenshot"
@@ -4253,7 +4204,7 @@ Scope {
         onLoaded: {
             try {
                 var o = JSON.parse(text());
-                root.applySettings(o, ["darkMode", "appearanceMode", "accent", "accentUi", "fontFamily", "glassOpacity", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "wallpaperPath"]);
+                root.applySettings(o, ["accent", "accentUi", "fontFamily", "glassOpacity", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "wallpaperPath"]);
                 if (o.dockStyle !== undefined) root.barStyle = (o.dockStyle === "liquid") ? "liquid" : "blur";
             } catch (err) { }
             store.path = root.configDir + "/settings.json";
@@ -4283,6 +4234,8 @@ Scope {
                 var cl = root.ccControls.slice();
                 if (cl.indexOf("record") < 0) { var fi = cl.indexOf("focus"); cl.splice(fi >= 0 ? fi + 1 : cl.length, 0, "record"); root.ccControls = cl; }
             }
+            if (root.ccControls.indexOf("darkmode") >= 0)               // the Dark Mode tile was removed
+                root.ccControls = root.ccControls.filter(function (x) { return x !== "darkmode"; });
             root.settingsReady = true;
             inputApplyT.restart();
             cursorApplyT.restart();
@@ -4439,6 +4392,8 @@ Scope {
     // window captures are admitted by the shared gate in shell.qml (hub.tlFor): 0.2 s after a window appears, one every 110 ms
 
     Component.onCompleted: {
+        // GTK / portal apps (color-scheme) follow the shell's dark look
+        Quickshell.execDetached(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "prefer-dark"]);
         syncAppKeys();
         Quickshell.execDetached(["mkdir", "-p", configDir]);
         wallpaperColorTimer.start();
@@ -4803,7 +4758,7 @@ Scope {
     function wpIsVideo(p) { return /[.](mp4|webm|mkv|mov|m4v)$/i.test(p || ""); }
     readonly property string setwallScript: Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-setwall.sh"
     // --- light / dark wallpaper pairs (macOS "Automatic / Light / Dark / Dynamic") ---
-    property string wallpaperAppearance: "auto"     // auto (follows Dark Mode) | light | dark | dynamic (time of day)
+    property string wallpaperAppearance: "dark"     // light | dark | dynamic (time of day); an old "auto" means dark
     property string wpPairLight: ""
     property string wpPairDark: ""
     readonly property bool wpHasPair: wpPairLight !== "" && wpPairDark !== ""
@@ -4876,7 +4831,6 @@ Scope {
         wpApplyProc.running = true;
     }
     onWallpaperAppearanceChanged: wpApplyAppearance()
-    onDarkModeChanged: if (wallpaperAppearance === "auto") wpApplyAppearance()
     Timer { interval: 60000; repeat: true; running: root.wpHasPair && root.wallpaperAppearance === "dynamic" && !root.gaming; onTriggered: root.wpApplyAppearance() }
     // at start: scan the folder, then pick up a pair for the wallpaper already in use
     Timer { interval: 1500; running: true; onTriggered: root.wpRefresh() }
@@ -8400,7 +8354,6 @@ Scope {
                         case "focus": return cFocus;
                         case "nightshift": return cNight;
                         case "keepawake": return cAwake;
-                        case "darkmode": return cDark;
                         case "nowplaying": return cNowPlaying;
                         case "lock": return cLock;
                         case "screenshot": return cShot;
@@ -8556,16 +8509,6 @@ Scope {
                             onClicked: root.keepAwake = !root.keepAwake
                             t: ccPal; gx: ccg
                             kind: "coffee"; title: I18n.tr("Keep Awake"); status: root.keepAwake ? I18n.tr("On") : I18n.tr("Off")
-                        }
-                    }
-                    Component {
-                        id: cDark
-                        CCSimpleTile {
-                            clickable: true
-                            on: root.darkMode
-                            onClicked: root.setAppearance(root.darkMode ? "light" : "dark")
-                            t: ccPal; gx: ccg
-                            kind: "contrast"; title: I18n.tr("Dark Mode"); status: root.darkMode ? I18n.tr("On") : I18n.tr("Off")
                         }
                     }
                     Component {

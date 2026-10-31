@@ -22,16 +22,7 @@ Scope {
     property var hub: null
     property var dock: hub ? hub.dock : null
     property var bar: hub ? hub.bar : null
-    property bool darkMode: bar ? bar.darkMode : (dock ? dock.darkMode : true)
-
-    Connections {
-        target: root.bar
-        function onDarkModeChanged() { if (root.bar) root.darkMode = root.bar.darkMode; }
-    }
-    Connections {
-        target: root.dock
-        function onDarkModeChanged() { if (!root.bar && root.dock) root.darkMode = root.dock.darkMode; }
-    }
+    readonly property bool darkMode: true      // YukiShell has one look: dark
 
     readonly property string fam: dock ? dock.fontFamily : "Open Runde"
     readonly property string boldFontFamily: hub && hub.boldFontFamily ? hub.boldFontFamily : "Open Runde Semibold"
@@ -41,10 +32,7 @@ Scope {
     property var info: ({})
     readonly property string scriptPath: decodeURIComponent(String(Qt.resolvedUrl("assets/about-info.sh")).replace(/^file:\/\//, ""))
 
-    function syncTheme() {
-        if (bar) darkMode = bar.darkMode;
-        else if (dock) darkMode = dock.darkMode;
-    }
+    function syncTheme() { }
 
     function open() { syncTheme(); win.visible = true; win.raise(); win.requestActivate(); }
     function close() { win.visible = false; }
