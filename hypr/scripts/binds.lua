@@ -25,9 +25,17 @@ hl.bind(mod .. " + H",     hl.dsp.focus({ direction = "left" }))
 hl.bind(mod .. " + K",     hl.dsp.focus({ direction = "up" }))
 hl.bind(mod .. " + N",     hl.dsp.focus({ direction = "down" }))
 
+-- "yukiws" tells YukiShell's DesktopFocus to keep the keyboard on the desktop when the pointer rests on it after the switch
+local function toWorkspace(ws)
+    return function()
+        hl.dispatch(hl.dsp.focus({ workspace = ws }))
+        hl.dispatch(hl.dsp.event("yukiws"))
+    end
+end
+
 for i = 1, 10 do
     local key = i % 10
-    bind(mod .. " + " .. key,         hl.dsp.focus({ workspace = i }),       i == 1 and "Go to Workspace 1–10 (0 = 10)" or nil, { fixed = true })
+    bind(mod .. " + " .. key,         toWorkspace(i),       i == 1 and "Go to Workspace 1–10 (0 = 10)" or nil, { fixed = true })
     bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), i == 1 and "Move Window to Workspace 1–10" or nil, { fixed = true })
     bind(mod .. " + ALT + " .. key,   hl.dsp.window.move({ workspace = i, follow = false }), i == 1 and "Send Window to Workspace 1–10" or nil, { fixed = true })
 end
@@ -42,8 +50,8 @@ bind(mod .. " + SHIFT + Page_Down", hl.dsp.window.move({ workspace = "+1" }), "M
 bind(mod .. " + SHIFT + Page_Up",   hl.dsp.window.move({ workspace = "-1" }), "Move Window to Previous Workspace")
 bind(mod .. " + SHIFT + O",      hl.dsp.window.move({ monitor = "+1" }), "Move Window to Next Monitor")
 
-hl.bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
+hl.bind(mod .. " + mouse_down", toWorkspace("e+1"))
+hl.bind(mod .. " + mouse_up",   toWorkspace("e-1"))
 hl.bind(mod .. " + mouse:272",  hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mod .. " + mouse:273",  hl.dsp.window.resize(), { mouse = true })
 
