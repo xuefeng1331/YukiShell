@@ -4834,7 +4834,6 @@ Scope {
 
                 SCard {
                     t: pal
-                    visible: wpPane.curVideo !== "" || (root.bar && root.bar.liveWallGlass)
                     SRow {
                         t: pal
                         visible: wpPane.curVideo !== ""
@@ -4881,8 +4880,9 @@ Scope {
                 Item {
                     id: wpHead
                     width: parent.width
-                    readonly property bool stack: wpHeadLbl.implicitWidth + wpFilter.width + 8 > width
-                    height: stack ? wpHeadLbl.height + 8 + wpFilter.height : Math.max(30, wpFilter.height)
+                    readonly property real natural: wpFilter.eqWidth * wpFilter.count + 2 * wpFilter.inset
+                    readonly property bool stack: wpHeadLbl.implicitWidth + 16 + natural > width
+                    height: stack ? wpHeadLbl.height + 8 + wpFilter.height : Math.max(wpHeadLbl.height, wpFilter.height)
                     SLabel {
                         id: wpHeadLbl
                         t: pal; header: true; topPadding: 0
@@ -4893,9 +4893,11 @@ Scope {
                     SSegmented {
                         id: wpFilter
                         t: pal
+                        // own line: equal segments spanning the page; next to the heading: its natural size, flush right
+                        segWidth: wpHead.stack ? Math.max(eqWidth, (wpHead.width - 2 * inset) / count) : -1
                         anchors.right: parent.right
                         y: wpHead.stack ? wpHeadLbl.height + 8 : Math.round((wpHead.height - height) / 2)
-                        scale: width > 0 ? Math.min(1, wpHead.width / width) : 1
+                        scale: width > wpHead.width ? wpHead.width / width : 1
                         transformOrigin: Item.TopRight
                         model: ["All", "Pictures", "Animated", "★ Favourites"]
                         current: wpPane.filter
