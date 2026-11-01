@@ -88,6 +88,7 @@ Item {
             property real flatInner: gs.flatInner
             property real rimTint: 1
             property real ringW: 0
+            property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)  // liquidglass.frag reads it; knobs and lenses stay untinted
         }
         }
     }

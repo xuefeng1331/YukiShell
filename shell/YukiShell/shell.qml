@@ -364,7 +364,7 @@ ShellRoot {
         function open(): void { yukiBar.notifPopRequest(true); }
         function close(): void { yukiBar.notifPopRequest(false); }
         function clear(): void { yukiBar.notifClearAnimated(); }
-        function dismiss(id: int): void { yukiBar.notifDelete(id); yukiBar.notifUnread = Math.max(0, yukiBar.notifUnread - 1); }
+        function dismiss(id: int): void { yukiBar.notifDelete(id); }
     }
     IpcHandler {
         target: "gaming"

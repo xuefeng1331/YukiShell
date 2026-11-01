@@ -4123,7 +4123,10 @@ Scope {
     function notifDelete(id) {
         notifToastRemove(id);
         var i = notifIndex(notifHist, id);
-        if (i >= 0) notifHist.remove(i);
+        if (i >= 0) {
+            if (i < root.notifUnread) root.notifUnread--;  // unread ones are the newest, at the top of the history
+            notifHist.remove(i);
+        }
         var n = root.notifRefs[id];
         if (n) { try { n.dismiss(); } catch (e) {} delete root.notifRefs[id]; }
     }
@@ -4688,8 +4691,11 @@ Scope {
             var apps = root.swBuild();
             if (apps.length === 0) return;
             root.swApps = apps;
-            root.swIndex = root.desktopFocused ? -1 : 0;
+            // index 0 is the app you are in, or from the desktop the app you just left; set before opening so nothing reads -1
+            var n0 = apps.length;
+            root.swIndex = dir < 0 ? n0 - 1 : (root.desktopFocused ? 0 : 1 % n0);
             root.swOpen = true;
+            return;
         }
         var n = root.swApps.length;
         root.swIndex = (root.swIndex + (dir >= 0 ? 1 : n - 1)) % n;
