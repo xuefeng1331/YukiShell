@@ -81,3 +81,10 @@ FLOAT_CHROMIUM_RULE = hl.window_rule({
     center = true,
     size = "1280 800",
 })
+
+TILE_CHROMIUM_RULE = hl.window_rule({
+    name  = "tile-chromium-once",
+    enabled = false,
+    match = { class = "^[Cc]hromium$" },
+    tile = true,
+})

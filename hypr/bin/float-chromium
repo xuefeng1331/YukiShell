@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Open a new Chromium window that is born floating, centred, 1280x800 (Super+Shift+W).
+"""Open a new Chromium window that is born floating, centred, 1280x800 (Super+Shift+W, and links from other apps).
+With --tile it is born tiled instead, even when "Open windows floating" is on (Super+W).
 
 An exec rule can't do this: when Chromium is already running, the new window is created by that running process, so
 Hyprland never sees the pid it spawned. Instead the window rule `float-chromium-once` (hypr/scripts/rules.lua, off by default)
@@ -8,6 +9,8 @@ If the rule can't be switched on, the window is floated after it appears instead
 import json, subprocess, sys, time
 
 W, H = 1280, 800
+TILE = "--tile" in sys.argv[1:]
+ARGS = [a for a in sys.argv[1:] if a != "--tile"]
 
 def hc(*args):
     return subprocess.run(["hyprctl", *args], capture_output=True, text=True).stdout
@@ -19,20 +22,22 @@ def chromium_windows():
         return {}
 
 def rule(on):
-    hc("eval", f"FLOAT_CHROMIUM_RULE:set_enabled({'true' if on else 'false'})")
+    hc("eval", f"{'TILE' if TILE else 'FLOAT'}_CHROMIUM_RULE:set_enabled({'true' if on else 'false'})")
 
 before = set(chromium_windows())
 rule(True)
 try:
-    subprocess.Popen(["chromium", "--new-window", *sys.argv[1:]], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+    subprocess.Popen(["chromium", "--new-window", *ARGS], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, start_new_session=True)
     deadline = time.time() + 10
     while time.time() < deadline:
         new = {a: c for a, c in chromium_windows().items() if a not in before}
         if new:
             addr, win = sorted(new.items())[0]
-            if not win["floating"]:
-                sel = f'window = "address:{addr}"'
+            sel = f'window = "address:{addr}"'
+            if TILE and win["floating"]:
+                hc("dispatch", f"hl.dsp.window.float({{ action = \"disable\", {sel} }})")
+            elif not TILE and not win["floating"]:
                 hc("dispatch", f"hl.dsp.window.float({{ action = \"enable\", {sel} }})")
                 hc("dispatch", f"hl.dsp.window.resize({{ x = {W}, y = {H}, \"exact\", {sel} }})")
                 hc("dispatch", f"hl.dsp.window.center({{ {sel} }})")
