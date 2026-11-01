@@ -1,4 +1,4 @@
 .pragma library
 
-var version = "1.7bf";
+var version = "1.8";
 var label = "v" + version;

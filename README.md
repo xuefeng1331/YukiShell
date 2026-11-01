@@ -47,10 +47,10 @@ What you get:
 
 Mauve and pink accents, a lot of glass, and an animated wallpaper if you want one.
 
-The current version is **v1.7bf**, a bug-fix release of v1.7: a new fish prompt with icons and the time, `ff` and `ll` in a blue-to-pink gradient,
-Chromium that tiles while links from other apps open in a small floating window, floating windows at 1280×800, weather
-icons for every condition, swayimg as the image viewer, and a tidier Settings. See
-[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.7) and [v1.7bf](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.7bf).
+The current version is **v1.8**: desktop widgets that fit every size with even margins, a music note for tracks without a cover,
+every keyboard shortcut listed in Settings in groups with aligned keys, scrolling the menu bar for brightness and volume, floating
+windows at 900×560 with Shift to open apps floating from the Dock and Spotlight, and focus that follows the pointer more reliably. See
+[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.8).
 
 ## Contents
 
