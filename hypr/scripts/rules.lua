@@ -1,6 +1,6 @@
 hl.window_rule({ name = "suppress-maximize", match = { class = ".*" }, suppress_event = "maximize" })
 
-FLOAT_NEW_RULE = hl.window_rule({ name = "float-new-windows", match = { class = ".*" }, float = true, center = true })
+FLOAT_NEW_RULE = hl.window_rule({ name = "float-new-windows", match = { class = ".*" }, float = true, center = true, size = "1280 800" })
 
 hl.window_rule({
     name  = "fix-xwayland-drags",

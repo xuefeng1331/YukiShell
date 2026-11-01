@@ -11,7 +11,7 @@ bind(mod .. " + SHIFT + W",      hl.dsp.exec_cmd("~/.config/hypr/bin/float-chrom
 bind(mod .. " + Q",              hl.dsp.window.close(), "Close Window")
 bind(mod .. " + SHIFT + Q",      hl.dsp.window.kill(),  "Force Quit Window")
 bind(mod .. " + F",              hl.dsp.window.fullscreen(), "Full Screen")
-bind(mod .. " + ALT + space",    hl.dsp.window.float({ action = "toggle" }), "Toggle Floating")
+bind(mod .. " + ALT + space",    hl.dsp.exec_cmd("~/.config/hypr/bin/toggle-float"), "Toggle Floating")
 bind(mod .. " + ALT + D",      hl.dsp.exec_cmd("~/.config/hypr/bin/dashboard"), "Dashboard")
 bind(mod .. " + SHIFT + Tab",   hl.dsp.exec_cmd("~/.config/hypr/bin/toggle-opacity"), "Terminal Transparency")
 hl.bind(mod .. " + P",              hl.dsp.window.pseudo())

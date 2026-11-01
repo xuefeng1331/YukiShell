@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Super+Alt+Space: toggle floating. A window switched to floating becomes 1280x800, centred (YukiShell Settings keeps its size)."""
+import json, subprocess
+
+def hc(*args):
+    return subprocess.run(["hyprctl", *args], capture_output=True, text=True).stdout
+
+try:
+    w = json.loads(hc("-j", "activewindow"))
+except ValueError:
+    w = {}
+if w.get("address"):
+    sel = f'window = "address:{w["address"]}"'
+    hc("dispatch", f'hl.dsp.window.float({{ action = "toggle", {sel} }})')
+    if not w["floating"] and w["title"] != "YukiShell Settings":
+        hc("dispatch", f'hl.dsp.window.resize({{ x = 1280, y = 800, "exact", {sel} }})')
+        hc("dispatch", f'hl.dsp.window.center({{ {sel} }})')
