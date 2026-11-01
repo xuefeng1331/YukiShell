@@ -462,7 +462,7 @@ Dolphin (`F4`) can only be Konsole: Dolphin embeds Konsole's terminal component 
 `konsole` if you want that panel.
 
 **Dolphin's *Open With* has no apps to choose from.** KDE apps get their list of installed apps from an app menu file that Plasma
-ships and Hyprland doesn't. `install.sh` links one to `~/.config/menus/applications.menu` (from v1.6+ run it once more). If an app
+ships and Hyprland doesn't. `install.sh` links one to `~/.config/menus/applications.menu` (installed before this fix? run it once more). If an app
 you just installed is missing, run `kbuildsycoca6 --noincremental`.
 
 **How much does YukiShell use?**
