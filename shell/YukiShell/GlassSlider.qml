@@ -28,6 +28,7 @@ Item {
     property color trackColor: Qt.rgba(1, 1, 1, 0.20)
     property color labelColor: Qt.rgba(1, 1, 1, 0.56)
     property string fontFamily: ""
+    property real labelSize: 11          // the end labels ("Sharp" / "Very blurry"); Settings passes its caption size
     property color baseColor: "#2B2B2D"                 // what lies under the slider (the lens refracts it)
     property bool dark: true
     property real knobSize: 1.0                         // knob size multiplier (the settings sliders use a bigger one)
@@ -110,7 +111,7 @@ Item {
         y: 25
         text: s.leftLabel
         color: s.labelColor
-        font.family: s.fontFamily; font.pixelSize: 11
+        font.family: s.fontFamily; font.pixelSize: s.labelSize
     }
     Text {
         visible: s.rightLabel !== ""
@@ -118,7 +119,7 @@ Item {
         x: s.width - implicitWidth
         text: s.rightLabel
         color: s.labelColor
-        font.family: s.fontFamily; font.pixelSize: 11
+        font.family: s.fontFamily; font.pixelSize: s.labelSize
     }
 
     // --- what the lens sees: a hidden duplicate of the bar on its backdrop ---
