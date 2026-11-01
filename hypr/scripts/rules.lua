@@ -73,6 +73,13 @@ hl.window_rule({
     min_size = "640 480",
 })
 
+-- Chromium windows tile even with "Open windows floating" on (Super+W, tabs dragged out); the one-shot rule below wins for links
+hl.window_rule({
+    name  = "tile-chromium",
+    match = { class = "^[Cc]hromium$" },
+    tile = true,
+})
+
 FLOAT_CHROMIUM_RULE = hl.window_rule({
     name  = "float-chromium-once",
     enabled = false,
@@ -80,11 +87,4 @@ FLOAT_CHROMIUM_RULE = hl.window_rule({
     float = true,
     center = true,
     size = "1280 800",
-})
-
-TILE_CHROMIUM_RULE = hl.window_rule({
-    name  = "tile-chromium-once",
-    enabled = false,
-    match = { class = "^[Cc]hromium$" },
-    tile = true,
 })
