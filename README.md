@@ -463,7 +463,8 @@ Dolphin (`F4`) can only be Konsole: Dolphin embeds Konsole's terminal component 
 `konsole` if you want that panel.
 
 **Pictures open in a browser or an image editor.** Install `swayimg` and run `./install.sh` again: pictures then open in swayimg,
-floating and centred, with nothing but the picture. `←` / `→` go through the folder, scroll zooms, `Enter` shows thumbnails, `F` is
+floating and centred, with nothing but the picture. `←` / `→` go through the pictures in the folder (videos and other files are
+skipped), scroll zooms, `Enter` shows thumbnails, `F` is
 full screen, `T` shows file info, `Esc` closes. Its settings are in `swayimg/init.lua`.
 
 **Dolphin's *Open With* has no apps to choose from.** KDE apps get their list of installed apps from an app menu file that Plasma

@@ -14,6 +14,37 @@ swayimg.decoration = false
 swayimg.imagelist.adjacent = true          -- opening one picture lists the rest of its folder too
 swayimg.imagelist.order = "alpha"
 
+-- only pictures: a folder with videos, music or documents in it would otherwise put those in the list too (swayimg turns a video
+-- into a sheet of frames, slowly, through ffmpeg). Anything that isn't a picture by its extension is taken out of the list, and
+-- the video and font decoders are off so nothing slips through.
+swayimg.format_conf = { video = { enable = false }, ttf = { enable = false } }
+
+local picture = {}
+for ext in ("jpg jpeg jpe jfif png apng gif webp avif heic heif jxl bmp dib ico cur tif tiff svg svgz tga exr hdr qoi dds "
+         .. "pbm pgm ppm pnm pam pcx xpm xbm psd dng cr2 cr3 nef nrw arw srf sr2 orf rw2 raf pef srw x3f erf kdc 3fr mrw"):gmatch("%S+") do
+  picture[ext] = true
+end
+local function is_picture(path)
+  local ext = path:match("%.([^./]+)$")
+  return ext ~= nil and picture[ext:lower()] == true
+end
+
+local listed = -1
+local function only_pictures()
+  if swayimg.imagelist.size == listed then return end
+  local others, keep = {}, 0
+  for _, e in ipairs(swayimg.imagelist.get()) do
+    if is_picture(e.path) then keep = keep + 1 else others[#others + 1] = e.path end
+  end
+  if #others > 0 and keep > 0 then swayimg.imagelist.remove(others) end   -- never empty the list (a picture with an odd name)
+  listed = swayimg.imagelist.size
+end
+swayimg.on_initialized(only_pictures)
+-- files added to the folder while it's open (fsmon) are checked again the next time the picture changes
+swayimg.viewer.on_image_change(only_pictures)
+swayimg.slideshow.on_image_change(only_pictures)
+swayimg.gallery.on_image_change(only_pictures)
+
 swayimg.text.visible = false
 swayimg.text.font = "JetBrainsMono Nerd Font"
 swayimg.text.size = 16
