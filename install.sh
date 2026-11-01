@@ -30,7 +30,6 @@ link "$here/shell/bin/yuki-start"              "$HOME/.local/bin/yuki-start"
 link "$here/shell/bin/yuki-restart"            "$HOME/.local/bin/yuki-restart"
 link "$here/shell/bin/yuki-brightness"         "$HOME/.local/bin/yuki-brightness"
 link "$here/shell/bin/yukishell"               "$HOME/.local/bin/yukishell"
-link "$here/shell/bin/yuki-ls"                 "$HOME/.local/bin/yuki-ls"
 link "$here/shell/bin/fff"                     "$HOME/.local/bin/fff"
 link "$here/shell/scripts"                     "$cfg/hypr-yukishell/scripts"
 [ -f "$cfg/hypr-yukishell/env" ] || { mkdir -p "$cfg/hypr-yukishell"; cp "$here/shell/env.example" "$cfg/hypr-yukishell/env"; }
