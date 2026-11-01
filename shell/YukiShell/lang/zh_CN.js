@@ -995,5 +995,20 @@ var strings = {
     "Japanese": "日语",
     "Korean": "韩语",
     "Roman": "罗马数字",
-    "Numbers": "数字"
+    "Numbers": "数字",
+    "Change Volume": "调节音量",
+    "Focus and Workspaces": "焦点与工作区",
+    "Keyboard Brightness": "键盘亮度",
+    "Media and Hardware": "媒体与硬件",
+    "Move Window with the Mouse": "用鼠标移动窗口",
+    "Mute Microphone": "麦克风静音",
+    "Mute Sound": "静音",
+    "Next or Previous Track": "下一首或上一首",
+    "Play or Pause": "播放或暂停",
+    "Pseudo-tile Window": "伪平铺窗口",
+    "Resize Window with the Mouse": "用鼠标调整窗口大小",
+    "Screen Brightness": "屏幕亮度",
+    "Screenshots and Recording": "截图与录屏",
+    "Switch Workspace with the Scroll Wheel": "用滚轮切换工作区",
+    "Other": "其他"
 };

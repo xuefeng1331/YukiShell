@@ -995,5 +995,20 @@ var strings = {
     "Japanese": "日本語",
     "Korean": "韓国語",
     "Roman": "ローマ数字",
-    "Numbers": "数字"
+    "Numbers": "数字",
+    "Change Volume": "音量を調整",
+    "Focus and Workspaces": "フォーカスとワークスペース",
+    "Keyboard Brightness": "キーボードの明るさ",
+    "Media and Hardware": "メディアとハードウェア",
+    "Move Window with the Mouse": "マウスでウインドウを移動",
+    "Mute Microphone": "マイクをミュート",
+    "Mute Sound": "サウンドをミュート",
+    "Next or Previous Track": "次または前のトラック",
+    "Play or Pause": "再生または一時停止",
+    "Pseudo-tile Window": "ウインドウを疑似タイル表示",
+    "Resize Window with the Mouse": "マウスでウインドウのサイズを変更",
+    "Screen Brightness": "画面の明るさ",
+    "Screenshots and Recording": "スクリーンショットと録画",
+    "Switch Workspace with the Scroll Wheel": "ホイールでワークスペースを切り替え",
+    "Other": "その他"
 };

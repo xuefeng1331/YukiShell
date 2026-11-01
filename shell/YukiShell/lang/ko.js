@@ -995,5 +995,20 @@ var strings = {
     "Japanese": "일본어",
     "Korean": "한국어",
     "Roman": "로마 숫자",
-    "Numbers": "숫자"
+    "Numbers": "숫자",
+    "Change Volume": "볼륨 조절",
+    "Focus and Workspaces": "포커스 및 작업 공간",
+    "Keyboard Brightness": "키보드 밝기",
+    "Media and Hardware": "미디어 및 하드웨어",
+    "Move Window with the Mouse": "마우스로 창 이동",
+    "Mute Microphone": "마이크 음소거",
+    "Mute Sound": "소리 음소거",
+    "Next or Previous Track": "다음 또는 이전 트랙",
+    "Play or Pause": "재생 또는 일시 정지",
+    "Pseudo-tile Window": "창 의사 타일링",
+    "Resize Window with the Mouse": "마우스로 창 크기 조절",
+    "Screen Brightness": "화면 밝기",
+    "Screenshots and Recording": "스크린샷 및 녹화",
+    "Switch Workspace with the Scroll Wheel": "스크롤 휠로 작업 공간 전환",
+    "Other": "기타"
 };

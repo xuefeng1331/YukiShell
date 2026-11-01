@@ -977,5 +977,20 @@ var strings = {
     "Japanese": "Японский",
     "Korean": "Корейский",
     "Roman": "Римские цифры",
-    "Numbers": "Цифры"
+    "Numbers": "Цифры",
+    "Change Volume": "Изменить громкость",
+    "Focus and Workspaces": "Фокус и рабочие столы",
+    "Keyboard Brightness": "Подсветка клавиатуры",
+    "Media and Hardware": "Медиа и оборудование",
+    "Move Window with the Mouse": "Перемещать окно мышью",
+    "Mute Microphone": "Выключить микрофон",
+    "Mute Sound": "Выключить звук",
+    "Next or Previous Track": "Следующий или предыдущий трек",
+    "Play or Pause": "Воспроизвести или приостановить",
+    "Pseudo-tile Window": "Псевдомозаика окна",
+    "Resize Window with the Mouse": "Менять размер окна мышью",
+    "Screen Brightness": "Яркость экрана",
+    "Screenshots and Recording": "Снимки и запись экрана",
+    "Switch Workspace with the Scroll Wheel": "Переключать рабочие столы колесом",
+    "Other": "Другое"
 };

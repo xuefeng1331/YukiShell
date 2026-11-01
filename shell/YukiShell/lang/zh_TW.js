@@ -995,5 +995,20 @@ var strings = {
     "Japanese": "日語",
     "Korean": "韓語",
     "Roman": "羅馬數字",
-    "Numbers": "數字"
+    "Numbers": "數字",
+    "Change Volume": "調整音量",
+    "Focus and Workspaces": "焦點與工作區",
+    "Keyboard Brightness": "鍵盤亮度",
+    "Media and Hardware": "媒體與硬體",
+    "Move Window with the Mouse": "用滑鼠移動視窗",
+    "Mute Microphone": "麥克風靜音",
+    "Mute Sound": "靜音",
+    "Next or Previous Track": "下一首或上一首",
+    "Play or Pause": "播放或暫停",
+    "Pseudo-tile Window": "偽平鋪視窗",
+    "Resize Window with the Mouse": "用滑鼠調整視窗大小",
+    "Screen Brightness": "螢幕亮度",
+    "Screenshots and Recording": "截圖與錄影",
+    "Switch Workspace with the Scroll Wheel": "用滾輪切換工作區",
+    "Other": "其他"
 };

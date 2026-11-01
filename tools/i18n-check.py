@@ -29,7 +29,7 @@ def unescape(raw):
         out.append(c); i += 1
     return "".join(out)
 
-SAME = {"H:mm", "Spotlight", "MacBook", "Tailscale", "\u25cf", "Rice", "Hyprland \u2022 Quickshell \u2022 Catppuccin Mocha"}
+SAME = {"H:mm", "Spotlight", "YukiShell", "MacBook", "Tailscale", "\u25cf", "Rice", "Hyprland \u2022 Quickshell \u2022 Catppuccin Mocha"}
 
 call = re.compile(r'I18n\.tr\(\s*(?:"((?:[^"\\\n]|\\.)*)"|\'((?:[^\'\\\n]|\\.)*)\')\s*[,)]')
 
@@ -40,7 +40,8 @@ for f in sorted(shell.glob("*.qml")):
         used.setdefault(unescape(raw), f.name)
 
 lua_desc = [re.compile(r'description = "([^"]+)"'), re.compile(r'\band "([^"]+)" or nil'),
-            re.compile(r'^bind\(.*?,\s*"([^"]+)"(?:,\s*\{[^}]*\})?\)\s*(?:--.*)?$', re.M)]
+            re.compile(r'^\s*bind\(.*?,\s*"([^"]+)"(?:,\s*\{[^}]*\})?\)\s*(?:--.*)?$', re.M),
+            re.compile(r'\bdesc = "([^"]+)"'), re.compile(r'\bsection\("([^"]+)"\)')]
 for f in sorted((root / "hypr" / "scripts").glob("*.lua")):
     text = f.read_text(encoding="utf-8")
     for rx in lua_desc:

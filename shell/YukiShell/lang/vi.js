@@ -953,5 +953,20 @@ var strings = {
     "Japanese": "Tiếng Nhật",
     "Korean": "Tiếng Hàn",
     "Roman": "Số La Mã",
-    "Numbers": "Chữ số"
+    "Numbers": "Chữ số",
+    "Change Volume": "Chỉnh âm lượng",
+    "Focus and Workspaces": "Tiêu điểm và không gian làm việc",
+    "Keyboard Brightness": "Độ sáng bàn phím",
+    "Media and Hardware": "Đa phương tiện và phần cứng",
+    "Move Window with the Mouse": "Di chuyển cửa sổ bằng chuột",
+    "Mute Microphone": "Tắt micrô",
+    "Mute Sound": "Tắt tiếng",
+    "Next or Previous Track": "Bài tiếp theo hoặc trước đó",
+    "Play or Pause": "Phát hoặc tạm dừng",
+    "Pseudo-tile Window": "Xếp ô giả cửa sổ",
+    "Resize Window with the Mouse": "Đổi cỡ cửa sổ bằng chuột",
+    "Screen Brightness": "Độ sáng màn hình",
+    "Screenshots and Recording": "Chụp và quay màn hình",
+    "Switch Workspace with the Scroll Wheel": "Chuyển không gian làm việc bằng con lăn",
+    "Other": "Khác"
 };

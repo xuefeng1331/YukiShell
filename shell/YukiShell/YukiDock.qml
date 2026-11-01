@@ -177,6 +177,7 @@ Scope {
         property string title: ""
         property string subtitle: ""
         property url iconSource: ""
+        property bool wrapTitle: false
         default property alias control: slot.data
         width: parent ? parent.width : 0
         readonly property bool stacked: slot.width > 0 && (r.width - (r.iconSource != "" ? 56 : 16) - slot.width - 32) < 160
@@ -210,7 +211,8 @@ Scope {
             Text {
                 width: parent.width
                 text: r.title
-                elide: Text.ElideRight
+                elide: r.wrapTitle ? Text.ElideNone : Text.ElideRight
+                wrapMode: r.wrapTitle ? Text.WordWrap : Text.NoWrap
                 color: r.t.text
                 font.family: root.fontForWeight(r.t.fw.title, r.t.fam)
                 font.pixelSize: r.t.fs.title
@@ -233,6 +235,23 @@ Scope {
             height: Math.ceil(childrenRect.height)
             scale: width > 0 ? Math.min(1, (r.width - 32) / width) : 1
             transformOrigin: Item.TopRight
+        }
+    }
+
+    component KCap: Rectangle {
+        required property var t
+        property string label: ""
+        property bool hot: false
+        height: 24; width: Math.max(24, Math.ceil(kcText.implicitWidth) + 12); radius: 6
+        color: t.dark ? Qt.rgba(1, 1, 1, hot ? 0.16 : 0.10) : Qt.rgba(0, 0, 0, hot ? 0.10 : 0.06)
+        border.width: 1; border.color: t.cardBorder
+        Text {
+            id: kcText
+            anchors.centerIn: parent
+            text: parent.label
+            color: parent.t.text
+            font.family: root.fontForWeight(Font.Medium, parent.t.fam)
+            font.pixelSize: parent.t.fs.control
         }
     }
 
@@ -568,7 +587,12 @@ Scope {
 
         readonly property var kbKeyNames: ({ "return": "Return", "space": "Space", "left": "←", "right": "→", "up": "↑", "down": "↓", "period": ".", "comma": ",", "print": "Print", "tab": "Tab",
                                              "minus": "-", "equal": "=", "slash": "/", "backslash": "\\", "semicolon": ";", "apostrophe": "'", "grave": "`", "bracketleft": "[", "bracketright": "]",
-                                             "prior": "Page Up", "next": "Page Down", "backspace": "⌫", "escape": "Esc", "delete": "Del", "insert": "Ins" })
+                                             "prior": "Page Up", "next": "Page Down", "page_up": "Page Up", "page_down": "Page Down",
+                                             "backspace": "⌫", "escape": "Esc", "delete": "Del", "insert": "Ins",
+                                             "mouse_down": "Wheel", "mouse_up": "Wheel", "mouse:272": "Left Button", "mouse:273": "Right Button",
+                                             "xf86audioraisevolume": "Vol +", "xf86audiolowervolume": "Vol −", "xf86audiomute": "Mute", "xf86audiomicmute": "Mic Mute",
+                                             "xf86monbrightnessup": "Bright +", "xf86monbrightnessdown": "Bright −", "xf86kbdbrightnessup": "Kbd +", "xf86kbdbrightnessdown": "Kbd −",
+                                             "xf86audioplay": "Play", "xf86audiopause": "Pause", "xf86audionext": "Next", "xf86audioprev": "Prev" })
         function kbCaps(spec) {
             var out = [], parts = String(spec).split("+");
             for (var i = 0; i < parts.length; i++) {
@@ -593,7 +617,7 @@ Scope {
             var mods = [[64, "SUPER"], [4, "CTRL"], [8, "ALT"], [1, "SHIFT"]], out = [];
             for (var i = 0; i < b.length; i++) {
                 var x = b[i];
-                if (x.mouse || (x.submap || "") !== "" || x.catch_all) continue;
+                if ((x.submap || "") !== "" || x.catch_all) continue;
                 var parts = [];
                 for (var m = 0; m < mods.length; m++) if (x.modmask & mods[m][0]) parts.push(mods[m][1]);
                 parts.push(x.key);
@@ -610,20 +634,58 @@ Scope {
                 if (ln === "") continue;
                 var f = ln.split("\t");
                 if (inOv) { if (f.length >= 2) ov[f[0]] = f[1]; }
-                else if (f.length >= 3) man.push({ desc: f[0], def: f[1], editable: f[2] === "1" });
+                else if (f.length >= 3) man.push({ desc: f[0], def: f[1], editable: f[2] === "1", sec: f.length >= 4 ? f[3] : "" });
             }
             kbOverrides = ov; kbManifest = man;
         }
-        function composeShortcuts() {
-            var first = {}, rows = [], seen = {};
-            for (var i = 0; i < kbBinds.length; i++) if (kbBinds[i].desc !== "" && !first[kbBinds[i].desc]) first[kbBinds[i].desc] = kbBinds[i];
-            for (var j = 0; j < kbManifest.length; j++) {
-                var m = kbManifest[j], h = first[m.desc]; seen[m.desc] = true;
-                var spec = h ? h.spec : "";
-                rows.push({ desc: m.desc, spec: spec, keys: kbCaps(spec), def: m.def, editable: m.editable, changed: kbOverrides[m.desc] !== undefined });
+        // the binds that share a description as one row: the modifiers of the first, then every key once,
+        // with the usual sets shortened ("1 – 0", "← → ↑ ↓", "H K N")
+        function kbGroup(specs) {
+            var mods = [], fin = [], isMod = { Super: 1, Ctrl: 1, Alt: 1, Shift: 1 };
+            for (var i = 0; i < specs.length; i++) {
+                var caps = kbCaps(specs[i]), m = caps.filter(c => isMod[c]), k = caps.filter(c => !isMod[c]);
+                if (i === 0) mods = m;
+                for (var j = 0; j < k.length; j++) if (fin.indexOf(k[j]) < 0) fin.push(k[j]);
             }
-            for (var d in first) if (!seen[d]) rows.push({ desc: d, spec: first[d].spec, keys: kbCaps(first[d].spec), def: first[d].spec, editable: false, changed: false });
-            shortcuts = rows;
+            if (fin.length > 2 && fin.every(k => /^[0-9]$/.test(k))) fin = [fin[0] + " – " + fin[fin.length - 1]];
+            var arrows = ["←", "→", "↑", "↓"];
+            if (arrows.every(a => fin.indexOf(a) >= 0)) fin = [arrows.join(" ")].concat(fin.filter(k => arrows.indexOf(k) < 0));
+            var letters = fin.filter(k => /^[A-Z]$/.test(k));
+            if (letters.length > 1) fin = fin.filter(k => !/^[A-Z]$/.test(k)).concat([letters.join(" ")]);
+            return { mods: mods, keys: fin };
+        }
+        property var shortcutGroups: []
+        property var kbColW: [0, 0, 0]
+        TextMetrics { id: kbTm; font.family: root.fontForWeight(Font.Medium, pal.fam); font.pixelSize: pal.fs.control }
+        function kbCapW(s) { kbTm.text = s; return Math.max(24, Math.ceil(kbTm.advanceWidth) + 12); }
+        function kbRunW(a) { var w = 0; for (var i = 0; i < a.length; i++) w += kbCapW(a[i]); return w + Math.max(0, a.length - 1) * 4; }
+        function composeShortcuts() {
+            var specs = {}, order = [], rows = [], seen = {};
+            for (var i = 0; i < kbBinds.length; i++) {
+                var b = kbBinds[i]; if (b.desc === "") continue;
+                if (!specs[b.desc]) { specs[b.desc] = []; order.push(b.desc); }
+                specs[b.desc].push(b.spec);
+            }
+            function row(desc, sec, def, editable) {
+                var s = specs[desc] || [], g = s.length > 0 ? kbGroup(s) : { mods: [], keys: [] };
+                rows.push({ desc: desc, sec: sec, mods: g.mods, keys: g.keys, def: def, editable: editable, changed: kbOverrides[desc] !== undefined });
+            }
+            for (var j = 0; j < kbManifest.length; j++) {
+                var m = kbManifest[j]; if (seen[m.desc]) continue;
+                seen[m.desc] = true; row(m.desc, m.sec, m.def, m.editable);
+            }
+            for (var d = 0; d < order.length; d++) if (!seen[order[d]]) row(order[d], "", (specs[order[d]] || [""])[0], false);
+            var secs = [], byName = {}, w = [0, 0, 0];
+            for (var r = 0; r < rows.length; r++) {
+                var x = rows[r], name = x.sec !== "" ? x.sec : "Other";
+                if (!byName[name]) { byName[name] = { name: name, rows: [] }; secs.push(byName[name]); }
+                byName[name].rows.push(x);
+                w[0] = Math.max(w[0], x.mods.length > 0 ? kbCapW(x.mods[0]) : 0);
+                w[1] = Math.max(w[1], kbRunW(x.mods.slice(1)));
+                w[2] = Math.max(w[2], kbRunW(x.keys));
+            }
+            ["System", "Other"].forEach(n => { if (byName[n]) { secs.splice(secs.indexOf(byName[n]), 1); secs.push(byName[n]); } });
+            kbColW = w; shortcutGroups = secs; shortcuts = rows;
         }
         Process {
             id: bindsProc
@@ -4388,84 +4450,89 @@ Scope {
                     }
                 }
                 SLabel { t: pal; text: I18n.tr("Layout: ") + "us" + ". Changes apply right away." }
-                SLabel { t: pal; header: true; visible: prefsWindow.shortcuts.length > 0; text: I18n.tr("Keyboard Shortcuts") }
-                SCard {
-                    t: pal
-                    visible: prefsWindow.shortcuts.length > 0
-                    Repeater {
-                        model: prefsWindow.shortcuts
-                        SRow {
-                            id: scRow
-                            required property var modelData
-                            readonly property bool recording: prefsWindow.kbCapturing === modelData.desc
-                            readonly property bool canEdit: modelData.editable && prefsWindow.kbCanEdit
-                            t: pal; title: I18n.tr(scRow.modelData.desc)
-                            subtitle: scRow.recording ? (prefsWindow.kbMessage !== "" ? prefsWindow.kbMessage : I18n.tr("Press the new shortcut. Esc cancels, Backspace removes it.")) : ""
-                            Row {
-                                spacing: 8
-                                SButton {
-                                    visible: scRow.modelData.changed && !scRow.recording
-                                    t: pal; glyph: "reset"; tip: I18n.tr("Reset")
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    onClicked: prefsWindow.kbReset(scRow.modelData.desc)
-                                }
-                                Item {
-                                    id: capBox
-                                    width: scRow.recording ? recPill.width : capRow.width
-                                    height: 28
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    Rectangle {
-                                        id: recPill
-                                        visible: scRow.recording
-                                        height: 28; width: Math.ceil(recText.implicitWidth) + 24; radius: 8
-                                        color: pal.dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.05)
-                                        border.width: 2; border.color: pal.accent
-                                        Text {
-                                            id: recText
-                                            anchors.centerIn: parent
-                                            text: I18n.tr("Type the new shortcut…")
-                                            color: pal.accent
-                                            font.family: root.fontForWeight(Font.Medium, pal.fam); font.pixelSize: pal.fs.control
-                                        }
-                                    }
+                Repeater {
+                    model: prefsWindow.shortcutGroups
+                    Column {
+                        id: scSec
+                        required property var modelData
+                        width: parent ? parent.width : 0
+                        spacing: 12
+                        SLabel { t: pal; header: true; text: I18n.tr(scSec.modelData.name) }
+                        SCard {
+                            t: pal
+                            Repeater {
+                                model: scSec.modelData.rows
+                                SRow {
+                                    id: scRow
+                                    required property var modelData
+                                    readonly property bool recording: prefsWindow.kbCapturing === modelData.desc
+                                    readonly property bool canEdit: modelData.editable && prefsWindow.kbCanEdit
+                                    t: pal; title: I18n.tr(scRow.modelData.desc); wrapTitle: true
+                                    subtitle: scRow.recording ? (prefsWindow.kbMessage !== "" ? prefsWindow.kbMessage : I18n.tr("Press the new shortcut. Esc cancels, Backspace removes it.")) : ""
                                     Row {
-                                        id: capRow
-                                        visible: !scRow.recording
-                                        spacing: 4
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        Repeater {
-                                            model: scRow.modelData.keys
-                                            Rectangle {
-                                                id: cap
-                                                required property string modelData
-                                                height: 24; width: Math.max(24, Math.ceil(capText.implicitWidth) + 12); radius: 6
-                                                color: pal.dark ? Qt.rgba(1, 1, 1, capMa.containsMouse ? 0.16 : 0.10) : Qt.rgba(0, 0, 0, capMa.containsMouse ? 0.10 : 0.06)
-                                                border.width: 1; border.color: pal.cardBorder
-                                                Text {
-                                                    id: capText
-                                                    anchors.centerIn: parent
-                                                    text: cap.modelData
-                                                    color: pal.text
-                                                    font.family: root.fontForWeight(Font.Medium, pal.fam)
-                                                    font.pixelSize: pal.fs.control
-                                                }
+                                        spacing: 8
+                                        SButton {
+                                            visible: scRow.modelData.changed && !scRow.recording
+                                            t: pal; glyph: "reset"; tip: I18n.tr("Reset")
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            onClicked: prefsWindow.kbReset(scRow.modelData.desc)
+                                        }
+                                        Item {
+                                            id: capBox
+                                            width: scRow.recording ? recPill.width : capRow.width
+                                            height: 28
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        Rectangle {
+                                            id: recPill
+                                            visible: scRow.recording
+                                            height: 28; width: Math.ceil(recText.implicitWidth) + 24; radius: 8
+                                            color: pal.dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.05)
+                                            border.width: 2; border.color: pal.accent
+                                            Text {
+                                                id: recText
+                                                anchors.centerIn: parent
+                                                text: I18n.tr("Type the new shortcut…")
+                                                color: pal.accent
+                                                font.family: root.fontForWeight(Font.Medium, pal.fam); font.pixelSize: pal.fs.control
                                             }
                                         }
-                                        Rectangle {
-                                            visible: scRow.modelData.keys.length === 0
-                                            height: 24; width: Math.ceil(noneText.implicitWidth) + 16; radius: 6
-                                            color: "transparent"
-                                            border.width: 1; border.color: pal.cardBorder
-                                            Text { id: noneText; anchors.centerIn: parent; text: I18n.tr("Not set"); color: pal.text3; font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: pal.fs.desc }
+                                            // three columns as wide as their widest cap in the whole list (first modifier,
+                                            // second modifier, keys), so the caps line up from row to row
+                                            Row {
+                                                id: capRow
+                                                visible: !scRow.recording
+                                                spacing: 6
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                Item {
+                                                    width: prefsWindow.kbColW[0]; height: 24
+                                                    KCap { t: pal; hot: capMa.containsMouse; label: scRow.modelData.mods.length > 0 ? scRow.modelData.mods[0] : ""; visible: label !== "" }
+                                                }
+                                                Item {
+                                                    width: prefsWindow.kbColW[1]; height: 24
+                                                    Row { spacing: 4; Repeater { model: scRow.modelData.mods.slice(1); KCap { required property string modelData; t: pal; hot: capMa.containsMouse; label: modelData } } }
+                                                }
+                                                Item {
+                                                    width: Math.max(prefsWindow.kbColW[2], noneCap.visible ? noneCap.width : 0); height: 24
+                                                    Row { spacing: 4; Repeater { model: scRow.modelData.keys; KCap { required property string modelData; t: pal; hot: capMa.containsMouse; label: modelData } } }
+                                                    Rectangle {
+                                                        id: noneCap
+                                                        visible: scRow.modelData.keys.length === 0
+                                                        height: 24; width: Math.ceil(noneText.implicitWidth) + 16; radius: 6
+                                                        color: "transparent"
+                                                        border.width: 1; border.color: pal.cardBorder
+                                                        Text { id: noneText; anchors.centerIn: parent; text: I18n.tr("Not set"); color: pal.text3; font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: pal.fs.desc }
+                                                    }
+                                                }
+                                            }
+                                        MouseArea {
+                                            id: capMa
+                                            anchors.fill: parent; anchors.margins: -4
+                                            enabled: scRow.canEdit && !scRow.recording
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: prefsWindow.kbStart(scRow.modelData.desc)
                                         }
-                                    }
-                                    MouseArea {
-                                        id: capMa
-                                        anchors.fill: parent; anchors.margins: -4
-                                        enabled: scRow.canEdit && !scRow.recording
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: prefsWindow.kbStart(scRow.modelData.desc)
+                                        }
                                     }
                                 }
                             }
