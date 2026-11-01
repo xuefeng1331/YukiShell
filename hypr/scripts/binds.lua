@@ -6,7 +6,7 @@ bind(mod .. " + Return",         hl.dsp.exec_cmd("kitty", { tile = true }), "Ope
 bind(mod .. " + E",              hl.dsp.exec_cmd("dolphin", { tile = true }), "Open Files")
 bind(mod .. " + W",              hl.dsp.exec_cmd("chromium"), "Open Browser")
 bind(mod .. " + SHIFT + Return", hl.dsp.exec_cmd("kitty", { float = true, center = true, size = "900 560" }), "Open a Floating Terminal")
-bind(mod .. " + SHIFT + E",      hl.dsp.exec_cmd("dolphin", { float = true, center = true, size = "1100 700" }), "Open a Floating Files Explorer")
+bind(mod .. " + SHIFT + E",      hl.dsp.exec_cmd("dolphin", { float = true, center = true, size = "900 560" }), "Open a Floating Files Explorer")
 bind(mod .. " + SHIFT + W",      hl.dsp.exec_cmd("~/.config/hypr/bin/float-chromium"), "Open a Floating Browser")
 bind(mod .. " + Q",              hl.dsp.window.close(), "Close Window")
 bind(mod .. " + SHIFT + Q",      hl.dsp.window.kill(),  "Force Quit Window")
