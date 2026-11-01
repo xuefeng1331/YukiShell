@@ -1,6 +1,11 @@
 function fish_prompt
     set -l last $status
-    set -l info (set_color 89b4fa) YukiShell (set_color eeacbe) (prompt_pwd --full-length-dirs 2)
+    set -l col eeacbe f5c2e7 cba6f7 b4befe 89b4fa 74c7ec 89dceb 94e2d5 a6e3a1
+    set -l yk
+    for c in (string split '' YukiShell)
+        set -a yk (set_color $col[(math (count $yk) + 1)])$c
+    end
+    set -l info (set_color 89b4fa) (string join '' $yk) (set_color eeacbe) (prompt_pwd --full-length-dirs 2)
     set -l git (fish_git_prompt '%s')
     test -n "$git"; and set -a info (set_color cba6f7) $git
     test "$CMD_DURATION" -gt 3000 2>/dev/null; and set -a info (set_color f9e2af)󰔟 (math -s1 $CMD_DURATION / 1000)s
