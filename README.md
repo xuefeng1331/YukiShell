@@ -15,6 +15,20 @@
 
 ---
 
+<p align="center"><img src="docs/screenshots/dashboard.png" alt="The dashboard (Super+Alt+D): fastfetch, a clock and the cava visualizer, tiled over Liquid Glass kitty"></p>
+
+<table>
+<tr>
+<td width="50%" align="center">
+<img src="docs/screenshots/now-playing.png" alt="The Now Playing widget"><br><sub>Now Playing widget, with the audio visualizer</sub><br><br>
+<img src="docs/screenshots/weather.png" alt="The weather widget"><br><sub>Weather widget</sub>
+</td>
+<td width="50%" align="center">
+<img src="docs/screenshots/settings.png" alt="System Settings"><br><sub>System Settings, in seven languages</sub>
+</td>
+</tr>
+</table>
+
 This is the setup I use every day. It started as a fork of [MacShell](https://github.com/0-ss/MacShell) by
 [Rickky](https://github.com/0-ss) and [vSuol](https://github.com/vsoultann), and over time it turned into its own thing: a different
 name, its own config folders, its own installer and Settings app. It doesn't talk to MacShell at all anymore, so you can't break one
