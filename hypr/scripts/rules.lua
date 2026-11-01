@@ -18,7 +18,7 @@ hl.window_rule({
     match = { class = "^(mpv|vlc|org\\.videolan\\.VLC)$" },
     float = true,
     center = true,
-    size = "(monitor_w*0.66) (monitor_h*0.66)",
+    size = "900 560",
 })
 
 hl.window_rule({
@@ -26,7 +26,7 @@ hl.window_rule({
     match = { class = "^(swayimg)$" },
     float = true,
     center = true,
-    size = "(monitor_w*0.66) (monitor_h*0.66)",
+    size = "900 560",
 })
 
 hl.window_rule({
