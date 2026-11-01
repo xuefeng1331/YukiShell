@@ -19,7 +19,7 @@ link "$here/btop/themes/mocha-glass.theme"      "$cfg/btop/themes/mocha-glass.th
 link "$here/cava/config"                        "$cfg/cava/config"
 link "$here/cava/dashboard.conf"               "$cfg/cava/dashboard.conf"
 link "$here/fish/config.fish"                   "$cfg/fish/config.fish"
-for f in cll ll warp; do link "$here/fish/functions/$f.fish" "$cfg/fish/functions/$f.fish"; done
+for f in cll ll warp fish_prompt fish_right_prompt; do link "$here/fish/functions/$f.fish" "$cfg/fish/functions/$f.fish"; done
 for v in 3 4; do
     link "$here/gtk-$v.0/gtk.css"      "$cfg/gtk-$v.0/gtk.css"
     link "$here/gtk-$v.0/settings.ini" "$cfg/gtk-$v.0/settings.ini"

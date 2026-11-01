@@ -29,13 +29,12 @@ function bsource --description 'Source a bash script into fish (exported vars on
     end
 end
 
-# --- colours: Catppuccin Mocha with the rice's pink accent (prompt is Pure, from fish-pure-prompt) ---
-set -g pure_color_primary eeacbe
-set -g pure_color_success cba6f7
-set -g pure_color_danger f38ba8
-set -g pure_color_warning f9e2af
-set -g pure_color_info 89dceb
-set -g pure_color_mute 6c7086
+# --- colours: Catppuccin Mocha with the rice's pink accent (the prompt is fish/functions/fish_prompt.fish) ---
+set -g __fish_git_prompt_showdirtystate 1
+set -g __fish_git_prompt_showcolorhints 1
+set -g __fish_git_prompt_color_branch cba6f7
+set -g __fish_git_prompt_color_dirtystate f9e2af
+set -g __fish_git_prompt_color_stagedstate a6e3a1
 set -g fish_color_normal cdd6f4
 set -g fish_color_command eeacbe
 set -g fish_color_keyword cba6f7
