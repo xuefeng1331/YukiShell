@@ -111,6 +111,8 @@ Item {
             id: clockVisual
             ClockWidget {
                 accentTint: host.accentTintVec
+                cityCode: host.cityCode
+                use24h: host.hub && host.hub.bar ? host.hub.bar.use24h === true : false
                 scaleF: host.widgetScale
                 style: wstyle
                 lay: v.wlay

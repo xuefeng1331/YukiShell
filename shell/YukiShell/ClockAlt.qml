@@ -14,9 +14,9 @@ Item {
     readonly property color ink2: wd && wd.dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.5)
     readonly property color tile: wd && wd.dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.05)
     readonly property color hand: "#FF9F0A"
-    readonly property int h12: { var h = now.getHours() % 12; return h === 0 ? 12 : h; }
+    readonly property string hh: wd ? wd.hourText : String(now.getHours() % 12 || 12)
     readonly property string mm: ("0" + now.getMinutes()).slice(-2)
-    readonly property string ampm: now.getHours() < 12 ? "AM" : "PM"
+    readonly property string ampm: wd && wd.use24h ? "" : (now.getHours() < 12 ? "AM" : "PM")
     readonly property real secs: wd ? wd.secs : 0
     readonly property string dateText: I18n.locale().toString(now, "dddd, d MMMM")
 
@@ -52,7 +52,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             y: 42 * a.u
             spacing: 10 * a.u
-            Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.h12 }
+            Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.hh }
             Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.mm }
         }
         Row {
@@ -78,7 +78,7 @@ Item {
             x: 26 * a.u; anchors.verticalCenter: parent.verticalCenter
             spacing: 8 * a.u
             Text {
-                text: a.wd.preview ? a.wd.previewTime : a.h12 + ":" + a.mm
+                text: a.wd.preview ? a.wd.previewTime : a.hh + ":" + a.mm
                 color: a.ink
                 font.family: a.wd.boldFam
                 font.pixelSize: 84 * a.u
@@ -162,7 +162,7 @@ Item {
                 spacing: 10 * a.u
                 Text {
                     id: hTime
-                    text: a.wd.preview ? a.wd.previewTime : a.h12 + ":" + a.mm
+                    text: a.wd.preview ? a.wd.previewTime : a.hh + ":" + a.mm
                     color: a.ink
                     font.family: a.wd.boldFam
                     font.pixelSize: 112 * a.u

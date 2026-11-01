@@ -19,7 +19,7 @@ Scope {
         if (p.trackArtist !== "") s += 4;
         if (p.trackTitle !== "") s += 2;
         if (p.lengthSupported && p.length > 0) s += 1;
-        if (p.dbusName === lastPlayed) s += 6;
+        if (p.dbusName === lastPlayed) s += 20;  // above all the metadata bonuses: the player you started last wins
         return s;
     }
 

@@ -16,7 +16,8 @@ Item {
     property string previewTime: "9:41"
     property bool editing: false
 
-    property string cityCode: "RIY"
+    property string cityCode: ""
+    property bool use24h: false
 
     property bool glassReady: false
     property url shaderUrl: ""
@@ -77,13 +78,8 @@ Item {
         onTriggered: w.now = new Date()
     }
 
-    readonly property string liveTime: {
-        var hour = w.now.getHours() % 12
-        if (hour === 0)
-            hour = 12
-
-        return hour + ":" + ("0" + w.now.getMinutes()).slice(-2)
-    }
+    readonly property string hourText: use24h ? ("0" + now.getHours()).slice(-2) : String(now.getHours() % 12 || 12)
+    readonly property string liveTime: hourText + ":" + ("0" + w.now.getMinutes()).slice(-2)
 
     readonly property string displayTime:
         preview ? previewTime : liveTime

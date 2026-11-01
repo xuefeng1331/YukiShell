@@ -367,6 +367,19 @@ Scope {
     }
     Timer { id: saveTimer; interval: 400; onTriggered: root.saveSettings() }
 
+    // the clock widget's label: the local time zone's city, "Asia/Ho_Chi_Minh" -> "HCM", "Asia/Tokyo" -> "TOK"
+    function cityCodeOf(tz) {
+        var w = String(tz).split("/").pop().split(/[_\s-]+/).filter(function (x) { return x !== ""; });
+        if (w.length === 0) return "";
+        return (w.length > 1 ? w.map(function (x) { return x[0]; }).join("") : w[0].substring(0, 3)).toUpperCase();
+    }
+    property string cityCode: ""
+    // shortcut: read once at start, a time zone change shows after a shell restart
+    Process {
+        running: true
+        command: ["sh", "-c", "timedatectl show -p Timezone --value 2>/dev/null || readlink /etc/localtime"]
+        stdout: StdioCollector { onStreamFinished: root.cityCode = root.cityCodeOf(text.trim().replace(/^.*zoneinfo\//, "")) }
+    }
     PlayerPicker { id: playerPick }
     readonly property var player: playerPick.player
     Timer {
