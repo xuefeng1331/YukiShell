@@ -466,6 +466,12 @@ started, with CPU, RAM, GPU load and video memory each, the shell's CPU split in
 it launches in the background, cache sizes and any helpers an earlier session left behind. `-i 5` samples for 5 seconds,
 `-w` keeps refreshing, `--json` is for scripts.
 
+**My disk is filling up with snapshots.**
+On a system with snapper (CachyOS sets it up with btrfs), every update leaves a before / after snapshot. `yukishell sc` lists them,
+keeps the newest four and deletes the rest after you confirm (it asks for your password through sudo). `yukishell sc -n` only
+shows what it would delete, `-k 6` keeps six, `--keep-id 387` keeps a particular one, and `--limit 10` makes snapper itself keep
+fewer from then on. With grub-btrfs, the GRUB snapshot menu is rebuilt afterwards.
+
 **It's using a lot of CPU / it's slow on my GPU.**
 Try Game Mode (`Super+G`) to see whether the effects are the cause. If it's an older GPU, see the environment variables above.
 The animated wallpaper costs the most, so try a still wallpaper too.

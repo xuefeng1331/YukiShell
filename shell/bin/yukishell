@@ -5,6 +5,12 @@
   yukishell stats -i 5            sample for 5 seconds instead of 2 (steadier numbers)
   yukishell stats -w              keep refreshing (Ctrl+C to stop)
   yukishell stats --json          the same as JSON, for scripts
+  yukishell sc                    snapshot clean-up (snapper): keep the newest few, delete the rest, after you confirm
+  yukishell sc -n                 only show what would be deleted
+  yukishell sc -k 6               keep the newest 6 instead of 4 (a "before" snapshot stays with its "after")
+  yukishell sc --keep-id 387      also keep snapshot 387 (repeat it for more)
+  yukishell sc --limit 10         and from now on let snapper keep at most 10 (its NUMBER_LIMIT)
+  yukishell sc -y                 don't ask
   yukishell version               the installed YukiShell version
   yukishell help                  this text
 
@@ -572,6 +578,149 @@ def render(d):
     return "\n".join(out)
 
 
+# ---------- snapshot clean-up (yukishell sc) ----------
+SC_HELP = """yukishell sc: clean up snapper snapshots
+
+  yukishell sc                    keep the newest 4 snapshots, delete the others (asks first)
+  -n, --dry-run                   only show what would be deleted
+  -k, --keep N                    keep the newest N (default 4: the last two updates' before + after)
+  --keep-id NUM                   also keep snapshot NUM; repeat it for more
+  --limit N                       also set snapper's NUMBER_LIMIT to N (and NUMBER_LIMIT_IMPORTANT to half of it)
+  -c, --config NAME               snapper config (default: root)
+  -y, --yes                       don't ask before deleting
+
+Needs root: it asks for your password through sudo. Snapshot 0 (the running system) is never touched, and a "pre" snapshot
+is kept or deleted together with its "post". With grub-btrfs installed, the GRUB snapshot menu is rebuilt once afterwards,
+and its rebuild service is made to wait for grub-mkconfig (the two used to write the same file at once and fail)."""
+
+GRUB_DROPIN_DIR = "/etc/systemd/system/grub-btrfs-snapper.service.d"
+GRUB_DROPIN = GRUB_DROPIN_DIR + "/wait-for-mkconfig.conf"
+GRUB_DROPIN_TEXT = """[Service]
+# added by `yukishell sc`: wait for the pre + post snapshots of an update, and for a running grub-mkconfig (pacman's kernel hook),
+# so the two don't write /boot/grub/grub-btrfs.new at the same time
+ExecStartPre=/bin/sh -c 'sleep 3; while pgrep -x grub-mkconfig >/dev/null; do sleep 1; done'
+"""
+
+
+def used_bytes(path="/"):
+    st = os.statvfs(path)
+    return (st.f_blocks - st.f_bfree) * st.f_frsize
+
+
+def snapper_list(config):
+    r = subprocess.run(["snapper", "--jsonout", "-c", config, "list"], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit("yukishell sc: snapper couldn't list the snapshots: " + (r.stderr.strip() or r.stdout.strip()))
+    data = json.loads(r.stdout)
+    snaps = data.get(config) or next(iter(data.values()), [])
+    return [x for x in snaps if int(x.get("number", 0)) != 0]
+
+
+def plan_cleanup(snaps, keep, keep_ids):
+    """-> set of snapshot numbers to keep: the newest `keep`, the asked ids, and the pre/post partner of anything kept"""
+    nums = sorted(int(x["number"]) for x in snaps)
+    kept = set(nums[-keep:] if keep > 0 else []) | (set(keep_ids) & set(nums))
+    pre_of = {int(x["number"]): int(x["pre-number"]) for x in snaps if x.get("type") == "post" and x.get("pre-number")}
+    post_of = {v: k for k, v in pre_of.items()}
+    for n in list(kept):
+        if n in pre_of: kept.add(pre_of[n])
+        if n in post_of: kept.add(post_of[n])
+    return kept
+
+
+def grub_btrfs_installed():
+    return os.path.exists("/etc/grub.d/41_snapshots-btrfs") and \
+        subprocess.run(["systemctl", "cat", "grub-btrfs-snapper.service"], capture_output=True).returncode == 0
+
+
+def rebuild_grub_menu():
+    if not os.path.exists(GRUB_DROPIN):
+        os.makedirs(GRUB_DROPIN_DIR, exist_ok=True)
+        with open(GRUB_DROPIN, "w") as f:
+            f.write(GRUB_DROPIN_TEXT)
+        subprocess.run(["systemctl", "daemon-reload"])
+        print("  " + dim("grub-btrfs-snapper now waits for grub-mkconfig (" + GRUB_DROPIN + ")"))
+    for _ in range(60):          # a rebuild the deletions started: let it finish first
+        if subprocess.run(["systemctl", "is-active", "-q", "grub-btrfs-snapper.service"]).returncode != 0:
+            break
+        time.sleep(1)
+    try:
+        os.remove("/boot/grub/grub-btrfs.new")
+    except OSError:
+        pass
+    subprocess.run(["systemctl", "start", "grub-btrfs-snapper.service"])
+    cfg = "/boot/grub/grub-btrfs.cfg"
+    ok = not os.path.exists("/boot/grub/grub-btrfs.new") and \
+        subprocess.run(["grub-script-check", cfg], capture_output=True).returncode == 0
+    if ok:
+        n = sum(1 for line in open(cfg, errors="replace") if line.startswith("submenu"))
+        print("  " + c("32", "GRUB snapshot menu rebuilt") + dim(f" ({n} snapshot entr{'y' if n == 1 else 'ies'})"))
+    else:
+        print("  " + c("33", "the GRUB snapshot menu didn't rebuild cleanly") + dim(" (the normal boot menu is fine)"))
+
+
+def cmd_sc(args):
+    keep, keep_ids, limit, config, dry, yes = 4, [], None, "root", False, False
+    it = iter(args)
+    try:
+        for a in it:
+            if a in ("-n", "--dry-run"): dry = True
+            elif a in ("-y", "--yes"): yes = True
+            elif a in ("-k", "--keep"): keep = max(0, int(next(it)))
+            elif a == "--keep-id": keep_ids.append(int(next(it)))
+            elif a == "--limit": limit = max(1, int(next(it)))
+            elif a in ("-c", "--config"): config = next(it)
+            elif a in ("-h", "--help"): print(SC_HELP); return
+            else: sys.exit(f"yukishell sc: unknown option {a!r} (see yukishell sc --help)")
+    except (StopIteration, ValueError):
+        sys.exit("yukishell sc: that option needs a number (see yukishell sc --help)")
+    if not shutil.which("snapper"):
+        sys.exit("yukishell sc: snapper isn't installed, so there are no snapper snapshots to clean")
+    if os.geteuid() != 0:
+        print(dim("snapper needs root: asking sudo…"))
+        os.execvp("sudo", ["sudo", sys.executable, os.path.realpath(__file__), "sc"] + list(args))
+
+    snaps = snapper_list(config)
+    if not snaps:
+        print("No snapshots in snapper's " + b(config) + " config.")
+        return
+    kept = plan_cleanup(snaps, keep, keep_ids)
+    gone = [x for x in snaps if int(x["number"]) not in kept]
+    print(b("SNAPSHOTS") + dim(f"  ({config}: {len(snaps)}, keeping {len(snaps) - len(gone)})"))
+    for x in sorted(snaps, key=lambda x: int(x["number"])):
+        n = int(x["number"]); k = n in kept
+        mark = c("32", "keep  ") if k else c("31", "delete")
+        desc = (x.get("description") or "").strip() or dim("(no description)")
+        typ = x.get("type", "")
+        typ = typ + (f" of {x['pre-number']}" if typ == "post" and x.get("pre-number") else "")
+        print(f"  {mark}  {str(n).rjust(5)}  {str(x.get('date', ''))[:16].ljust(16)}  {typ.ljust(12)}  {desc[:70]}")
+    if not gone:
+        print(c("32", "Nothing to delete."))
+    elif dry:
+        print(dim(f"Dry run: {len(gone)} snapshot(s) would be deleted. Run it without -n to do it."))
+    else:
+        if not yes:
+            try:
+                ans = input(f"Delete {len(gone)} snapshot(s)? [y/N] ").strip().lower()
+            except EOFError:
+                ans = ""
+            if ans not in ("y", "yes"):
+                print("Nothing deleted.")
+                return
+        before = used_bytes("/")
+        nums = [str(x["number"]) for x in gone]
+        r = subprocess.run(["snapper", "-c", config, "delete", "--sync"] + nums)
+        if r.returncode != 0:
+            sys.exit("yukishell sc: snapper delete failed (see above); nothing else was changed")
+        freed = before - used_bytes("/")
+        print("  " + c("32", f"deleted {len(gone)} snapshot(s)") + dim(f", about {size(max(0, freed))} freed (btrfs may keep releasing space for a minute)"))
+        if grub_btrfs_installed():
+            rebuild_grub_menu()
+    if limit is not None and not dry:
+        r = subprocess.run(["snapper", "-c", config, "set-config", f"NUMBER_LIMIT={limit}", f"NUMBER_LIMIT_IMPORTANT={max(1, limit // 2)}"])
+        print("  " + (c("32", f"snapper keeps at most {limit} from now on") if r.returncode == 0 else c("31", "setting the limit failed")))
+
+
 # ---------- commands ----------
 def cmd_stats(args):
     seconds, watch, as_json = 2.0, False, False
@@ -615,10 +764,12 @@ def main(argv):
     cmd, rest = argv[0], argv[1:]
     if cmd == "stats":
         cmd_stats(rest)
+    elif cmd in ("sc", "snapshots"):
+        cmd_sc(rest)
     elif cmd in ("version", "--version", "-v"):
         print(f"YukiShell v{version()}")
     else:
-        sys.exit(f"yukishell: unknown command {cmd!r} (try: yukishell stats, yukishell help)")
+        sys.exit(f"yukishell: unknown command {cmd!r} (try: yukishell stats, yukishell sc, yukishell help)")
 
 
 if __name__ == "__main__":
