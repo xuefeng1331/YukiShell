@@ -32,6 +32,8 @@
 </tr>
 </table>
 
+<p align="center"><img src="docs/screenshots/dock.png" alt="The Dock: pinned apps, running apps and minimized windows as live previews"><br><sub>Dock, with minimized windows as live previews</sub></p>
+
 This is the setup I use every day. It started as a fork of [MacShell](https://github.com/0-ss/MacShell) by
 [Rickky](https://github.com/0-ss) and [vSuol](https://github.com/vsoultann), and over time it turned into its own thing: a different
 name, its own config folders, its own installer and Settings app. It doesn't talk to MacShell at all anymore, so you can't break one
