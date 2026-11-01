@@ -37,6 +37,8 @@ link "$here/shell/scripts"                     "$cfg/hypr-yukishell/scripts"   #
 [ -f "$cfg/hypr-yukishell/env" ] || { mkdir -p "$cfg/hypr-yukishell"; cp "$here/shell/env.example" "$cfg/hypr-yukishell/env"; }
 link "$here/qt/CatppuccinMauve.colors" "$HOME/.local/share/color-schemes/CatppuccinMauve.colors"
 link "$here/chromium/chromium-flags.conf" "$cfg/chromium-flags.conf"
+# the app menu KDE apps read outside Plasma: without it Dolphin's "Open With" dialog has no apps to choose from
+link "$here/xdg/menus/applications.menu" "$cfg/menus/applications.menu"
 
 # the YukiVideo plugin: one video decoder for the animated wallpaper in all the glass (optional; needs cmake + Qt 6 dev files)
 "$here/tools/build-plugins" >/dev/null 2>&1 || echo "note: YukiVideo plugin not built (install cmake and the Qt 6 dev packages, then run tools/build-plugins)."
@@ -117,6 +119,7 @@ if command -v gsettings >/dev/null; then
     gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark || true
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 fi
+command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true   # KDE apps re-read the app list
 command -v hyprctl >/dev/null && hyprctl reload || true
 echo "Rice installed. Needs: adw-gtk-theme, papirus-icon-theme, bibata cursor, JetBrainsMono Nerd Font, qt6ct, breeze."
 echo

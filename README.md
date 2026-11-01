@@ -461,6 +461,10 @@ isn't using the Lua config. `tools/doctor` checks both.
 Dolphin (`F4`) can only be Konsole: Dolphin embeds Konsole's terminal component there, and no other terminal can be embedded. Install
 `konsole` if you want that panel.
 
+**Dolphin's *Open With* has no apps to choose from.** KDE apps get their list of installed apps from an app menu file that Plasma
+ships and Hyprland doesn't. `install.sh` links one to `~/.config/menus/applications.menu` (from v1.6+ run it once more). If an app
+you just installed is missing, run `kbuildsycoca6 --noincremental`.
+
 **How much does YukiShell use?**
 `yukishell stats` lists every YukiShell process (the shell, the waiting lock screen, the wallpaper player) and the helpers it
 started, with CPU, RAM, GPU load and video memory each, the shell's CPU split into rendering / QML / video decoding, the programs

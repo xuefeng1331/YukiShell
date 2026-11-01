@@ -1,0 +1,23 @@
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+<!-- The application menu KDE apps read outside Plasma (~/.config/menus/applications.menu, linked by install.sh).
+     Without it Dolphin's "Open With" dialog has no list of apps to choose from: Plasma ships this file, Hyprland doesn't.
+     Every installed app (.desktop file) is listed once, under its first matching category; the rest go into Other. -->
+<Menu>
+  <Name>Applications</Name>
+  <DefaultAppDirs/>
+  <DefaultDirectoryDirs/>
+  <DefaultMergeDirs/>
+  <Menu><Name>Accessories</Name><Include><Category>Utility</Category></Include></Menu>
+  <Menu><Name>Development</Name><Include><Category>Development</Category></Include></Menu>
+  <Menu><Name>Education</Name><Include><Category>Education</Category></Include></Menu>
+  <Menu><Name>Games</Name><Include><Category>Game</Category></Include></Menu>
+  <Menu><Name>Graphics</Name><Include><Category>Graphics</Category></Include></Menu>
+  <Menu><Name>Internet</Name><Include><Category>Network</Category></Include></Menu>
+  <Menu><Name>Multimedia</Name><Include><Category>AudioVideo</Category><Category>Audio</Category><Category>Video</Category></Include></Menu>
+  <Menu><Name>Office</Name><Include><Category>Office</Category></Include></Menu>
+  <Menu><Name>Science</Name><Include><Category>Science</Category></Include></Menu>
+  <Menu><Name>Settings</Name><Include><Category>Settings</Category></Include></Menu>
+  <Menu><Name>System</Name><Include><Category>System</Category></Include></Menu>
+  <Menu><Name>Other</Name><OnlyUnallocated/><Include><All/></Include></Menu>
+  <Layout><Merge type="menus"/><Merge type="files"/></Layout>
+</Menu>
