@@ -17,6 +17,17 @@ hl.window_rule({ name = "float-polkit",      match = { class = "^(org.kde.polkit
 hl.window_rule({ name = "float-utilities",   match = { class = "^(nm-connection-editor|blueman-manager|org\\.gnome\\.Calculator|org\\.kde\\.kcalc|qalculate-gtk|io\\.github\\.Qalculate\\.qalculate-gtk|org\\.kde\\.kdeconnect.*|org\\.gnome\\.Characters)$" }, float = true, center = true })
 hl.window_rule({ name = "pip-float",         match = { title = "^(Picture-in-Picture)$" }, float = true, pin = true })
 
+-- Video players float, centred, at two thirds of the screen. Without this a 4K video opened mpv at 3840x2160, off the edges, and
+-- VLC grew to the video's own size once it started playing (install.sh turns VLC's "Resize interface to video size" off, so it
+-- keeps this size; mpv keeps it by itself and letterboxes).
+hl.window_rule({
+    name  = "float-video-players",
+    match = { class = "^(mpv|vlc|org\\.videolan\\.VLC)$" },
+    float = true,
+    center = true,
+    size = "(monitor_w*0.66) (monitor_h*0.66)",
+})
+
 -- File pickers float, centred, instead of tiling next to your work. "Choose a picture", Chromium's Open/Save, Dolphin and the like all
 -- go through the desktop portal (xdg-desktop-portal-gtk / -kde); zenity, kdialog and yad are covered too, and so are the GTK/Qt
 -- dialogs that name themselves "Open File", "Save As" etc. (Chromium page titles end in " - Chromium", so they never match.)

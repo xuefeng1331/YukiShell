@@ -93,6 +93,20 @@ if command -v kwriteconfig6 >/dev/null; then
     # KDE apps (Dolphin's file view) read colours from kdeglobals itself, so the scheme's groups have to be copied in
     python3 "$here/qt/apply-scheme.py" "$here/qt/CatppuccinMauve.colors" || true
 fi
+# VLC keeps the size the window rule gives it (hypr/scripts/rules.lua, float-video-players) instead of growing to the video's own
+# size once it plays ("Resize interface to video size" off). Only that one key is touched; a missing vlcrc gets a one-line one.
+if command -v vlc >/dev/null; then
+    mkdir -p "$cfg/vlc"
+    if [ -f "$cfg/vlc/vlcrc" ]; then
+        if grep -q '^#\?qt-video-autoresize=' "$cfg/vlc/vlcrc"; then
+            sed -i 's/^#\?qt-video-autoresize=.*/qt-video-autoresize=0/' "$cfg/vlc/vlcrc"
+        else
+            printf '\n[qt] # Qt interface\nqt-video-autoresize=0\n' >> "$cfg/vlc/vlcrc"
+        fi
+    else
+        printf '[qt] # Qt interface\nqt-video-autoresize=0\n' > "$cfg/vlc/vlcrc"
+    fi
+fi
 # Qt apps' theme without Plasma (QT_QPA_PLATFORMTHEME=qt6ct in hypr/scripts/look.lua): the same colours, Breeze style, Papirus icons
 mkdir -p "$cfg/qt6ct/colors"
 link "$here/qt/qt6ct/YukiShell.conf" "$cfg/qt6ct/colors/YukiShell.conf"
