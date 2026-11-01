@@ -1,6 +1,6 @@
 function fish_prompt
     set -l last $status
-    set -l col eeacbe f5c2e7 cba6f7 b4befe 89b4fa 74c7ec 89dceb 94e2d5 a6e3a1
+    set -l col 89b4fa 96b3f2 a2b2eb afb1e4 bcb0dc c8afd4 d5aecd e1adc6 eeacbe  # 89b4fa (Arch icon) to eeacbe (folder)
     set -l yk
     for c in (string split '' YukiShell)
         set -a yk (set_color $col[(math (count $yk) + 1)])$c
