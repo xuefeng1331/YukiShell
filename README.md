@@ -15,6 +15,23 @@
 
 ---
 
+<table>
+<tr>
+<td><img src="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/01-desktop.gif" alt="The desktop: Dock, menu bar, widgets"><br><sub>The desktop: Dock, menu bar, widgets</sub></td>
+<td><img src="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/02-menus.gif" alt="Menus and the calendar"><br><sub>Menus and the calendar</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/03-control-center.gif" alt="Control Center and its edit mode"><br><sub>Control Center and its edit mode</sub></td>
+<td><img src="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/04-spotlight.gif" alt="Spotlight: apps and emoji"><br><sub>Spotlight: apps and emoji</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/05-settings.gif" alt="System Settings: live accent colours"><br><sub>System Settings: live accent colours</sub></td>
+<td><img src="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/06-widgets.gif" alt="Widgets and wallpapers"><br><sub>Widgets and wallpapers</sub></td>
+</tr>
+</table>
+
+<p align="center">🎬 <a href="https://raw.githubusercontent.com/wiki/xuefeng1331/YukiShell/demo/yukishell-demo.mp4">Full demo video (1:40, MP4)</a> · more on the <a href="https://github.com/xuefeng1331/YukiShell/wiki/Demo">Demo</a> wiki page</p>
+
 This is the setup I use every day. It started as a fork of [MacShell](https://github.com/0-ss/MacShell) by
 [Rickky](https://github.com/0-ss) and [vSuol](https://github.com/vsoultann), and over time it turned into its own thing: a different
 name, its own config folders, its own installer and Settings app. It doesn't talk to MacShell at all anymore, so you can't break one
