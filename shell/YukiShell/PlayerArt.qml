@@ -6,7 +6,6 @@ Item {
     id: art
     required property var wd
     property real r: 7
-    readonly property bool iconFallback: wd.hasPlayer && wd.appIcon !== "" && !wd.preview
     readonly property bool bare: !wd.hasPlayer && !wd.preview
 
     property color idleBgTop: "#3b3b40"
@@ -36,7 +35,6 @@ Item {
 
         Item {
             id: cv
-            visible: !art.iconFallback
             width: 512; height: 512
             scale: idle.width / 512
             transformOrigin: Item.TopLeft
@@ -113,26 +111,6 @@ Item {
                 visible: !art.bare
                 opacity: art.rimOpacity
             }
-        }
-    }
-    Rectangle {
-        anchors.fill: parent
-        visible: art.iconFallback && artImg.status !== Image.Ready
-        radius: art.r
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: art.idleBgTop }
-            GradientStop { position: 1.0; color: art.idleBgBottom }
-        }
-        Image {
-            anchors.centerIn: parent
-            width: parent.width * 0.58
-            height: width
-            source: art.wd.appIcon
-            sourceSize.width: 256
-            sourceSize.height: 256
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            mipmap: true
         }
     }
     property real newT: 1

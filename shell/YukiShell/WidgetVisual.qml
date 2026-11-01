@@ -7,16 +7,6 @@ Item {
     id: v
     required property var host
 
-    function playerIcon(p) {
-        var d = p.desktopEntry || "", n = p.identity || "";
-        var c = [d, d.replace(/-browser$/, ""), n, n.toLowerCase(), n.toLowerCase().replace(/\s+/g, "-")];
-        for (var i = 0; i < c.length; i++) {
-            if (c[i] === "") continue;
-            var path = Quickshell.iconPath(c[i], true);
-            if (path !== "") return path;
-        }
-        return "";
-    }
     property string wtype: "weather"
     property string wstyle: "liquid"
     property string wsize: "small"
@@ -157,7 +147,6 @@ Item {
                 album: host.player ? host.player.trackAlbum : ""
                 artUrl: host.player ? host.player.trackArtUrl : ""
                 appName: host.player ? host.player.identity : ""
-                appIcon: host.player ? v.playerIcon(host.player) : ""
                 playing: host.player ? host.player.isPlaying : false
                 paused: host.player ? host.player.playbackState === MprisPlaybackState.Paused : false
                 shuffle: (host.player && host.player.shuffleSupported) ? host.player.shuffle : false

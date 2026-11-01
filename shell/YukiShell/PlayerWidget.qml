@@ -22,7 +22,6 @@ Item {
     property string album: ""
     property string artUrl: ""
     property string appName: ""
-    property string appIcon: ""
     property bool playing: false
     property bool paused: false
     property real position: 0
