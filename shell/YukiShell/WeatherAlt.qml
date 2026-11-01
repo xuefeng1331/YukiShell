@@ -39,7 +39,7 @@ Item {
         visible: a.lay === "tall"
         Label { x: a.pad; y: a.pad - 2 * a.u; width: parent.width - 2 * a.pad; text: a.wd.city; px: 15 }
         Label { id: tTemp; x: a.pad - 2 * a.u; y: 34 * a.u; text: a.deg(a.wd.temp); px: 52; weight: Font.Light }
-        WeatherIcon {
+        WeatherIcon { light: !a.wd.dark;
             visible: a.wd.showIcon(a.wd.kind)
             x: parent.width - a.pad - size; y: 46 * a.u
             kind: a.wd.kind; size: 26 * a.u
@@ -56,7 +56,7 @@ Item {
                     required property var modelData
                     width: parent.width; height: 31 * a.u
                     Label { anchors.verticalCenter: parent.verticalCenter; text: modelData.h; px: 13; color: a.wd.fgHour }
-                    WeatherIcon {
+                    WeatherIcon { light: !a.wd.dark;
                         visible: a.wd.showIcon(modelData.k)
                         anchors.centerIn: parent
                         kind: modelData.k; size: 16 * a.u
@@ -92,7 +92,7 @@ Item {
                     width: (a.width - 234 * a.u - 14 * a.u) / sDays.n
                     height: sDays.height
                     Label { id: dn; anchors.horizontalCenter: parent.horizontalCenter; y: 20 * a.u; text: modelData.d; px: 13; color: index === 0 ? a.wd.fg : a.wd.fgHour }
-                    WeatherIcon {
+                    WeatherIcon { light: !a.wd.dark;
                         visible: a.wd.showIcon(modelData.k)
                         anchors.horizontalCenter: parent.horizontalCenter; y: 44 * a.u
                         kind: modelData.k; size: 20 * a.u
@@ -124,7 +124,7 @@ Item {
         // now: a big panel of its own
         Label { x: 26 * a.u; y: 24 * a.u; width: 250 * a.u; text: a.wd.city; px: 18 }
         Label { id: hTemp; x: 20 * a.u; y: 50 * a.u; text: a.deg(a.wd.temp); px: 104; weight: Font.Light }
-        WeatherIcon {
+        WeatherIcon { light: !a.wd.dark;
             visible: a.wd.showIcon(a.wd.kind)
             x: 222 * a.u; y: 30 * a.u
             kind: a.wd.kind; size: 44 * a.u
@@ -147,7 +147,7 @@ Item {
                     Label { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.h; px: 13; color: a.wd.fgHour }
                     Item {
                         width: parent.width; height: 22 * a.u
-                        WeatherIcon { visible: a.wd.showIcon(modelData.k); anchors.centerIn: parent; kind: modelData.k; size: 20 * a.u }
+                        WeatherIcon { light: !a.wd.dark; visible: a.wd.showIcon(modelData.k); anchors.centerIn: parent; kind: modelData.k; size: 20 * a.u }
                     }
                     Label { anchors.horizontalCenter: parent.horizontalCenter; text: a.deg(modelData.t); px: 17 }
                 }
@@ -164,7 +164,7 @@ Item {
                     required property var modelData
                     width: parent.width; height: 34 * a.u
                     Label { width: 90 * a.u; anchors.verticalCenter: parent.verticalCenter; text: modelData.d; px: 15 }
-                    WeatherIcon { visible: a.wd.showIcon(modelData.k); x: 96 * a.u; anchors.verticalCenter: parent.verticalCenter; kind: modelData.k; size: 18 * a.u }
+                    WeatherIcon { light: !a.wd.dark; visible: a.wd.showIcon(modelData.k); x: 96 * a.u; anchors.verticalCenter: parent.verticalCenter; kind: modelData.k; size: 18 * a.u }
                     Label { x: 130 * a.u; width: 44 * a.u; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; text: a.deg(modelData.lo); px: 15; color: a.wd.fgSub }
                     Rectangle {
                         id: hTrack

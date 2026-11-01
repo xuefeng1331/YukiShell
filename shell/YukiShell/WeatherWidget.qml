@@ -93,8 +93,9 @@ Item {
     width: (isSmall ? 158 : (isLarge ? 358 : 338)) * s
     height: (isLarge ? 354 : 168) * scaleF
 
-    // The cloud glyphs are not shown: only the sun / moon get an icon.
-    function showIcon(k) { return k === "sun" || k === "moon"; }
+    // every condition has its glyph (WeatherIcon.qml): sun, moon, partly cloudy (day / night), cloud, fog, rain, snow, storm
+    readonly property var iconKinds: ["sun", "moon", "partly", "partlyNight", "cloud", "fog", "rain", "snow", "storm"]
+    function showIcon(k) { return iconKinds.indexOf(k) >= 0; }
 
     // --- light / dark (same rules as the Clock and Calendar widgets) ---
     readonly property bool dark: darkGlass
@@ -348,7 +349,7 @@ Item {
             visible: w.showIcon(w.kind)
             width: parent.width
             height: visible ? 23 * w.s : 0
-            WeatherIcon {
+            WeatherIcon { light: !w.dark;
                 x: w.isLarge ? parent.width - width : 0
                 kind: w.kind
                 size: 20 * w.s
@@ -442,7 +443,7 @@ Item {
                     font.pixelSize: 14 * w.s
                     font.weight: Font.DemiBold
                 }
-                WeatherIcon {
+                WeatherIcon { light: !w.dark;
                     x: 72 * w.s
                     anchors.verticalCenter: parent.verticalCenter
                     visible: w.showIcon(dr.modelData.k)

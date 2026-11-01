@@ -21,7 +21,7 @@ Column {
     Item {
         width: parent.width
         height: 20 * hc.wd.s
-        WeatherIcon {
+        WeatherIcon { light: !hc.wd.dark;
             visible: hc.wd.showIcon(hc.info.k)
             anchors.centerIn: parent
             kind: hc.info.k
