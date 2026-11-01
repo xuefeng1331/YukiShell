@@ -1,32 +1,18 @@
 import QtQuick
 import QtQuick.Effects
 
-// Scroll-under feather for the top of a scroll area (Settings pages), like a macOS toolbar: content that slides up under the
-// toolbar is blurred, and the blur melts away smoothly over `topDepth` px below the toolbar.
-//
-// The scroller is drawn twice: a sharp copy and ONE blurred copy. A smooth (smoothstep) mask cross-fades between them, and the two
-// masks always add up to 1, so translucent content is never drawn twice on top of itself. Plain gradient masks are used (like the
-// lyrics feather in the Player widget). Few layers on purpose: many blur levels made visible lines out of thin separators.
-//
-// Put it over the Flickable with the same x / y / width / height. It captures the Flickable (hidden, but it keeps
-// scrolling and clicking as before).
-//   topHold    px at the very top that are fully blurred (the toolbar's height)
-//   topDepth   px below that over which the blur melts away
-//   topAmount  0..1, switches the whole effect on (e.g. only once the content has scrolled)
-//   radiusScale  scales the blur radius
 Item {
     id: fb
     property Item target: null
     property real topHold: 52
     property real topDepth: 30
     property real topAmount: 1
-    property real edgeAlpha: 0.35          // kept for compatibility, not used
+    property real edgeAlpha: 0.35
     property real blurMax: 24
     property real radiusScale: 1.0
-    readonly property real radius: 9       // px of blur under the toolbar
+    readonly property real radius: 9
     readonly property real pad: 24
     readonly property real stripH: topHold + topDepth + pad
-    // the ramp, as fractions of the blurred strip (sp*) and of the whole height (hp*)
     readonly property real sp0: topHold / stripH
     readonly property real sp1: (topHold + topDepth) / stripH
     readonly property real hp0: Math.min(0.85, topHold / Math.max(1, height))
@@ -41,7 +27,6 @@ Item {
         width: fb.width; height: fb.height
     }
 
-    // sharp copy: fades out under the toolbar, back to full over the ramp
     Item {
         id: sharpMask
         visible: false; layer.enabled: true
@@ -71,7 +56,6 @@ Item {
         maskSource: sharpMask
     }
 
-    // blurred copy: strongest under the toolbar, melting away down the ramp
     Item {
         id: part
         visible: fb.target !== null && fb.topAmount > 0.01

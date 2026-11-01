@@ -1,6 +1,5 @@
 .pragma library
 
-// Simplified Chinese interface strings. Keys are the English texts exactly as written in the QML files.
 var strings = {
     " Connected": " 已连接",
     " Hz · Scale ": " Hz · 缩放 ",

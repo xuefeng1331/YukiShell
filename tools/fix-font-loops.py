@@ -20,7 +20,7 @@ def mask(src):
             j = src.find('*/', i + 2); j = n if j < 0 else j + 2
             out.append(''.join(ch if ch == '\n' else ' ' for ch in src[i:j])); i = j
         elif c == '/' and re.search(r'(?:^|[(,=:\[!&|?{};+\-*%<>~^]|\breturn|\btypeof)\s*$', ''.join(out)[-40:]):
-            j = i + 1; cls = False                       # JS regex literal: may contain quotes, braces, '/' inside [...]
+            j = i + 1; cls = False
             while j < n and src[j] != '\n':
                 ch = src[j]
                 if ch == '\\': j += 2; continue
@@ -84,7 +84,7 @@ def process(path, apply):
         blk = enclosing_block(m, mt.start())
         if not blk: stats['skipped'] += 1; continue
         w = direct_prop(src, m, blk[0], blk[1], 'font.weight')
-        if w is None and re.search(r'(?<![\w.])font\s*\{', m[blk[0]:blk[1]]): stats['skipped'] += 1; continue   # group syntax: handle by hand
+        if w is None and re.search(r'(?<![\w.])font\s*\{', m[blk[0]:blk[1]]): stats['skipped'] += 1; continue
         if w is not None and 'font.weight' in w: stats['skipped'] += 1; continue
         if w is None:
             b = direct_prop(src, m, blk[0], blk[1], 'font.bold')

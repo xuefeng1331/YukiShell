@@ -1,12 +1,3 @@
-//0.3.9// About This Linux - the "About This Mac" window for YukiShell.
-//
-//   qs -c YukiShell ipc call about open | close | toggle        (the Apple menu's "About This Linux" opens it too)
-//
-// Everything shown comes from the running system (assets/about-info.sh): the computer's model from the firmware (DMI),
-// the processor, graphics cards, memory, the size of the disk holding "/", the kernel and the distribution.
-//
-// Logo: the YukiShell logo (assets/yukishell-logo.png). To show a Linux logo of your own instead, for example your
-// distribution's, put it at  assets/linux-logo.svg  (or .png).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
@@ -22,11 +13,10 @@ Scope {
     property var hub: null
     property var dock: hub ? hub.dock : null
     property var bar: hub ? hub.bar : null
-    readonly property bool darkMode: true      // YukiShell has one look: dark
+    readonly property bool darkMode: true
 
     readonly property string fam: dock ? dock.fontFamily : "Open Runde"
     readonly property string boldFontFamily: hub && hub.boldFontFamily ? hub.boldFontFamily : "Open Runde Semibold"
-    // Open Runde: bold text uses its Semibold face; another selected font keeps its own family (and real bold weight)
     function fontForWeight(weight, regularFamily) { return (Number(weight) >= Font.DemiBold && regularFamily === "Open Runde") ? boldFontFamily : regularFamily; }
 
     property var info: ({})
@@ -53,7 +43,6 @@ Scope {
         stdout: StdioCollector { onStreamFinished: root.parse(text) }
     }
 
-    // the spec rows: [label, value, small grey line under it]
     readonly property var rows: {
         var o = info, r = [];
         if (!o.cpu) return r;
@@ -66,16 +55,15 @@ Scope {
         return r;
     }
 
-    // the logo: a file the user supplied > the YukiShell logo
     Window {
         id: win
         title: "About This Linux"
-        readonly property real uiS: root.bar ? root.bar.uiScale : 1      // UI scale (Settings -> Menu Bar)
+        readonly property real uiS: root.bar ? root.bar.uiScale : 1
         readonly property int wantH: Math.round((Math.ceil(content.implicitHeight) + 40 + 26) * uiS)
         readonly property int wantW: Math.round(300 * uiS)
         width: wantW
         height: wantH
-        minimumWidth: wantW; maximumWidth: wantW      // not `width`: the window feeds its own limits back into its width (binding loop)
+        minimumWidth: wantW; maximumWidth: wantW
         minimumHeight: wantH; maximumHeight: wantH
         visible: false
         color: "transparent"
@@ -83,7 +71,6 @@ Scope {
 
         onVisibleChanged: if (visible) { root.refresh(); floatTries = 0; floatTimer.restart(); }
         property int floatTries: 0
-        // the size changed while the window is open (UI scale, or the content grew): send Hyprland the new size again
         onWidthChanged: if (visible) { floatTries = 0; floatTimer.restart(); }
         onHeightChanged: if (visible) { floatTries = 0; floatTimer.restart(); }
         Timer {
@@ -91,16 +78,12 @@ Scope {
             interval: 60
             repeat: true
             onTriggered: {
-                // the compositor maps the window a moment after it becomes visible: send the dispatches a few times
                 var sel = 'window = "title:^(' + win.title + ')$"';
                 Hyprland.dispatch('hl.dsp.window.float({ action = "enable", ' + sel + ' })');
                 Hyprland.dispatch('hl.dsp.window.fullscreen({ mode = "maximized", action = "unset", ' + sel + ' })');
-                // this window draws its own macOS-style edge: no Hyprland border, and Hyprland's corner rounding
-                // (also used for its shadow and blur) matches the window's own radius
                 Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "border_size", value = "0", ' + sel + ' })');
                 Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "rounding", value = "' + Math.round(frame.radius * win.uiS) + '", ' + sel + ' })');
                 if (win.floatTries >= 2) {
-                    // Hyprland keeps the size the window was first mapped with (and its blur / shadow region): force the scaled size
                     Hyprland.dispatch('hl.dsp.window.resize({ x = ' + win.width + ', y = ' + win.height + ', "exact", ' + sel + ' })');
                     Hyprland.dispatch('hl.dsp.window.center({ ' + sel + ' })');
                 }
@@ -117,8 +100,8 @@ Scope {
             readonly property color text2: dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.5)
             readonly property color text3: dark ? Qt.rgba(1, 1, 1, 0.38) : Qt.rgba(0, 0, 0, 0.42)
             readonly property color border: dark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.18)
-            readonly property color edgeOuter: Qt.rgba(1, 1, 1, 0.50)     // thin dark line on the outside
-            readonly property color edgeInner: dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.65)      // soft highlight just inside it
+            readonly property color edgeOuter: Qt.rgba(1, 1, 1, 0.50)
+            readonly property color edgeInner: dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.65)
             function lightBorder(active, c) { return active ? Qt.darker(c, dark ? 1.12 : 1.22) : "transparent"; }
             readonly property color lightOff: dark ? Qt.rgba(1, 1, 1, 0.2) : Qt.rgba(0, 0, 0, 0.15)
             readonly property color btn: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.75)
@@ -127,7 +110,6 @@ Scope {
 
         Rectangle {
             id: frame
-            // drawn at a scaled size: the window content shrinks with the UI scale, the window itself shrinks to match
             width: parent.width / win.uiS; height: parent.height / win.uiS
             scale: win.uiS; transformOrigin: Item.TopLeft
             radius: 18
@@ -135,7 +117,6 @@ Scope {
             border.width: 1; border.color: pal.edgeOuter
             clip: true
 
-            // inner highlight: together with the outer line this is the two-tone edge macOS windows have
             Rectangle {
                 anchors.fill: parent; anchors.margins: 1
                 radius: frame.radius - 1
@@ -144,15 +125,13 @@ Scope {
                 z: 50
             }
 
-            // drag anywhere on the window
             DragHandler { target: null; onActiveChanged: if (active) win.startSystemMove() }
 
-            // traffic lights: only Close is active, like the About window on a Mac
             Item {
                 x: 15; y: 12
                 width: 58; height: 14
                 Row {
-                    scale: 0.93; transformOrigin: Item.TopLeft      // a touch smaller
+                    scale: 0.93; transformOrigin: Item.TopLeft
                     spacing: 8
                     Repeater {
                         model: [{ c: "#FF5F57", on: true }, { c: "#FEBC2E", on: false }, { c: "#28C840", on: false }]
@@ -189,7 +168,6 @@ Scope {
                 width: parent.width - 40
                 spacing: 0
 
-                // --- logo ---
                 Item {
                     width: parent.width; height: 118
                     Image {
@@ -205,7 +183,6 @@ Scope {
                 }
                 Item { width: 1; height: 20 }
 
-                // --- name, with the version next to it in a lighter weight (like "macOS Sequoia 15") ---
                 Item {
                     width: parent.width; height: nameRow.height
                     Row {
@@ -237,7 +214,6 @@ Scope {
                 }
                 Item { width: 1; height: 22 }
 
-                // --- specs ---
                 Column {
                     width: parent.width
                     spacing: 5
@@ -278,7 +254,6 @@ Scope {
                 }
                 Item { width: 1; height: 18 }
 
-                // --- More Info... ---
                 Item {
                     width: parent.width; height: 24
                     Rectangle {
@@ -298,7 +273,6 @@ Scope {
                 }
                 Item { width: 1; height: 20 }
 
-                // --- links and legal ---
                 Item {
                     width: parent.width; height: siteTxt.implicitHeight
                     Text {

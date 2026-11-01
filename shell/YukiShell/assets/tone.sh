@@ -1,16 +1,10 @@
 #!/bin/sh
-# Prints "<brightness> <spread>" (both 0..1, perceived/gamma brightness) of a screen area, read by YukiBar.qml (auto contrast).
-#   tone.sh SCALE X Y W H [IX IY IW IH]
-# The area X,Y WxH is grabbed with grim (wallpaper + every window + layers = what is really on screen). With IX IY IW IH given,
-# that inner rectangle (the open panel itself) is left out, so the panel's own glass never feeds back into the measurement.
-# The brightness is taken after a median filter, so thin text (the bar's own labels) does not tilt it.
 t=$(mktemp /tmp/yukishell-tone.XXXXXX) || exit 1
 trap 'rm -f "$t"' EXIT
 s=${1:-0.1}; X=$2; Y=$3; W=$4; H=$5
 grim -t ppm -s "$s" -g "$X,$Y ${W}x$H" "$t" 2>/dev/null || exit 1
 L='0.299*mean.r+0.587*mean.g+0.114*mean.b'
 D='0.299*standard_deviation.r+0.587*standard_deviation.g+0.114*standard_deviation.b'
-# one magick run for both numbers (a process start costs more than the measuring itself): the median-filtered brightness, then the spread
 ms=$(magick "$t" \( +clone -statistic Median 3x3 -format "%[fx:$L] " -write info: +delete \) -format "%[fx:$D]" info: 2>/dev/null) || exit 1
 mo=${ms% *}; sd=${ms#* }
 [ -n "$mo" ] && [ -n "$sd" ] || exit 1

@@ -1,5 +1,4 @@
 .pragma library
-// Colour helpers shared by the colour choosers in Settings (ColorChoice.qml).
 
 function hex2(n) {
     n = Math.max(0, Math.min(255, Math.round(n)));
@@ -8,7 +7,6 @@ function hex2(n) {
 
 function fromRgb(r, g, b) { return "#" + hex2(r) + hex2(g) + hex2(b); }
 
-// "#0A84FF", "0a84ff", "#08f", "#0a84ffcc" (alpha is dropped), "rgb(10, 132, 255)", "10, 132, 255", "10 132 255" -> "#0a84ff"; "" when it is none of those
 function parse(text) {
     var s = String(text === undefined || text === null ? "" : text).trim().toLowerCase();
     if (s === "") return "";
@@ -25,14 +23,12 @@ function parse(text) {
     return "";
 }
 
-// the three channels of "#rrggbb" as "10, 132, 255"
 function rgbText(hex) {
     var h = parse(hex);
     if (h === "") return "";
     return parseInt(h.substr(1, 2), 16) + ", " + parseInt(h.substr(3, 2), 16) + ", " + parseInt(h.substr(5, 2), 16);
 }
 
-// HSL (h 0..360, s and l 0..1) -> "#rrggbb"
 function fromHsl(h, s, l) {
     var c = (1 - Math.abs(2 * l - 1)) * s, hp = (((h % 360) + 360) % 360) / 60;
     var x = c * (1 - Math.abs(hp % 2 - 1)), r = 0, g = 0, b = 0;
@@ -42,7 +38,6 @@ function fromHsl(h, s, l) {
     return fromRgb((r + m) * 255, (g + m) * 255, (b + m) * 255);
 }
 
-// the palette grid: 12 hues (columns) in 5 shades from light to dark, then a row of greys
 function palette() {
     var shades = [[0.80, 0.82], [0.85, 0.68], [0.85, 0.52], [0.78, 0.38], [0.70, 0.26]], out = [];
     for (var r = 0; r < shades.length; r++)

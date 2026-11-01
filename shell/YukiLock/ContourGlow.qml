@@ -1,13 +1,11 @@
-// Hover contour glow (same shader as YukiShell's Spotlight): a thin light line along the rounded outline + a soft
-// halo, brightest near the cursor. Put it inside the shape it outlines.
 import QtQuick
 
 ShaderEffect {
     id: cgl
     property real cornerR: 18
     property bool hovered: false
-    property real boost: 1.0                                  // > 1 while pressed
-    property point at: Qt.point(width / 2, height / 2)      // cursor, in the shape's coordinates
+    property real boost: 1.0
+    property point at: Qt.point(width / 2, height / 2)
     property real pad: 14
     property color glowColor: "white"
     anchors.fill: parent

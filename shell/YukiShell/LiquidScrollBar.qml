@@ -1,7 +1,3 @@
-// LiquidScrollBar - macOS-style overlay scroller for any Flickable / ListView / GridView.
-// It fades in while the view scrolls or the pointer is near, and fades out a moment after. Hovering widens it into
-// a glass capsule (clear with a bright rim for Liquid Glass, frosted for Frosted / Blur, solid for Opaque); drag it to scroll.
-//   LiquidScrollBar { flick: myList; anchors { right: myList.right; top: myList.top; bottom: myList.bottom } }
 import QtQuick
 
 Item {
@@ -9,15 +5,14 @@ Item {
     property Flickable flick: null
     property string material: "liquid"
     property bool dark: true
-    property bool alwaysVisible: false   // keep the thumb showing (dimmed) so people can tell there is more to scroll to
-    property bool compact: false         // slimmer thumb and track
+    property bool alwaysVisible: false
+    property bool compact: false
     width: compact ? 10 : 16
     readonly property real contentH: flick ? Math.max(flick.contentHeight, 1) : 1
     readonly property real ratio: flick ? Math.min(1, flick.height / contentH) : 1
     readonly property real thumbH: Math.max(compact ? 18 : 32, ratio * height)
     readonly property real travel: Math.max(1, contentH - (flick ? flick.height : 0))
     readonly property real frac: flick ? Math.max(0, Math.min(1, (flick.contentY - flick.originY) / travel)) : 0
-    // stays hoverable while faded out, so moving the pointer to the edge brings it back
     visible: flick !== null && flick.visible && ratio < 0.999
 
     readonly property bool hot: ma.containsMouse || ma.pressed
@@ -47,7 +42,6 @@ Item {
                          : Qt.rgba(ink, ink, ink, 0.42 + (sb.material === "opaque" ? 0.15 : 0) * sb.glass)
         border.width: sb.lens > 0.01 ? 1 : 0
         border.color: Qt.rgba(1, 1, 1, (sb.liquid ? 0.8 : 0.45) * sb.lens)
-        // specular strip down the left edge, like light catching a glass rod
         Rectangle {
             visible: sb.lens > 0.01
             opacity: sb.lens
@@ -71,7 +65,6 @@ Item {
             sb.flick.contentY = sb.flick.originY + f * sb.travel;
         }
         onPressed: mouse => {
-            // on the thumb: keep the grab point; on the track: jump so the thumb centres on the pointer
             grab = (mouse.y >= thumb.y && mouse.y <= thumb.y + thumb.height) ? mouse.y - thumb.y : sb.thumbH / 2;
             scrollTo(mouse.y);
         }

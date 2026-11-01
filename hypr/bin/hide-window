@@ -18,10 +18,8 @@ import json, os, subprocess, sys
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "yukishell-hidden.json")
 HIDDEN = "special:hidden"
 
-
 def hc(*args):
     return subprocess.run(["hyprctl", *args], capture_output=True, text=True).stdout
-
 
 def hj(what):
     try:
@@ -29,10 +27,8 @@ def hj(what):
     except ValueError:
         return {} if what == "activewindow" else []
 
-
 def dispatch(lua):
     hc("dispatch", lua)
-
 
 def load():
     try:
@@ -41,20 +37,15 @@ def load():
     except (OSError, ValueError):
         return []
 
-
 def save(entries):
     with open(STATE, "w") as f:
         json.dump(entries, f)
 
-
 def lua_str(s):
-    return json.dumps(str(s))      # a JSON string is a valid Lua string literal for the names Hyprland uses
-
+    return json.dumps(str(s))
 
 def ws_selector(ws):
-    # a numbered workspace by its id, any other (named) one by its name
     return str(ws["id"]) if isinstance(ws.get("id"), int) and ws["id"] > 0 else lua_str(ws.get("name", ""))
-
 
 def restore(entry, focus):
     sel = f'window = "address:{entry["address"]}"'
@@ -70,9 +61,8 @@ def restore(entry, focus):
     fs = entry.get("fullscreen", 0)
     if fs or focus:
         dispatch(f"hl.dsp.focus({{ {sel} }})")
-    if fs:                          # full screen acts on the focused window
+    if fs:
         dispatch(f'hl.dsp.window.fullscreen({{ mode = "{"maximized" if fs == 1 else "fullscreen"}", action = "set" }})')
-
 
 def pointer_on_desktop():
     """With focus following the mouse, Hyprland keeps the keyboard focus on the last window when the pointer moves onto the empty
@@ -97,7 +87,6 @@ def pointer_on_desktop():
             return False
     return True
 
-
 def focused_window():
     """The focused window, if it is a normal one (not on a special workspace such as "hidden" itself)."""
     win = hj("activewindow")
@@ -106,7 +95,6 @@ def focused_window():
     if win.get("workspace", {}).get("name", "").startswith("special:"):
         return None
     return win
-
 
 def hide(win, entries):
     addr = win["address"]
@@ -119,20 +107,17 @@ def hide(win, entries):
         "fullscreen": int(win.get("fullscreen", 0) or 0),
     }
     sel = f'window = "address:{addr}"'
-    if entry["fullscreen"]:        # leave full screen first, so the workspace it leaves is not stuck in full-screen mode
+    if entry["fullscreen"]:
         dispatch(f'hl.dsp.window.fullscreen({{ mode = "{"maximized" if entry["fullscreen"] == 1 else "fullscreen"}", action = "unset" }})')
     dispatch(f'hl.dsp.window.move({{ workspace = "{HIDDEN}", follow = false, {sel} }})')
     save([e for e in entries if e["address"] != addr] + [entry])
-
 
 def show_all(entries, in_hidden, clients):
     active = hj("activeworkspace")
     here = ws_selector(active) if isinstance(active, dict) and active else None
     recorded = {e["address"] for e in entries}
-    # windows hidden some other way (no record): back to the workspace in front, oldest focus first
     stray = sorted((a for a in in_hidden if a not in recorded), key=lambda a: -clients[a].get("focusHistoryID", 0))
-    todo = [{"address": a, "workspace": here} for a in stray if here] + entries      # oldest first, the one hidden last at the end
-    # focus: the window hidden last among those coming back to this workspace (none: stay where you are)
+    todo = [{"address": a, "workspace": here} for a in stray if here] + entries
     target = next((e["address"] for e in reversed(todo) if here is not None and str(e["workspace"]) == str(here)), None)
     save([])
     for e in todo:
@@ -140,11 +125,9 @@ def show_all(entries, in_hidden, clients):
     if target:
         dispatch(f'hl.dsp.focus({{ window = "address:{target}" }})')
 
-
 def main(mode):
     clients = {c["address"]: c for c in hj("clients")}
     in_hidden = {a for a, c in clients.items() if c.get("workspace", {}).get("name") == HIDDEN}
-    # forget windows that were closed (or taken out of "hidden" by hand) since they were hidden
     entries = [e for e in load() if e.get("address") in in_hidden]
     save(entries)
 
@@ -156,6 +139,5 @@ def main(mode):
         if mode == "hide":
             return
     show_all(entries, in_hidden, clients)
-
 
 main(sys.argv[1] if len(sys.argv) > 1 else "toggle")

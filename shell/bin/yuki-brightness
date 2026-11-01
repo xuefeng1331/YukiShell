@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
-# yuki-brightness get | set <0-100> | sync <0-100> | step <+N|-N>
-# Laptop backlight -> brightnessctl (backlight class only, never the LAN/keyboard LEDs).
-# External monitor -> DDC/CI through ddcutil (VCP 0x10). ddcutil is slow (~0.3-1 s per call), so the last value is cached
-# for 30 s and writes are serialised with flock; the shell sends the newest slider value as soon as the previous write ends.
 rt="${XDG_RUNTIME_DIR:-/tmp}"; cache="$rt/yuki-brightness.val"; busf="$rt/yuki-brightness.bus"; lock="$rt/yuki-brightness.lock"
 
-# a desktop has no /sys/class/backlight entry: skip the brightnessctl run (and its fork) entirely
 backlight() {
     local d; for d in /sys/class/backlight/*/; do [ -e "${d}brightness" ] && { brightnessctl -c backlight -m 2>/dev/null | head -n1; return; }; done
 }
@@ -15,23 +10,21 @@ bus() {
 }
 fresh() { [ -s "$cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$cache") )) -lt 30 ]; }
 
-get() {   # prints a percentage
+get() {
     if [ -n "$(backlight)" ]; then backlight | cut -d, -f4 | tr -d %; return; fi
     if fresh; then cat "$cache"; return; fi
     local b; b=$(bus); [ -n "$b" ] || return 1
     ddcutil --bus "$b" getvcp 10 --brief 2>/dev/null | awk '$1=="VCP" && $3=="C" { print $4; exit }' | tee "$cache"
 }
-set_() {  # set_ <pct>
+set_() {
     local p=$1; [ "$p" -lt 1 ] && p=1; [ "$p" -gt 100 ] && p=100
     if [ -n "$(backlight)" ]; then brightnessctl -c backlight -q set "${p}%"; return; fi
     echo "$p" > "$cache"
     local b; b=$(bus); [ -n "$b" ] || return 1
-    # fast path ~80 ms (skips the per-call capability checks, short sleeps); one slow, safe retry if the monitor NAKs it
     flock "$lock" sh -c 'ddcutil --bus "$1" --noverify --skip-ddc-checks --sleep-multiplier 0.1 setvcp 10 "$2" || ddcutil --bus "$1" --noverify setvcp 10 "$2"' _ "$b" "$p" >/dev/null 2>&1
 }
 
-sync_() {  # sync_ <pct>: make the monitor really read <pct>. Fast writes can be dropped silently (exit 0, nothing happens),
-           # so after a burst read the real value back and rewrite until it matches (max 4 tries); the cache gets the truth.
+sync_() {
     local p=$1; [ "$p" -lt 1 ] && p=1; [ "$p" -gt 100 ] && p=100
     if [ -n "$(backlight)" ]; then return 0; fi
     local b; b=$(bus); [ -n "$b" ] || return 1
@@ -40,7 +33,7 @@ sync_() {  # sync_ <pct>: make the monitor really read <pct>. Fast writes can be
     for i in 1 2 3 4; do
         cur=$(ddcutil --bus "$b" getvcp 10 --brief 2>/dev/null | awk '$1=="VCP" && $3=="C" { print $4; exit }')
         [ "$cur" = "$p" ] && break
-        ddcutil --bus "$b" --sleep-multiplier 0.5 setvcp 10 "$p" >/dev/null 2>&1      # verified write, normal pacing
+        ddcutil --bus "$b" --sleep-multiplier 0.5 setvcp 10 "$p" >/dev/null 2>&1
         sleep 0.12
     done
     [ -n "$cur" ] && echo "$cur" > "$cache"
@@ -49,7 +42,7 @@ sync_() {  # sync_ <pct>: make the monitor really read <pct>. Fast writes can be
 
 case "${1:-get}" in
     get)  get ;;
-    getm) v=$(get) && echo "yuki,monitor,$v,${v}%" ;;          # brightnessctl -m shaped, for the shell
+    getm) v=$(get) && echo "yuki,monitor,$v,${v}%" ;;
     set)  set_ "$2" ;;
     sync) sync_ "$2" ;;
     step) cur=$(get) || exit 1; set_ $(( cur + $2 )) ;;

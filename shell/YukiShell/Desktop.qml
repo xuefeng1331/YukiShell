@@ -1,7 +1,3 @@
-// Desktop - the files, folders and apps sitting on your desktop, exactly as macOS shows them.
-//
-// Everything in ~/Desktop appears here. Drag an icon to move it (positions live in ~/.config/yukishell/desktop.json),
-// double-click to open, drop one icon onto another to make a folder, right-click for the menu.
 import QtQuick
 import QtQuick.Effects
 import Quickshell
@@ -22,8 +18,8 @@ Scope {
     readonly property string dir: home + "/Desktop"
 
     readonly property bool enabled: dock ? dock.desktopIcons : true
-    property var items: []                  // { name, path, isDir, isApp, exec, icon, kind }
-    property var places: ({})               // name -> { x, y }
+    property var items: []
+    property var places: ({})
     property string selected: ""
 
     readonly property int cellW: 96
@@ -66,7 +62,6 @@ Scope {
     function placeOf(name, index) {
         var p = places[name];
         if (p) return p;
-        // nothing saved yet: fill the right-hand column the way macOS does
         var perCol = 7;
         return { x: -(1 + Math.floor(index / perCol)) * cellW, y: 36 + (index % perCol) * cellH };
     }
@@ -85,7 +80,6 @@ Scope {
         Quickshell.execDetached(["sh", "-c", "cd \"$1\" && n='untitled folder'; i=2; while [ -e \"$n\" ]; do n=\"untitled folder $i\"; i=$((i+1)); done; mkdir \"$n\"", "sh", root.dir]);
         rescan.restart();
     }
-    // dropping one icon onto another makes a folder holding both, the way macOS does
     function combine(aPath, bPath) {
         Quickshell.execDetached(["sh", "-c",
             "d=\"$1\"; a=\"$2\"; b=\"$3\"; n=\"$d/New Folder\"; i=2; while [ -e \"$n\" ]; do n=\"$d/New Folder $i\"; i=$((i+1)); done; "
@@ -138,7 +132,6 @@ Scope {
                         required property var modelData
                         required property int index
                         readonly property var place: root.placeOf(modelData.name, index)
-                        // a negative x means "measured from the right edge", which keeps the default column pinned there
                         x: dragging ? dragX : (place.x < 0 ? w.width + place.x : place.x)
                         y: dragging ? dragY : place.y
                         width: root.cellW; height: root.cellH
@@ -154,7 +147,6 @@ Scope {
                                  : (dropMa.containsDrag ? Qt.rgba(1, 1, 1, 0.18) : "transparent")
                             Behavior on color { ColorAnimation { duration: 150 } }
                         }
-                        // the icon itself: app icon, folder, image thumbnail or a plain document
                         Image {
                             id: img
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -167,7 +159,6 @@ Scope {
                                   : (icon.modelData.isDir ? (root.dock ? root.dock.folderIcon : Quickshell.iconPath("folder"))
                                   : (icon.modelData.isApp ? root.appIcon(icon.modelData.path) : Quickshell.iconPath("text-x-generic", "application-x-executable")))
                             onStatusChanged: if (status === Image.Error) source = Quickshell.iconPath("application-x-executable", true)
-                            // Settings -> Icons -> Tinted, for app icons (pictures and folders keep their colours)
                             layer.enabled: icon.modelData.isApp === true && root.dock !== null && root.dock.iconsTinted
                             layer.effect: MultiEffect {
                                 colorization: root.dock ? root.dock.iconColorize : 0
@@ -176,7 +167,6 @@ Scope {
                                 saturation: root.dock ? root.dock.iconSat : 0
                                 opacity: root.dock ? root.dock.iconAlpha : 1
                             }
-                            // switching the icon style: a simple fade
                             opacity: icon.modelData.isApp === true && root.dock ? 1 - root.dock.iconSwap : 1
                         }
                         Text {
@@ -225,7 +215,6 @@ Scope {
                             onReleased: {
                                 if (!icon.dragging) return;
                                 icon.dragging = false;
-                                // snap to the grid, like macOS with "Snap to Grid" on
                                 var gx = Math.max(0, Math.min(w.width - root.cellW, Math.round(icon.dragX / root.cellW) * root.cellW));
                                 var gy = Math.max(28, Math.min(w.height - root.cellH, Math.round((icon.dragY - 36) / root.cellH) * root.cellH + 36));
                                 root.setPlace(icon.modelData.name, gx, gy);
@@ -235,7 +224,6 @@ Scope {
                     }
                 }
 
-                // right-click menu - the macOS one: a soft card, inset highlight, separators, and it springs open
                 Item {
                     id: dctx
                     property var item: undefined
@@ -248,8 +236,6 @@ Scope {
                     transformOrigin: Item.TopLeft
                     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                     Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-                    // Holding the Scope here keeps the menu's actions working: looking "root" up from inside the
-                    // delegate's handler fails at runtime, which is what used to make Move to Trash do nothing.
                     readonly property var app: root
                     function show(it, mx, my) {
                         item = it;
@@ -335,7 +321,6 @@ Scope {
                     onPressed: dctx.item = undefined
                 }
 
-                // rename sheet
                 Rectangle {
                     id: renamer
                     property var item: undefined
@@ -372,10 +357,8 @@ Scope {
         }
     }
 
-    // a .desktop file's icon, read out of the file itself
     property var appIcons: ({})
     function appIcon(path) {
-        // through the Dock, so Settings -> Icons -> Dark gives the desktop the same real dark icons
         if (appIconNames[path] !== undefined && dock && dock.iconSrc) { var dk = dock.iconLook; return dock.iconSrc(appIconNames[path]); }
         if (appIcons[path] !== undefined) return appIcons[path];
         iconQueue.push(path);

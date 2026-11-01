@@ -2,7 +2,7 @@ hl.config({
     input = {
         kb_layout    = "us",
         follow_mouse = 1,
-        focus_on_close = 1,   -- a closed window hands focus to the window under the pointer (YukiShell: the desktop if none)
+        focus_on_close = 1,
         sensitivity  = 0,
         repeat_rate  = 40,
         repeat_delay = 250,

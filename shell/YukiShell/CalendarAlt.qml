@@ -2,10 +2,6 @@ import QtQuick
 import "Fonts.js" as Fonts
 import "I18n.js" as I18n
 
-// The Calendar widget's designs for the other grid shapes (CalendarWidget.qml draws the card, this only the contents):
-//   tall   one column, 2+ rows   today big on top, then this week as a list
-//   strip  4 x 1                 the month on the left, this week and the next across as day columns
-//   hero   4 columns, 2+ rows    today big on the left, this month and the next side by side
 Item {
     id: a
     property Item wd
@@ -15,7 +11,6 @@ Item {
                             : (lay === "strip" ? Math.min(width / 809, height / 185) : Math.min(width / 809, height / 385))
     readonly property var now: wd ? wd.now : new Date()
     readonly property int ws: wd ? wd.weekStart : 0
-    // the first day of this week (weekStart decides Sunday or Monday)
     readonly property var weekStart: { var d = new Date(now.getFullYear(), now.getMonth(), now.getDate()); d.setDate(d.getDate() - ((d.getDay() - ws + 7) % 7)); return d; }
     function dayAt(i) { var d = new Date(weekStart); d.setDate(d.getDate() + i); return d; }
     function same(d, e) { return d.getFullYear() === e.getFullYear() && d.getMonth() === e.getMonth() && d.getDate() === e.getDate(); }
@@ -30,7 +25,6 @@ Item {
         font.weight: weight
         elide: Text.ElideRight
     }
-    // a month: weekday letters, then the days; today in a red circle
     component MonthGrid: Item {
         id: mg
         property int year
@@ -68,7 +62,6 @@ Item {
         }
     }
 
-    // ---------- tall ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "tall"
@@ -94,7 +87,6 @@ Item {
         }
     }
 
-    // ---------- strip ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "strip"
@@ -124,13 +116,12 @@ Item {
                         color: parent.today ? a.wd.red : "transparent"
                         Label { anchors.centerIn: parent; text: parent.parent.d.getDate(); px: 17; color: parent.parent.today ? "white" : a.wd.fg; opacity: parent.parent.past ? 0.4 : 1 }
                     }
-                    // the first day of a new month gets its name under it
                     Label {
                         visible: parent.d.getDate() === 1
                         anchors.horizontalCenter: parent.horizontalCenter; y: 120 * a.u
                         text: a.wd.monthNames[parent.d.getMonth()].slice(0, 3); px: 11; color: a.wd.red
                     }
-                    Rectangle {   // a thin line between the two weeks
+                    Rectangle {
                         visible: index === 7
                         x: 0; y: 46 * a.u; width: 1; height: 70 * a.u; color: a.wd.line
                     }
@@ -139,14 +130,12 @@ Item {
         }
     }
 
-    // ---------- hero ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "hero"
         Label { x: 28 * a.u; y: 26 * a.u; text: a.wd.dayNames[a.now.getDay()].toUpperCase(); px: 15; color: a.wd.red; font.letterSpacing: 0.8 * a.u }
         Label { id: hNum; x: 22 * a.u; y: 40 * a.u; text: a.now.getDate(); px: 140; weight: Font.Light }
         Label { x: 28 * a.u; y: hNum.y + hNum.height - 14 * a.u; text: a.wd.monthNames[a.now.getMonth()] + " " + a.now.getFullYear(); px: 18; color: a.wd.fgSub }
-        // how far through the year: a small note under the date
         Label {
             x: 28 * a.u; y: parent.height - 42 * a.u
             readonly property int doy: Math.floor((new Date(a.now.getFullYear(), a.now.getMonth(), a.now.getDate()) - new Date(a.now.getFullYear(), 0, 1)) / 86400000) + 1

@@ -1,8 +1,3 @@
-// LiquidSwitch - the on/off switch used everywhere in the shell, after the iOS 26 / macOS Tahoe switch:
-//   one tap is one motion: the knob swells into a clear glass lens as it leaves, crosses as glass (stretching a
-//   little, the track colour following it) and is the solid white knob again as it lands
-//   holding it keeps it glass, and it can be dragged across
-// The knob can also be dragged across. Frosted / Blur turn the lens frosted, Opaque keeps it solid (it still moves).
 import QtQuick
 import QtQuick.Effects
 
@@ -17,9 +12,6 @@ Item {
     width: 38; height: 22
     opacity: enabled ? 1 : 0.4
 
-    // ONE motion, like the iOS 26 switch: a single value (along) moves the knob, and everything else follows it  - 
-    // the knob turns to glass and swells as it leaves, is most glassy half way, and is solid again as it lands;
-    // the stretch and the track colour ride on the same curve. Holding it (press / drag) keeps it glass.
     property real along: checked ? 1 : 0
     Behavior on along { enabled: !ma.dragging; NumberAnimation { duration: 520; easing.type: Easing.OutCubic } }
     readonly property real travel: Math.sin(Math.PI * Math.max(0, Math.min(1, along)))
@@ -30,7 +22,6 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: height / 2
-        // the colour follows the knob across rather than switching at once
         color: Qt.rgba(sw.offColor.r + (sw.accent.r - sw.offColor.r) * sw.along,
                        sw.offColor.g + (sw.accent.g - sw.offColor.g) * sw.along,
                        sw.offColor.b + (sw.accent.b - sw.offColor.b) * sw.along,
@@ -41,7 +32,7 @@ Item {
         z: 2
         restW: sw.height - 4; restH: sw.height - 4
         grow: 1.5
-        growH: 0.34                      // it swells past the track's edges, like on iOS
+        growH: 0.34
         glass: sw.glass
         material: sw.material
         dark: sw.dark
@@ -49,7 +40,6 @@ Item {
         trackH: sw.height - 4
         leftRoom: sw.along * (sw.width - sw.height)
         rightRoom: (1 - sw.along) * (sw.width - sw.height)
-        // the centre runs along the track; growing never shifts it, so the lens bulges evenly
         readonly property real cx: ma.dragging ? Math.max(sw.height / 2, Math.min(sw.width - sw.height / 2, ma.dragX))
                                                : sw.height / 2 + Math.max(0, Math.min(1, sw.along)) * (sw.width - sw.height)
         x: cx - width / 2

@@ -1,5 +1,3 @@
-// macOS pop-up button (System Settings style): right-aligned value + grey chevrons; opens a menu ON the button with
-// the current item lined up on it, a check mark, accent hover, and a fade/scale animation
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
@@ -11,7 +9,6 @@ Item {
     property var model: []
     property int current: 0
     signal picked(int index)
-    // the chevron ends flush with the row's right inset, like a switch or a slider; the hover highlight reaches 8 px past it
     width: 220; height: 28
     Rectangle {
         anchors.fill: parent; anchors.leftMargin: -8; anchors.rightMargin: -8; radius: 8
@@ -47,9 +44,6 @@ Item {
         readonly property real rowH: 28
         width: Math.max(pu.width + 16, 192)
         x: pu.width + 8 - width
-        // macOS: the current item sits right on the button; if that would leave the window, the menu shifts to fit,
-        // and a menu taller than the window scrolls (no separate popup window: those fought Hyprland's pointer grabs)
-        // Qt keeps the popup inside the window (8 px margin): it shifts up and, if still too tall, shrinks - the list scrolls
         margins: 8
         height: pu.model.length * rowH + 8
         y: -(4 + pu.current * rowH)

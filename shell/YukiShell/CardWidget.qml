@@ -1,74 +1,60 @@
-// One desktop widget card in the macOS Tahoe style, for widgets whose contents come from ExtraWidgets.qml
-// (Batteries, Notes, Photos, Reminders, Alarms, Stocks). The card, sizes, styles and Liquid Glass are the
-// Calendar widget's own; the contents get a `ctx` ({ size: "s" | "m" | "l", fg, fg2, mono, dark }) from their parent.
-//   size:  "small" · "medium" · "large"     style: "liquid" | "normal"     mode: "auto" | "light" | "dark"
 import QtQuick
 import QtQuick.Effects
 
 Item {
     id: w
 
-    // --- look ---
     property string style: "liquid"
     property string size: "small"
-    property string mode: "auto"        // "auto" | "light" | "dark"
+    property string mode: "auto"
     property real scaleF: 1.0
     property string fam: "Open Runde"
     property real screenX: x
     property real screenY: y
-    property Component content: null    // ExtraWidgets.comp(type)
+    property Component content: null
 
-    // --- liquid glass inputs (the Appearance sliders) ---
-    property bool glassReady: false     // liquidglass.frag.qsb compiled
+    property bool glassReady: false
     property url shaderUrl: ""
     property url wallUrl: ""
-    property string wallVideo: ""        // animated wallpaper to play behind the glass ("" = none / real-time glass off)
-    property bool wallPaused: false      // desktop covered / Game Mode: keep the decoder idle
-    property Item wallItem: null         // a LiveWall shared by the whole window: show a slice of it instead of a decoder of our own
+    property string wallVideo: ""
+    property bool wallPaused: false
+    property Item wallItem: null
     property real screenW: 1920
     property real screenH: 1080
-    property real glassOpacity: 0.42    // Translucency
-    property real glassBlur: 5          // Blur
-    property real glassLiquid: 1.0      // Liquid strength
+    property real glassOpacity: 0.42
+    property real glassBlur: 5
+    property real glassLiquid: 1.0
     property real glassRim: 0.45
-    property color borderTint: "#8A9AB5"      // Control Center border colour
-    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)   // "Tint the interface" (rgb = accent, a = on) for the glass shader
+    property color borderTint: "#8A9AB5"
+    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)
     property real glassGrain: 0.03
-    property bool darkGlass: true       // the shell's Dark / Light setting (used by mode "auto")
-    property bool preview: false        // inside the Settings gallery: no wallpaper, simplified glass
+    property bool darkGlass: true
+    property bool preview: false
 
-    // --- desktop edit mode ---
     property bool editing: false
 
-    signal glassFailed()                // the shader did not compile / load -> YukiWidgets falls back to the frosted card
+    signal glassFailed()
 
     readonly property bool isSmall: size === "small"
     readonly property bool isMedium: size === "medium"
     readonly property bool isLarge: size === "large"
-    // Small / Medium are slightly enlarged; Large shares the widened footprint without stretching its vertical content.
     readonly property real s: scaleF * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
     readonly property real radiusPx: 28 * s
     readonly property bool glassOn: style === "liquid" && glassReady && !preview && wallUrl !== ""
-    // the glass is made at once but only shown once its backdrop holds the wallpaper (an empty backdrop refracts as black):
-    // until then it sits at 1% opacity (so it still renders and fills its textures) over the plain card, then fades in
     property bool glassShown: false
-    property bool glassFull: false          // the fade-in is over: the plain card underneath can go
+    property bool glassFull: false
     onGlassOnChanged: if (!glassOn) { glassShown = false; glassFull = false; }
     onGlassShownChanged: if (glassShown) fullT.restart()
     Timer { id: fullT; interval: 250; onTriggered: w.glassFull = w.glassShown }
     width: (isSmall ? 158 : (isLarge ? 358 : 338)) * s
     height: (isLarge ? 354 : 168) * scaleF
 
-    // --- light / dark ---
     readonly property bool dark: mode === "dark" || (mode !== "light" && darkGlass)
     readonly property color fg: dark ? Qt.rgba(1, 1, 1, 0.96) : Qt.rgba(0, 0, 0, 0.86)
     readonly property color fgSub: dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.45)
     readonly property color line: dark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.12)
-    // glass tint: stronger than the Weather widget's, so black (light mode) / white (dark mode) text stays readable on any wallpaper
     readonly property real tint: Math.min(0.92, dark ? 0.25 + glassOpacity * 0.8 : 0.45 + glassOpacity * 0.9)
 
-    // --- background ---
-    // Normal: solid card
     Rectangle {
         anchors.fill: parent
         visible: w.style === "normal"
@@ -79,7 +65,6 @@ Item {
         }
     }
 
-    // Liquid fallback / gallery preview: frosted card (while the shader builds, if it fails, and in Settings)
     Rectangle {
         anchors.fill: parent
         visible: w.style === "liquid" && !(w.glassOn && w.glassFull)
@@ -98,7 +83,6 @@ Item {
         }
     }
 
-    // Liquid Glass: wallpaper crop -> blur -> refraction shader (the same maths as the Dock and the Weather widget)
     Loader {
         id: glassLoader
         anchors.fill: parent
@@ -107,23 +91,19 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         sourceComponent: Item {
             id: gl
-            // the backdrop has the wallpaper (or the live video slice); one more moment for the blur to render it, then show
             readonly property bool filled: wallImg.status === Image.Ready || wallImg.status === Image.Error || wslice.ready
             onFilledChanged: if (filled) showT.restart()
             Component.onCompleted: if (filled) showT.restart()
             Timer { id: showT; interval: 100; onTriggered: w.glassShown = true }
-            readonly property real margin: 72           // backdrop captured around the widget (blur + refraction reach)
-            readonly property real padPx: 10            // shader item padding (soft shadow)
+            readonly property real margin: 72
+            readonly property real padPx: 10
             readonly property real ds: w.glassBlur >= 8 ? 0.5 : 1.0
             readonly property real bn: Math.min(1.0, w.glassBlur * 1.5 * ds / 64.0)
 
-            // the part of the wallpaper behind the widget, laid out exactly like the screen
             Item {
                 id: backdrop
                 width: w.width + 2 * (gl.padPx + gl.margin)
                 height: w.height + 2 * (gl.padPx + gl.margin)
-                // the placeholder only shows when the wallpaper can't be loaded (while it loads, the glass stays clear instead of
-                // flashing these colours after every restart)
                 Rectangle {
                     anchors.fill: parent
                     visible: wallImg.status === Image.Error
@@ -156,8 +136,6 @@ Item {
                     paused: w.wallPaused
                 }
             }
-            // the window's shared video (WallSlice), straight into the blur while it plays: the backdrop (gradient + still picture) is
-            // not captured at all then, since the full-screen video covers it anyway
             WallSlice {
                 id: wslice
                 wall: w.wallItem
@@ -213,22 +191,21 @@ Item {
                 property real dispersion: 0.06 * w.glassLiquid
                 property real magnify: 0.08 * w.glassLiquid * Math.min(1, 90 / w.height)
                 property real rim: w.glassRim
-                property real grain: w.glassGrain * 0.3     // the Dock's glass
-                property real blurPx: 1.5            // tiny residual smoothing; the real blur is the MultiEffect pre-pass
-                property real tintMix: w.glassOpacity * 0.55     // the Dock's light, adaptive tint (no heavy widget tint)
+                property real grain: w.glassGrain * 0.3
+                property real blurPx: 1.5
+                property real tintMix: w.glassOpacity * 0.55
                 property vector4d accentTint: w.accentTint
                 property real saturation: 1.25
-                property real dark: w.dark ? 1 : 0   // this widget's own light / dark mode, not the shell's
+                property real dark: w.dark ? 1 : 0
                 property real debug: 0
-                property real shadowAmt: 0           // no drop shadow
-                property real flatInner: 1           // no darker inner edge (needs the rebuilt liquidglass shader)
-                property real rimTint: 1             // rim + border follow the glass's own colour
-                property real ringW: 0               // the border is the Control Center CornerBorder below
+                property real shadowAmt: 0
+                property real flatInner: 1
+                property real rimTint: 1
+                property real ringW: 0
             }
         }
     }
 
-    // Control Center border (the solid styles; Liquid Glass has the Dock's edge light from the shader instead)
     CornerBorder {
         z: 2
         visible: w.style !== "liquid"
@@ -239,10 +216,8 @@ Item {
         lineW: 0.8
     }
 
-    // --- content ---
     Loader {
         id: body
-        // what the contents read: the size they are drawn at, and the text colours for this card
         readonly property var ctx: ({ size: w.isSmall ? "s" : (w.isMedium ? "m" : "l"), fg: w.fg, fg2: w.fgSub, mono: false, dark: w.dark })
         x: 16 * w.s; y: 14 * w.s
         width: (w.width / w.s - 32) ; height: (w.height / w.s - 28)

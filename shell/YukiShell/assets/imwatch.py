@@ -13,7 +13,7 @@ import sys
 
 try:
     from gi.repository import Gio, GLib
-except ImportError:          # python-gobject missing: the bar keeps using fcitx's own tray data
+except ImportError:
     sys.exit(0)
 
 INTERVAL_MS = 250
@@ -21,7 +21,6 @@ parent = os.getppid()
 last = None
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
-
 
 def emit(name):
     global last
@@ -31,26 +30,23 @@ def emit(name):
     try:
         sys.stdout.write(name + "\n")
         sys.stdout.flush()
-    except BrokenPipeError:  # the shell is gone
+    except BrokenPipeError:
         loop.quit()
-
 
 def done(source, result):
     try:
         name = source.call_finish(result).unpack()[0]
-    except GLib.Error:       # fcitx5 not running (yet), or restarting
+    except GLib.Error:
         name = ""
     emit(name)
 
-
 def tick():
-    if os.getppid() != parent:   # the shell exited and we were adopted by init
+    if os.getppid() != parent:
         loop.quit()
         return False
     bus.call("org.fcitx.Fcitx5", "/controller", "org.fcitx.Fcitx.Controller1", "CurrentInputMethod",
              None, GLib.VariantType.new("(s)"), Gio.DBusCallFlags.NO_AUTO_START, 1000, None, done)
     return True
-
 
 tick()
 GLib.timeout_add(INTERVAL_MS, tick)

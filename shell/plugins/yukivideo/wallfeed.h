@@ -1,9 +1,4 @@
 #pragma once
-// One decoded video for every window. A Qt Quick window can only show video that is decoded for it, so each window's
-// Liquid Glass used to run its own player of the same wallpaper (bar, Dock, widgets, Spotlight, Settings ...), each a little
-// out of step with the others. WallFeed is one sink for ONE MediaPlayer: every frame it gets is copied once into plain memory
-// (a hardware frame belongs to the decoder's GPU context) and handed to every WallFeedOutput, which shows it in a VideoOutput
-// of any window. Windows also say here whether they want the video (want()), so the single player knows when to play.
 #include <QHash>
 #include <QMetaObject>
 #include <QMutex>
@@ -19,10 +14,10 @@ class WallFeed : public QObject
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
-    Q_PROPERTY(QObject *sink READ sink CONSTANT)                          // MediaPlayer.videoOutput
+    Q_PROPERTY(QObject *sink READ sink CONSTANT)
     Q_PROPERTY(bool hasFrame READ hasFrame NOTIFY hasFrameChanged)
-    Q_PROPERTY(int watching READ watching NOTIFY wantsChanged)            // windows that want the video playing now
-    Q_PROPERTY(int holding READ holding NOTIFY wantsChanged)              // windows that show it (playing or paused)
+    Q_PROPERTY(int watching READ watching NOTIFY wantsChanged)
+    Q_PROPERTY(int holding READ holding NOTIFY wantsChanged)
 public:
     explicit WallFeed(QObject *parent = nullptr);
     QObject *sink() const { return m_sink; }
@@ -31,10 +26,9 @@ public:
     int holding() const { return m_wants.size(); }
     QVideoFrame lastFrame() const;
 
-    // key: any string unique to the window's LiveWall. playing = false: it shows the video but may be paused.
     Q_INVOKABLE void want(const QString &key, bool playing);
     Q_INVOKABLE void release(const QString &key);
-    Q_INVOKABLE void clear();          // the player is gone: forget the last frame
+    Q_INVOKABLE void clear();
 
 signals:
     void frameReady(const QVideoFrame &frame);
@@ -42,7 +36,7 @@ signals:
     void wantsChanged();
 
 private:
-    void onFrame(const QVideoFrame &frame);   // decoder thread
+    void onFrame(const QVideoFrame &frame);
     QVideoSink *m_sink;
     mutable QMutex m_lock;
     QVideoFrame m_last;
@@ -55,8 +49,8 @@ class WallFeedOutput : public QObject, public QQmlParserStatus
     Q_OBJECT
     Q_INTERFACES(QQmlParserStatus)
     QML_ELEMENT
-    Q_PROPERTY(QObject *target READ target WRITE setTarget NOTIFY targetChanged)   // a VideoOutput's videoSink
-    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)  // false: keeps the last frame, takes no new ones
+    Q_PROPERTY(QObject *target READ target WRITE setTarget NOTIFY targetChanged)
+    Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
 public:
     explicit WallFeedOutput(QObject *parent = nullptr);
     QObject *target() const { return m_target; }
@@ -73,7 +67,7 @@ signals:
 private:
     void rewire();
     void push(const QVideoFrame &frame);
-    QPointer<WallFeed> m_feed;         // the WallFeed singleton of this object's QML engine
+    QPointer<WallFeed> m_feed;
     QPointer<QObject> m_target;
     bool m_enabled = true;
     QMetaObject::Connection m_conn;

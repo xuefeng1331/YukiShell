@@ -1,6 +1,3 @@
-# YukiVideo: one video decoder for every window's Liquid Glass (see wallfeed.h). Built by install.sh / tools/build-plugins:
-#   cmake -S shell/plugins/yukivideo -B build && cmake --build build
-# and installed to ~/.local/share/yukishell/qml/YukiVideo, which yuki-start puts on QML_IMPORT_PATH.
 cmake_minimum_required(VERSION 3.21)
 project(yukivideo LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)

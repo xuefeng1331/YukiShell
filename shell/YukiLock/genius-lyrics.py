@@ -47,9 +47,7 @@ class GeniusLyricsParser(HTMLParser):
 
     def get_lyrics(self):
         text = "".join(self.lyrics_parts)
-        # Normalize whitespace and excessive newlines
         lines = [line.strip() for line in text.split("\n")]
-        # Remove consecutive blank lines
         cleaned = []
         for line in lines:
             if line:
@@ -59,7 +57,6 @@ class GeniusLyricsParser(HTMLParser):
         return "\n".join(cleaned).strip()
 
 def clean_title(title):
-    # Remove (feat. X), [Remastered], etc.
     t = re.sub(r'[\(\[][^\)\]]*[\)\]]', '', title)
     t = re.sub(r' - .*$', '', t)
     return t.strip()
@@ -110,7 +107,6 @@ def fetch_genius_lyrics(artist, title, cache_dir):
         lyrics_text = parser.get_lyrics()
 
         if not lyrics_text or len(lyrics_text) < 20:
-            # Fallback regex extraction if class structure slightly differed
             containers = re.findall(r'<div[^>]*data-lyrics-container="true"[^>]*>(.*?)</div>', html, re.DOTALL)
             if containers:
                 raw = "\n".join(containers)

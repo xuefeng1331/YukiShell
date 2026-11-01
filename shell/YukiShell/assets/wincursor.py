@@ -16,7 +16,6 @@ from PIL import Image
 
 SIZES = (32, 48, 64, 96)
 
-# Windows pointer role -> the Xcursor names it stands for (the first one is the real file, the others are links to it)
 ROLE_NAMES = {
     "arrow": ["left_ptr", "default", "arrow", "top_left_arrow", "context-menu", "copy", "alias", "dnd-copy", "dnd-link", "dnd-move", "dnd-none", "right_ptr", "draft_large", "draft_small"],
     "help": ["help", "question_arrow", "whats_this", "left_ptr_help", "d9ce0ab605698f320427677b458ad60b", "5c6cd98b3f3ebcb1f9c7f1c204630408"],
@@ -36,7 +35,6 @@ ROLE_NAMES = {
     "person": [],
     "pin": [],
 }
-# when there is no install.inf: words in the file name -> role
 NAME_HINTS = [("appstart", "appstarting"), ("working", "appstarting"), ("progress", "appstarting"), ("busy", "wait"), ("wait", "wait"),
               ("help", "help"), ("precision", "crosshair"), ("cross", "crosshair"), ("text", "ibeam"), ("beam", "ibeam"),
               ("hand", "hand"), ("link", "hand"), ("write", "nwpen"), ("pen", "nwpen"), ("unavail", "no"), ("no", "no"),
@@ -44,8 +42,6 @@ NAME_HINTS = [("appstart", "appstarting"), ("working", "appstarting"), ("progres
               ("dgn2", "sizenesw"), ("diagonal2", "sizenesw"), ("move", "sizeall"), ("alt", "uparrow"), ("up", "uparrow"),
               ("person", "person"), ("pin", "pin"), ("normal", "arrow"), ("arrow", "arrow"), ("pointer", "arrow")]
 
-
-# ---------- reading ----------
 def read_dib(blob):
     """A cursor's bitmap (a BMP without its file header, twice as tall: the colours, then a 1-bit transparency mask)."""
     hs, w, h2, _, bpp = struct.unpack_from("<IiiHH", blob, 0)
@@ -59,7 +55,7 @@ def read_dib(blob):
     out = np.zeros((h, w, 4), np.uint8)
     has_alpha = False
     for row in range(h):
-        y = h - 1 - row                      # bottom-up
+        y = h - 1 - row
         line = blob[p + row * stride: p + (row + 1) * stride]
         mline = blob[mask_at + row * mstride: mask_at + (row + 1) * mstride]
         for x in range(w):
@@ -76,10 +72,9 @@ def read_dib(blob):
             out[y, x] = (r, g, b, a)
             if masked and not (bpp == 32 and has_alpha):
                 out[y, x, 3] = 0
-    if bpp == 32 and has_alpha:              # a real alpha channel: the mask is only a fallback
+    if bpp == 32 and has_alpha:
         pass
     return Image.fromarray(out, "RGBA")
-
 
 def read_cur(data):
     """(RGBA image, hotspot x, y) of the biggest picture in a .cur / .ico file."""
@@ -100,7 +95,6 @@ def read_cur(data):
     if typ != 2:
         hx = hy = 0
     return img, hx, hy
-
 
 def read_ani(data):
     """[(RGBA image, hotspot x, y, delay ms)] of a RIFF ACON (.ani) animated cursor."""
@@ -131,7 +125,6 @@ def read_ani(data):
         out.append((img, hx, hy, max(20, round(j * 1000 / 60))))
     return out
 
-
 def read_gif(path, size):
     """The frames of a GIF shrunk to `size` px (nearest: pixel art stays sharp), with their delays (ms)."""
     im = Image.open(path)
@@ -147,13 +140,8 @@ def read_gif(path, size):
         pass
     return out
 
-
-# ---------- matching a GIF to its static cursor ----------
-# The GIF's picture is often placed differently from the static cursor's (moved over to leave room for the arrow), so every shift up
-# to 12 px each way is tried and the best one is used for all the frames.
 def arr(img):
     return np.asarray(img.convert("RGBA"), dtype=np.int16)
-
 
 def shift(a, dx, dy):
     out = np.zeros_like(a)
@@ -163,7 +151,6 @@ def shift(a, dx, dy):
     out[yd:h - ys if dy < 0 else h, xd:w - xs if dx < 0 else w] = a[ys:h - yd if dy > 0 else h, xs:w - xd if dx > 0 else w]
     return out
 
-
 def score(s, f):
     """How badly a GIF frame matches a static cursor: pixels both show but differently, and pixels only the GIF shows. Pixels only
     the static cursor has (the arrow) cost a little, so the GIF that has the same symbol still wins."""
@@ -171,7 +158,6 @@ def score(s, f):
     both = so & fo
     diff = np.abs(s[..., :3] - f[..., :3]).sum(axis=2) > 90
     return float((both & diff).sum() + (fo & ~so).sum() + 0.25 * (so & ~fo).sum())
-
 
 def best_shift(s, f, reach=12):
     best = (1e9, 0, 0)
@@ -181,7 +167,6 @@ def best_shift(s, f, reach=12):
             if sc < best[0]:
                 best = (sc, dx, dy)
     return best
-
 
 def glyph_mask(s, frames):
     """The pixels only the static cursor has (its arrow / symbol): shown there, transparent in every GIF frame. Specks of under 6
@@ -210,14 +195,11 @@ def glyph_mask(s, frames):
                     keep[cy, cx] = True
     return keep
 
-
 def with_glyph(f, s, keep):
     out = f.copy()
     out[keep] = s[keep]
     return Image.fromarray(out.astype(np.uint8), "RGBA")
 
-
-# ---------- writing ----------
 def xcursor(frames_by_size):
     """An Xcursor file: frames_by_size = {size: [(RGBA image, hx, hy, delay ms)]}."""
     chunks = []
@@ -236,7 +218,6 @@ def xcursor(frames_by_size):
         body += c
     return head + toc + body
 
-
 def scaled(frames, base):
     out = {}
     for size in SIZES:
@@ -245,8 +226,6 @@ def scaled(frames, base):
                      for img, hx, hy, d in frames]
     return out
 
-
-# ---------- the pack ----------
 def inf_roles(folder):
     """file name (lower case) -> role, and the scheme's name, from an install.inf"""
     path = next((os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(".inf")), None)
@@ -267,7 +246,6 @@ def inf_roles(folder):
             roles[f.lower()] = role.lower()
     return roles, strings.get("scheme_name", "")
 
-
 def guess_role(name):
     n = os.path.splitext(name)[0].lower()
     for word, role in NAME_HINTS:
@@ -275,9 +253,7 @@ def guess_role(name):
             return role
     return None
 
-
 def convert(pack, out, name="", log=False):
-    # the cursors may sit one folder down (Static/, Gifs/...)
     folders = [pack] + [os.path.join(pack, d) for d in sorted(os.listdir(pack)) if os.path.isdir(os.path.join(pack, d))]
     curs, gifs, roles, scheme = {}, [], {}, ""
     for d in folders:
@@ -292,7 +268,7 @@ def convert(pack, out, name="", log=False):
     if not curs:
         sys.exit("no .cur or .ani cursors in " + pack)
 
-    cursors = {}       # role -> [(img, hx, hy, delay)]
+    cursors = {}
     for low, p in curs.items():
         role = roles.get(low) or guess_role(low)
         if not role or role in cursors:
@@ -304,7 +280,6 @@ def convert(pack, out, name="", log=False):
             img, hx, hy = read_cur(data)
             cursors[role] = [(img, hx, hy, 0)]
 
-    # GIF animations for the static cursors: each GIF goes to the static cursor it matches best (if it matches well)
     if gifs:
         base = max(fr[0][0].width for fr in cursors.values())
         anim = {g: [(arr(f), d) for f, d in read_gif(g, base)] for g in gifs}
@@ -315,7 +290,6 @@ def convert(pack, out, name="", log=False):
             if img.width != base:
                 continue
             st = arr(img)
-            # a GIF named for this pointer ("link" for the hand, "text" for the I-beam) wins a close call
             def ranked(g, frames):
                 r = best_shift(st, frames[0][0])
                 return (r[0] - (10 if guess_role(os.path.basename(g)) == role else 0), r[0], r[1], r[2])
@@ -347,13 +321,11 @@ def convert(pack, out, name="", log=False):
         f.write("[Icon Theme]\nName=%s\nComment=Converted from a Windows cursor pack\nInherits=Adwaita\n" % title)
     return title
 
-
 def is_pack(folder):
     for d in [folder] + [os.path.join(folder, s) for s in os.listdir(folder) if os.path.isdir(os.path.join(folder, s))]:
         if any(f.lower().endswith((".cur", ".ani")) for f in os.listdir(d)):
             return True
     return False
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

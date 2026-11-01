@@ -82,73 +82,47 @@ import "Fonts.js" as Fonts
 Scope {
     id: root
 
-    // shared helpers from shell.qml (window geometry poller, wallpaper lookup)
     property var hub: null
-    // true while a screen recording / screen share runs: the glass's live window captures sit out (see shell.qml: hub.captureQuiet)
     readonly property bool captureQuiet: hub ? hub.captureQuiet : recording
-    // windows opening / closing: the glass's live captures pause (it keeps its last frame; the source stays attached) - see shell.qml: hub.glassHold
     readonly property bool captureHeld: hub ? hub.glassHold : false
 
-    // --- CONFIG (all persisted to settings.json) ---
-    property bool barEnabled: true           // the menu bar strip itself
-    // every part of the shell can be switched off on its own (the installer's feature picker writes these too)
-    property bool spotlightEnabled: true     // Spotlight (the magnifier / its keybind)
-    property bool reduceMotion: false        // Spotlight: no pop / stagger / slide animations (settings.json: "reduceMotion": true)
-    property bool ccEnabled: true            // Control Center
-    property string ccStyle: "tiles"         // tiles = every control its own glass | macos = one frosted panel behind them
-    property bool notificationsEnabled: true // banners + Notification Center (off = no D-Bus daemon at all, so mako/dunst can take over)
-    property bool clockAppEnabled: true      // the Clock app (alarms and timers still ring while it is on)
+    property bool barEnabled: true
+    property bool spotlightEnabled: true
+    property bool reduceMotion: false
+    property bool ccEnabled: true
+    property string ccStyle: "tiles"
+    property bool notificationsEnabled: true
+    property bool clockAppEnabled: true
     readonly property bool barLayerNeeded: barEnabled || spotlightEnabled || ccEnabled || notificationsEnabled
-    // YukiShell has one look: dark. (The Light / Dark / Auto setting, the Dark Mode toggle and Super+Alt+A were removed; the light
-    // palettes below are left in place but never used.)
     readonly property bool darkMode: true
-    // Panels (top bar menus / popovers, Spotlight, Control Center, notifications) are light or dark by what is BEHIND them
-    // (panelTone, measured live, see "Auto contrast" below); the Light / Dark / Auto setting is the fallback while nothing is
-    // measured yet and the tie-break when the backdrop is neither clearly bright nor clearly dark.
-    // Readability only ever changes the TEXT: panelDarkMode (glass tint, cards, borders) always follows the Light / Dark setting,
-    // while panelTextWhite (text + glyph colour) follows the measured backdrop.
     readonly property bool panelDarkMode: darkMode
-    // Menus and popovers always have white text and glyphs, like the bar itself: the text used to flip to black when the measured
-    // backdrop (a white window, a bright patch of wallpaper) was bright, which looked like a glitch on the dark glass.
     readonly property bool panelTextWhite: true
-    // ...so the backdrop is no longer measured at all (assets/tone.sh grabbed the screen for the bar strip and, every 0.7 s,
-    // around an open menu). The code below stays, switched off here; "autoContrast" in settings.json is ignored.
     readonly property bool toneMeasuring: false
     property color accent: "#eeacbe"
-    property bool accentUi: false            // Appearance -> "Tint the interface": glass, panels and cards take a shade of the accent
-    // the accent as an icon colour: a little lighter on white-text panels, a little deeper on black-text ones
+    property bool accentUi: false
     readonly property color accentInk: panelTextWhite ? Qt.tint(accent, Qt.rgba(1, 1, 1, 0.18)) : Qt.tint(accent, Qt.rgba(0, 0, 0, 0.25))
-    readonly property vector4d accentTintVec: Qt.vector4d(accent.r, accent.g, accent.b, accentUi ? 1 : 0)     // handed to the glass shaders (accentTint)
-    // "Tint the interface": lean a surface colour toward the accent shade the glass shaders use (deep in dark mode, pale in light
-    // mode), keeping its transparency. k = how far (0..1). Off: the colour as it is.
+    readonly property vector4d accentTintVec: Qt.vector4d(accent.r, accent.g, accent.b, accentUi ? 1 : 0)
     function accentWash(c, k, dark) {
         if (!accentUi) return c;
         var a = accent, t = dark ? Qt.rgba(a.r * 0.40, a.g * 0.40, a.b * 0.40, 1) : Qt.rgba(a.r + (1 - a.r) * 0.70, a.g + (1 - a.g) * 0.70, a.b + (1 - a.b) * 0.70, 1);
         return Qt.rgba(c.r + (t.r - c.r) * k, c.g + (t.g - c.g) * k, c.b + (t.b - c.b) * k, c.a);
     }
-    // The UI font is Open Runde (bundled in assets/fonts, loaded by shell.qml). Settings that still say Inter move over to it.
     property string fontFamily: "Open Runde"
     readonly property string boldFontFamily: hub && hub.boldFontFamily ? hub.boldFontFamily : "Open Runde Semibold"
-    // Open Runde: bold text uses its Semibold face; another selected font keeps its own family (and real bold weight)
     function fontForWeight(weight, regularFamily) { return (Number(weight) >= Font.DemiBold && regularFamily === "Open Runde") ? boldFontFamily : regularFamily; }
     onFontFamilyChanged: if (fontFamily.indexOf("Inter") === 0) fontFamily = "Open Runde"
     property int barHeight: 28
-    // --- UI scale (small screens / laptops) ---
-    // uiScaleAuto: shrink everything automatically on screens smaller than 1920x1080 (logical pixels, i.e. after the compositor's own
-    // scaling). uiScaleManual: the user's own multiplier from Settings, applied on top. barH is the bar's real height in px.
     property bool uiScaleAuto: true
     property real uiScaleManual: 1.0
     readonly property real autoUiScale: {
         var sc = Quickshell.screens;
         if (!sc || sc.length === 0) return 1;
         var s = sc[0];
-        for (var i = 0; i < sc.length; i++) if (sc[i].width * sc[i].height < s.width * s.height) s = sc[i];   // the smallest screen decides
+        for (var i = 0; i < sc.length; i++) if (sc[i].width * sc[i].height < s.width * s.height) s = sc[i];
         return Math.max(0.7, Math.min(1, Math.min(s.width / 1920, s.height / 1080)));
     }
     readonly property real uiScale: Math.max(0.5, Math.min(1.25, (uiScaleAuto ? autoUiScale : 1) * uiScaleManual))
     readonly property int barH: Math.max(14, Math.round(barHeight * uiScale))
-    // The bar changed size: tiled windows move, so everything that captures the wallpaper / apps behind the bar and its popovers
-    // (window geometry, the live backdrop, the screen snapshot, the measured tone behind panels) is refreshed once Hyprland has settled.
     signal barRelayout()
     onBarHeightChanged: { if (settingsReady) barRelayoutT.restart(); }
     Timer {
@@ -158,27 +132,24 @@ Scope {
             if (root.hub && root.hub.kickGeo) root.hub.kickGeo();
             root.barRelayout();
             pass++;
-            if (pass < 2) restart(); else pass = 0;      // a second pass ~0.5 s later, after the windows finished re-tiling
+            if (pass < 2) restart(); else pass = 0;
         }
     }
-    property string barLogoMode: "apple"       // "arch", "apple", or "custom"
-    property string barCustomLogoPath: ""     // absolute path, ~/path, or file URL for the custom menu-bar logo
-    // The bar-size slider scales its widget groups while the left/right groups stay pinned to their corners.
+    property string barLogoMode: "apple"
+    property string barCustomLogoPath: ""
     readonly property real barWidgetScale: Math.max(0.45, Math.min(1.55, barHeight / 28 * uiScale))
-    // popovers and the Control Center scale with the same slider (smaller bar -> smaller panels, down to 70 %)
     readonly property real barPopupScale: Math.max(0.5, Math.min(1.25, (1 + (barHeight - 28) / 60) * uiScale))
     property real glassOpacity: 0.42
-    property string barStyle: "liquid"        // "liquid" = Liquid Glass popovers, "blur" = flat translucent
+    property string barStyle: "liquid"
     property real glassRim: 0.45
     property real glassGrain: 0.015
     property real glassLiquid: 1.5
     property real glassBlur: 5
-    // --- Keyboard / Mouse / Trackpad (Settings): applied live to Hyprland with `hyprctl eval`, remembered here ---
     property int kbRepeatRate: 35
     property int kbRepeatDelay: 250
     property real mouseSens: 0
     property bool mouseNatural: false
-    property bool mouseAccel: false      // pointer acceleration: on = libinput's default (adaptive), off = flat (1:1)
+    property bool mouseAccel: false
     property bool tpNatural: true
     property bool tpTap: true
     property bool tpDwt: true
@@ -186,16 +157,13 @@ Scope {
     readonly property string inputSig: [kbRepeatRate, kbRepeatDelay, mouseSens, mouseNatural, mouseAccel, tpNatural, tpTap, tpDwt, tpScroll].join("|")
     onInputSigChanged: if (settingsReady) inputApplyT.restart()
     Timer { id: inputApplyT; interval: 150; onTriggered: root.applyInput() }
-    // --- Cursor (Settings -> Cursor) ---
-    // The theme and size go through assets/cursors.py (Hyprland, GTK, KDE/Qt and X apps, and ~/.config/yukishell/cursor, which
-    // hypr/scripts/look.lua reads at login); the behaviours are applied live with `hyprctl eval`, like the input settings.
     property string cursorTheme: "Bibata-Modern-Classic"
     property int cursorSize: 24
-    property bool cursorHideTyping: false    // hide the pointer while typing
-    property real cursorHideIdle: 10         // hide it after this many seconds without moving (0 = never)
-    property bool cursorFollowFocus: true   // focus follows the mouse (off: click a window to focus it)
-    property bool cursorWarpWs: false       // switching workspace puts the pointer on the window that gets the focus
-    property real cursorZoom: 1.0           // magnify the screen around the pointer (1 = off)
+    property bool cursorHideTyping: false
+    property real cursorHideIdle: 10
+    property bool cursorFollowFocus: true
+    property bool cursorWarpWs: false
+    property real cursorZoom: 1.0
     readonly property string cursorScript: decodeURIComponent(String(Qt.resolvedUrl("assets/cursors.py")).replace(/^file:\/\//, ""))
     readonly property string cursorLook: cursorTheme + "|" + cursorSize
     onCursorLookChanged: if (settingsReady) cursorLookT.restart()
@@ -207,17 +175,11 @@ Scope {
         function b(v) { return v ? "true" : "false"; }
         Quickshell.execDetached(["hyprctl", "eval", "hl.config({ cursor = { hide_on_key_press = " + b(cursorHideTyping) + ", inactive_timeout = " + cursorHideIdle.toFixed(1)
             + ", warp_on_change_workspace = " + (cursorWarpWs ? 1 : 0) + ", zoom_factor = " + Math.max(1, cursorZoom).toFixed(2)
-            // closing a window: focus goes to the window under the pointer (the desktop if there is none, see DesktopFocus.qml),
-            // not to some other window that happened to be focused before
             + " }, input = { follow_mouse = " + (cursorFollowFocus ? 1 : 0) + ", focus_on_close = " + (cursorFollowFocus ? 1 : 0) + " } })"]);
     }
-    // --- Window borders follow the accent colour (Settings -> Appearance -> Accent) ---
-    // Every window, the terminals included, gets the same border: the accent on the focused window, a faint accent on the others.
-    // hypr/scripts/theme.lua only sets the colours used before the shell starts; this is re-applied after every Hyprland config reload.
-    property int windowBorder: 1            // border thickness in px (Settings -> Desktop & Dock -> Windows), 0 = no border
+    property int windowBorder: 1
     onAccentChanged: if (settingsReady) borderApplyT.restart()
     onWindowBorderChanged: if (settingsReady) borderApplyT.restart()
-    // new windows open floating, centred (hypr/scripts/rules.lua: FLOAT_NEW_RULE); off = they tile as before
     property bool floatNewWindows: true
     onFloatNewWindowsChanged: if (settingsReady) borderApplyT.restart()
     function applyWindowRules() {
@@ -228,7 +190,6 @@ Scope {
     function applyBorders() {
         function hx(v) { var s = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16); return s.length < 2 ? "0" + s : s; }
         var a = root.accent, rgb = hx(a.r) + hx(a.g) + hx(a.b);
-        // with the desktop holding the keyboard, Hyprland still draws the window it left as active: give it the inactive colour
         var act = root.desktopFocused ? "40" : "ff";
         Quickshell.execDetached(["hyprctl", "eval", "hl.config({ general = { border_size = " + Math.max(0, Math.min(8, Math.round(windowBorder))) + ", col = { active_border = \"rgba(" + rgb + act + ")\", inactive_border = \"rgba(" + rgb + "40)\" } } })"]);
     }
@@ -239,37 +200,25 @@ Scope {
             + ", touchpad = { natural_scroll = " + b(tpNatural) + ", tap_to_click = " + b(tpTap) + ", disable_while_typing = " + b(tpDwt)
             + ", scroll_factor = " + tpScroll.toFixed(2) + " } } })"]);
     }
-    // --- Auto contrast ---
-    // One measuring script (assets/tone.sh) grabs the real screen (wallpaper + every window) and reports brightness + spread.
-    //  - bar: the strip behind the bar -> barTone (text / glyphs / glass of the bar and its buttons)
-    //  - panels: the area behind the open menu / Control Center / Spotlight -> panelTone. While a panel is open the area AROUND
-    //    it is re-measured continuously (the panel itself is left out), so opening, closing, moving or switching apps behind it
-    //    flips it between light and dark by itself.
-    // The choice is made by worst-case contrast (white text on the brightest part vs dark text on the darkest part, spread
-    // included), with hysteresis so it never flickers, and falls back to the system look when both read equally well.
-    // web links: assets/open-url.py opens them and switches to the browser window they went to (xdg-open alone left a running
-    // browser's new tab on whatever workspace that browser was, so the click looked like it did nothing)
     readonly property string openUrlScript: decodeURIComponent(String(Qt.resolvedUrl("assets/open-url.py")).replace(/^file:\/\//, ""))
     function openUrl(u) { Quickshell.execDetached([openUrlScript, u]); }
     readonly property string toneScript: decodeURIComponent(String(Qt.resolvedUrl("assets/tone.sh")).replace(/^file:\/\//, ""))
-    // cur: 1 = dark text now (bright backdrop), -1 = white text now, 0 = undecided; v/sd = brightness / spread 0..1
     function pickTone(cur, v, sd, fresh) {
         v = Math.max(0, Math.min(1, v)); sd = Math.max(0, Math.min(0.5, sd || 0));
         var hi = Math.min(1, v + 0.6 * sd), lo = Math.max(0, v - 0.6 * sd);
-        var cw = 1.05 / (Math.pow(hi, 2.2) + 0.05);          // contrast of white text on the brightest part
-        var cd = (Math.pow(lo, 2.2) + 0.05) / 0.0623;         // contrast of dark text on the darkest part
+        var cw = 1.05 / (Math.pow(hi, 2.2) + 0.05);
+        var cd = (Math.pow(lo, 2.2) + 0.05) / 0.0623;
         if (!fresh && cur === 1) return cw > cd * 1.2 ? -1 : 1;
         if (!fresh && cur === -1) return cd > cw * 1.2 ? 1 : -1;
         if (Math.abs(cw - cd) < 0.08 * Math.max(cw, cd)) return darkMode ? -1 : 1;
         return cd > cw ? 1 : -1;
     }
     property var tonePending: null
-    // measure a screen rect (logical coords, in a screen scr); inner (optional) = the panel's own rect, left out of the measurement.
     function measureTone(sx, sy, sw, sh) { measureArea(null, Qt.rect(sx, sy, sw, sh), null, true); }
     function measureArea(scr, rect, inner, fresh) {
         if (!toneMeasuring) return;
         var x = rect.x, y = rect.y, w = rect.width, h = rect.height;
-        if (scr) {                                           // clamp to the screen (grim refuses areas outside the outputs)
+        if (scr) {
             var x1 = Math.max(scr.x, x), y1 = Math.max(scr.y, y), x2 = Math.min(scr.x + scr.width, x + w), y2 = Math.min(scr.y + scr.height, y + h);
             x = x1; y = y1; w = x2 - x1; h = y2 - y1;
         }
@@ -285,7 +234,6 @@ Scope {
         panelToneProc.command = ["sh", toneScript].concat(req.args.map(String));
         panelToneProc.running = true;
     }
-    // the area around a panel rect (what its glass shows), for measuring while the panel is open
     function measureAround(scr, panelRect, fresh) {
         var m = 160;
         measureArea(scr, Qt.rect(panelRect.x - m, panelRect.y - m, panelRect.width + 2 * m, panelRect.height + 2 * m), panelRect, fresh);
@@ -303,10 +251,7 @@ Scope {
         }
         onRunningChanged: if (!running && root.tonePending) { var r = root.tonePending; root.tonePending = null; root.runPanelTone(r); }
     }
-    // --- bar text colour: measure what is behind the bar strip (wallpaper + windows + the bar's own glass) ---
     function measureBar() {
-        // the bar's text, glyphs and logo are always white now (barTextDark), so what is behind the bar strip no longer decides
-        // anything: it is not measured any more (it was a grim + ImageMagick run every 1.2-4.8 s)
         return;
         if (!toneMeasuring || !barEnabled || barToneProc.running) return;
         var sc = Quickshell.screens && Quickshell.screens.length ? Quickshell.screens[0] : null;
@@ -314,13 +259,10 @@ Scope {
         barToneProc.command = ["sh", toneScript, "0.25", String(Math.round(sc.x)), String(Math.round(sc.y)), String(Math.max(8, Math.round(sc.width))), String(Math.max(8, Math.round(barH)))];
         barToneProc.running = true;
     }
-    Timer { id: barToneT; interval: 350; onTriggered: { root.toneStable = 0; root.measureBar(); } }   // debounce: after a resize / wallpaper / window change settles
-    // Poll every 1.2 s while the backdrop is changing (live wallpaper, windows moving under the bar); once it has read the same for
-    // a few rounds, back off to 2.4 s and then 4.8 s. Any change, or one of the events above, drops it straight back to 1.2 s.
+    Timer { id: barToneT; interval: 350; onTriggered: { root.toneStable = 0; root.measureBar(); } }
     property int toneStable: 0
     property real toneLastV: -1
     property real toneLastSd: -1
-    // (the bar-strip poll is gone with measureBar's work; panels are still measured while they are open, see measureLive)
     Connections {
         target: root
         function onBarHeightChanged() { barToneT.restart(); }
@@ -343,15 +285,14 @@ Scope {
             }
         }
     }
-    property bool lockArtBackground: true     // lock screen: blurred album art as the background while the cover is enlarged
-    // lock screen clock (Settings -> Lock Screen -> Clock); YukiLock reads these when it starts
-    property string lockClockStyle: "custom"   // preset last picked: glass | classic | serif | liquid | thin | custom
-    property string lockClockFont: "rounded"   // rounded | serif | inter
+    property bool lockArtBackground: true
+    property string lockClockStyle: "custom"
+    property string lockClockFont: "rounded"
     property int lockClockWeight: 1000
-    property string lockClockMaterial: "glass"   // solid (Apple's vibrancy) | glass (Liquid Glass)
-    property real lockClockIntensity: 0.099        // solid: how bright / opaque; glass: clear (0) ... frosted (1)
+    property string lockClockMaterial: "glass"
+    property real lockClockIntensity: 0.099
     property string lockClockTint: "#EEACBE"
-    property string lockClockDate: "long"        // long ("Friday, October 16") | short ("Fri Oct 16")
+    property string lockClockDate: "long"
     readonly property var lockClockPresets: ({
         glass:   { f: "rounded",   w: 680, m: "glass", i: 0.6,  d: "long" },
         classic: { f: "rounded",   w: 600, m: "solid", i: 0.8,  d: "long" },
@@ -359,9 +300,7 @@ Scope {
         liquid:  { f: "rounded",   w: 560, m: "glass", i: 0.12, d: "short" },
         thin:    { f: "rounded",   w: 200, m: "solid", i: 0.6,  d: "short" }
     })
-    // the Condensed font is gone: saved settings that still name it move to Rounded
     onLockClockFontChanged: if (lockClockFont === "condensed") Qt.callLater(function () { lockClockFont = "rounded"; })
-    // settings saved before Solid / Glass existed: move them over (presets keep their name, the rest map across)
     onLockClockMaterialChanged: Qt.callLater(function () {
         if (lockClockMaterial !== "frosted" && lockClockMaterial !== "liquid") return;
         if (lockClockPresets[lockClockStyle]) { applyLockClockPreset(lockClockStyle); return; }
@@ -373,30 +312,25 @@ Scope {
         lockClockFont = p.f; lockClockWeight = p.w; lockClockMaterial = p.m; lockClockIntensity = p.i; lockClockDate = p.d;
         lockClockStyle = name;
     }
-    property bool uiSounds: true              // Apple-style UI sounds (volume pop, notification, screenshot, charger, lock)
-    property real uiSoundVolume: 1            // 0..1, scales every UI sound
-    property string alertSound: "glass"       // the notification sound, one of soundDir's .wav files
-    property bool gamingMode: false           // Game Mode switched on by hand
-    property bool gamingAuto: true            // Game Mode turns itself on while a game is fullscreen
+    property bool uiSounds: true
+    property real uiSoundVolume: 1
+    property string alertSound: "glass"
+    property bool gamingMode: false
+    property bool gamingAuto: true
     property bool gamingAutoActive: false
     readonly property bool gaming: gamingMode || gamingAutoActive
-    property bool ccMigGame: false            // one-time: add the Game Mode tile to an existing Control Center layout
-    property bool barGlass: true              // the bar strip itself is Liquid Glass (needs barStyle "liquid")
-    property real barBgOpacity: 0.10          // fill of the separate "yukibarbg" layer (0 = layer hidden). Must stay above the layerrule's ignore_alpha (0.05) for Hyprland to blur it
-    property bool glassRealtime: true        // live-capture every window all the time; off by default now that popovers refract a screen snapshot       // keep every window capture live all the time (no wallpaper-first delay when a popover opens)
-    // Animated wallpaper inside the Liquid Glass (bar, Dock, widgets, Settings): OFF by default. Off = no video decoder exists at all and the
-    // glass refracts a still frame of the wallpaper (the wallpaper itself still plays through mpvpaper). On = the glass plays a small
-    // low-resolution copy (see glassVideo) so it stays cheap.
+    property bool ccMigGame: false
+    property bool barGlass: true
+    property real barBgOpacity: 0.10
+    property bool glassRealtime: true
     property bool liveWallGlass: true
-    // The animated wallpaper keeps playing behind windows. "Pause behind windows" (off by default) stops it while tiled windows hide the desktop;
-    // wallUserPaused is the menu bar button: paused by hand until it is pressed again (also after a restart).
     property bool wallPauseCovered: false
     property bool wallUserPaused: false
     property bool showWallButton: true
     property bool glassDebug: false
     property string wallpaperPath: ""
     property bool use24h: true
-    property string language: "auto"        // "auto" = the system language, or a code with a table in lang/
+    property string language: "auto"
     onLanguageChanged: Qt.uiLanguage = language === "auto" ? "" : language
     property bool showDate: true
     property bool showSeconds: true
@@ -405,43 +339,40 @@ Scope {
     property bool showSearch: true
     property bool weekStartsMonday: true
     property string terminal: "kitty"
-    property string launcher: ""              // "" = built-in Spotlight; set a command (rofi, fuzzel, ...) to use an external launcher instead
+    property string launcher: ""
     property string filesCmd: "xdg-open \"$HOME\""
     property string clipboardCmd: "cliphist list | (fuzzel --dmenu || wofi --dmenu || rofi -dmenu) | cliphist decode | wl-copy"
-    property var appUsage: ({})               // launch counts, feeds the "Suggestions" row in Spotlight
-    property bool clipHistory: true           // keep a clipboard history for Spotlight -> Clipboard (needs wl-clipboard + cliphist)
-    property bool clipAutoPaste: true         // after picking a clipboard entry / emoji, paste it into the focused app
-    property var emojiRecent: []              // recently used emoji, newest first
-    property string screenshotDir: Quickshell.env("HOME") + "/Screenshots"   // where screenshots are saved ("" = ~/Pictures/Screenshots)
-    property bool screenshotSave: true        // save the PNG to screenshotDir
-    property bool screenshotClipboard: true   // also copy it to the clipboard
-    property bool screenshotNotify: true      // "Screenshot saved" notification
+    property var appUsage: ({})
+    property bool clipHistory: true
+    property bool clipAutoPaste: true
+    property var emojiRecent: []
+    property string screenshotDir: Quickshell.env("HOME") + "/Screenshots"
+    property bool screenshotSave: true
+    property bool screenshotClipboard: true
+    property bool screenshotNotify: true
     property int spotRequest: 0
-    property string spotWant: "home"          // which Spotlight panel the next request opens: home | clip | emoji | apps
+    property string spotWant: "home"
     property int nightTemp: 4000
-    // audio visualizer (the Now Playing widget and the Control Center tile; Settings -> Widgets)
     property bool visOn: true
-    property string visStyle: "mirror"          // bars | mirror | wave
-    property string visColor: "white"           // art (from the cover) | white | accent
-    property real visGain: 2.0                // how tall the bars get
-    property int visCount: 128                // how many columns (the music widget and the Control Center tile)
-    property real visWidth: 0.7              // bar width as a share of its column (0.2 thin .. 1 touching)
-    // the Now Playing widget (Settings -> Widgets -> Music Widget)
-    property real mwGlow: 0.6                 // the album art lights the card from behind (0 = off)
-    property bool mwMotion: true              // living artwork: the cover settles back when paused, the glow drifts while playing
-    property string mwBar: "slim"             // progress bar: slim | bold
-    property string mwVisMode: "ambient"      // visualizer: ambient (a glowing wave along the bottom) | strip (bars behind the controls)
-    property bool visInCC: true               // also inside the Control Center's Now Playing tile
-    // Control Center: ids of the enabled controls, in order (edit with Control Center -> Edit Controls)
+    property string visStyle: "mirror"
+    property string visColor: "white"
+    property real visGain: 2.0
+    property int visCount: 128
+    property real visWidth: 0.7
+    property real mwGlow: 0.6
+    property bool mwMotion: true
+    property string mwBar: "slim"
+    property string mwVisMode: "ambient"
+    property bool visInCC: true
     property var ccControls: ["nowplaying", "focus", "record", "keepawake", "nightshift", "display", "sound", "micmute", "settings", "wallpapers", "lock", "screenshot"]
-    property bool ccMigRec: false              // one-time: add the Screen Recording tile to an existing Control Center layout
+    property bool ccMigRec: false
     property bool recording: false
     property int recSecs: 0
     property var otherConnections: []
-    property string keyboardLayout: "EN"      // two-letter label shown in the bar
-    property var kbLayouts: []                // configured layouts of the main keyboard: [{ code, name }]
-    property int kbIndex: 0                   // index of the active one
-    property string kbMain: ""                // name of the main keyboard (Hyprland)
+    property string keyboardLayout: "EN"
+    property var kbLayouts: []
+    property int kbIndex: 0
+    property string kbMain: ""
     property string recordFile: ""
     property string fileQuery: ""
     property string fileSearchFor: ""
@@ -459,7 +390,6 @@ Scope {
         "kbRepeatRate", "kbRepeatDelay", "mouseSens", "mouseNatural", "mouseAccel", "tpNatural", "tpTap", "tpDwt", "tpScroll",
         "cursorTheme", "cursorSize", "cursorHideTyping", "cursorHideIdle", "cursorFollowFocus", "cursorWarpWs", "cursorZoom", "windowBorder", "floatNewWindows",
         "wsNumerals"]
-    // Optional bar widgets; tray and Spotlight use their existing showTray/showSearch settings.
     property var barWidgets: ["appleMenu", "appMenus", "workspaces", "volume", "keyboard", "notifications", "privacy", "controlCenter", "clock", "wifi", "bluetooth"]
     function barWidgetEnabled(id) { return barWidgets.indexOf(id) >= 0; }
     function resolvedBarLogoUrl() {
@@ -485,12 +415,6 @@ Scope {
         { name: "Green", c: "#30d158" }, { name: "Graphite", c: "#8e8e93" }
     ]
 
-    // --- Control center layout ---
-    // The Control Center is a 4-column grid. Every control has a size in grid cells; the enabled ones are packed
-    // first-fit in the order of `ccControls`, so dragging a control onto another one simply reorders the list.
-    // `sizes` lists the sizes (in cells, default first) the badge cycles through and Settings -> Control Center offers; `range` is
-    // [min width, max width, min height, max height] for the corner handle in Edit Controls, which resizes by hand to any cell size in it
-    // (default [1, 4, 1, 2]). Controls can also be dropped on any free cell: `ccPos` pins them there.
     readonly property var ccCatalog: [
         { id: "wifi",       label: I18n.tr("Wi-Fi"),         glyph: "wifi",       w: 2, h: 1, sizes: [[2, 1], [1, 1], [4, 1], [2, 2]] },
         { id: "bluetooth",  label: I18n.tr("Bluetooth"),     glyph: "bluetooth",  w: 2, h: 1, sizes: [[2, 1], [1, 1], [4, 1], [2, 2]] },
@@ -511,7 +435,7 @@ Scope {
         { id: "micmute",     label: I18n.tr("Microphone"),      glyph: "mic",     w: 4, h: 1, sizes: [[4, 1], [3, 1], [2, 1]], range: [2, 4, 1, 1] },
         { id: "powermode",   label: I18n.tr("Power Mode"),      glyph: "bolt",    w: 1, h: 1, sizes: [[1, 1], [2, 1], [4, 1], [2, 2]] }
     ]
-    property var ccSizes: ({ "micmute": "4x1", "nowplaying": "4x2", "wallpapers": "2x1", "settings": "1x1", "lock": "2x1" })             // control id -> "WxH" the user picked (only for controls that offer several sizes)
+    property var ccSizes: ({ "micmute": "4x1", "nowplaying": "4x2", "wallpapers": "2x1", "settings": "1x1", "lock": "2x1" })
     function ccRange(id) {
         var d = ccDef(id);
         return d && d.range ? d.range : [1, 4, 1, 2];
@@ -527,7 +451,6 @@ Scope {
         return [d.w, d.h];
     }
     function ccSetSize(id, w, h) { var m = {}; for (var k in ccSizes) m[k] = ccSizes[k]; m[id] = w + "x" + h; ccSizes = m; }
-    // resize by hand (the corner handle, the badge, Settings): the tile keeps its cell and wins over whatever it now overlaps
     function ccResizeTo(id, w, h) {
         var r = ccRange(id);
         w = Math.max(r[0], Math.min(r[1], w)); h = Math.max(r[2], Math.min(r[3], h));
@@ -538,7 +461,6 @@ Scope {
             if (me) {
                 var col = Math.min(me.col, 4 - w);
                 pos[id] = col + "," + me.row;
-                // what it now covers is unpinned, so it flows to the next free cell instead of overlapping
                 var it = ccPlan.items;
                 for (var i = 0; i < it.length; i++) {
                     var o = it[i];
@@ -559,16 +481,15 @@ Scope {
     }
     function ccResetLayout() { ccControls = ccDefault.slice(); ccSizes = ({}); ccPos = ({}); }
     function ccResetAll() { ccResetLayout(); ccRowH = 66; ccGapPx = 6; ccOnColor = ""; }
-    // looks of the Control Center (Settings -> Control Center)
-    property real ccRowH: 68               // height of one row of tiles, px (the old Compact / Regular / Large were 56 / 66 / 78)
-    property real ccGapPx: 8               // gap between tiles, px (the old Tight / Normal / Loose were 3 / 6 / 10)
-    property var ccPos: ({})               // control id -> "col,row": dropped on that cell by hand. Empty = everything packs in order.
+    property real ccRowH: 68
+    property real ccGapPx: 8
+    property var ccPos: ({})
     readonly property bool ccFree: Object.keys(ccPos).length > 0
     function ccTidy() { ccPos = ({}); }
-    property string ccOnColor: "#eeacbe"          // "" = white; otherwise the colour a switched-on tile (or its icon disc) turns
+    property string ccOnColor: "#eeacbe"
     readonly property color ccOnFill: ccOnColor !== "" ? Qt.color(ccOnColor) : Qt.color("white")
     readonly property bool ccOnLight: (0.299 * ccOnFill.r + 0.587 * ccOnFill.g + 0.114 * ccOnFill.b) > 0.62
-    readonly property color ccOnInk: ccOnLight ? Qt.rgba(0.07, 0.07, 0.09, 1) : Qt.color("white")     // text / icon drawn on the on-colour
+    readonly property color ccOnInk: ccOnLight ? Qt.rgba(0.07, 0.07, 0.09, 1) : Qt.color("white")
     readonly property var ccDefault: ["wifi", "nowplaying", "bluetooth", "airplane", "focus", "record", "nightshift", "keepawake", "display", "sound"]
     function ccDef(id) {
         for (var i = 0; i < ccCatalog.length; i++) if (ccCatalog[i].id === id) return ccCatalog[i];
@@ -590,7 +511,6 @@ Scope {
             seen[d.id] = true;
             todo.push(d);
         }
-        // controls dropped on a cell by hand keep it (the earlier one in the list wins a clash); the rest pack first-fit around them
         var rest = [];
         for (var q = 0; q < todo.length; q++) {
             var pz = ccSizeFor(todo[q].id), pin = ccPosOf(todo[q].id);
@@ -616,13 +536,12 @@ Scope {
                 }
             }
         }
-        // pixel layout: tiles sit ccGap apart; the slider tiles (Display, Sound, Microphone) keep the wider ccSliderGap around them
         var sliderRow = [], ys = [];
         for (var k = 0; k < out.length; k++) {
             if (out[k].id === "display" || out[k].id === "sound" || out[k].id === "micmute")
                 for (var rr = out[k].row; rr < out[k].row + out[k].h; rr++) sliderRow[rr] = true;
         }
-        for (var r2 = 0; r2 <= rows; r2++)           // one more than there are rows: the empty row below, where a control can be dropped
+        for (var r2 = 0; r2 <= rows; r2++)
             ys[r2] = r2 === 0 ? 0 : ys[r2 - 1] + ccCellH + ((sliderRow[r2] || sliderRow[r2 - 1]) ? ccSliderGap : ccGap);
         for (var m = 0; m < out.length; m++) {
             out[m].y = ys[out[m].row];
@@ -641,7 +560,6 @@ Scope {
         for (var i = 0; i < it.length; i++) if (it[i].id === id) return it[i];
         return null;
     }
-    // every control on the grid pinned to the cell it is in now (what a manual drop starts from, so nothing else moves)
     function ccFreezeMap() {
         var m = {}, it = ccPlan.items;
         for (var i = 0; i < it.length; i++) m[it[i].id] = it[i].col + "," + it[i].row;
@@ -650,8 +568,6 @@ Scope {
     readonly property real ccCellH: Math.max(40, Math.min(110, ccRowH))
     readonly property real ccGap: Math.max(1, Math.min(20, ccGapPx))
     readonly property real ccSliderGap: ccGap + 4
-    // Controls this PC can't use (no Wi-Fi card, no Bluetooth adapter, no radio for Airplane Mode) are left out of the grid and the
-    // Add Controls list; they stay in ccControls, so they come back by themselves when the hardware shows up.
     function ccAvailable(id) {
         if (id === "wifi") return hasWifi;
         if (id === "bluetooth") return hasBt;
@@ -659,8 +575,6 @@ Scope {
         return true;
     }
     readonly property var ccPlan: ccLayout(ccControls.filter(function (id) { return root.ccAvailable(id); }))
-    // Edit Controls works on a copy: Save keeps the changes, Cancel (or closing the Control Center) puts the layout back as it
-    // was. Nothing is written to settings.json while editing.
     property var ccSnap: null
     function ccEditBegin() { ccSnap = { c: ccControls.slice(), s: JSON.parse(JSON.stringify(ccSizes)), p: JSON.parse(JSON.stringify(ccPos)) }; }
     function ccEditSave() { ccSnap = null; saveTimer.restart(); }
@@ -678,9 +592,6 @@ Scope {
         ccControls = ccControls.filter(function (x) { return x !== id; });
         if (ccPos[id] !== undefined) { var m = {}; for (var k in ccPos) if (k !== id) m[k] = ccPos[k]; ccPos = m; }
     }
-    // Where would control `id` land if it were dropped with its top-left corner at (tx, ty), in grid pixels? -> null, or
-    //   { col, row, kind }  kind: "stay" (same cell) | "free" (empty cells: it is pinned there) | "swap" (trades places with `other`)
-    //                              | "order" (automatic layout only: reorders, like dropping on the nearest control) | "none" (doesn't fit)
     function ccTarget(id, tx, ty, cw) {
         var me = ccItem(id);
         if (!me) return null;
@@ -704,14 +615,13 @@ Scope {
         if (hits.length === 0) return { col: col, row: row, kind: "free" };
         if (!ccFree) return { col: col, row: row, kind: "order" };
         if (hits.length === 1) {
-            var o2 = hits[0];                                    // it takes our place, if it fits there and nothing else is in the way
+            var o2 = hits[0];
             if (me.col + o2.w <= 4 && clash(me.col, me.row, o2.w, o2.h, id, o2.id).length === 0
                 && !(me.col < col + me.w && col < me.col + o2.w && me.row < row + me.h && row < me.row + o2.h))
                 return { col: col, row: row, kind: "swap", other: o2 };
         }
         return { col: col, row: row, kind: "none" };
     }
-    // dropped: (tx, ty) = the tile's top-left in the grid, (px, py) = the pointer
     function ccDrop(id, tx, ty, px, py, cw) {
         var t = ccTarget(id, tx, ty, cw);
         if (!t || t.kind === "stay" || t.kind === "none") return;
@@ -722,7 +632,6 @@ Scope {
             ccPos = pos;
             return;
         }
-        // automatic layout: it takes the slot of the nearest control
         var order = ccControls.slice(), from = order.indexOf(id);
         if (from < 0) return;
         var to = -1, best = 1e18, it = ccPlan.items;
@@ -745,8 +654,6 @@ Scope {
     readonly property int popRoom: 900
 
     function sh(cmd) { Quickshell.execDetached(["sh", "-c", cmd]); }
-    // Log out of Hyprland. 0.55+ (Lua) takes a Lua expression; UWSM sessions are stopped through uwsm so the session ends cleanly.
-    // Lock Screen: starts YukiLock via IPC helper; does nothing if already locked
     function lockScreen() {
         sh('sh ~/.config/quickshell/YukiLock/lock-via-ipc.sh');
     }
@@ -758,22 +665,13 @@ Scope {
            + 'else hyprctl dispatch "hl.dsp.exit()" || hyprctl dispatch exit; fi');
     }
 
-    // --- Palette ---
-    // Auto contrast: see "AUTO CONTRAST" above. panelTone: what is behind the open panel (1 bright, -1 dark, 0 not measured).
     property bool autoContrast: true
     property int panelTone: 0
-    // The shell's one (dark) look: every panel follows it, the Control Center included (ccDark / ccPal are aliases of it).
-    readonly property bool effDark: panelDarkMode      // every panel palette (pal) follows the measured light / dark panel look
+    readonly property bool effDark: panelDarkMode
     property real dk: effDark ? 1 : 0
     Behavior on dk { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
     function mixc(l, d) { return Qt.rgba(l.r + (d.r - l.r) * dk, l.g + (d.g - l.g) * dk, l.b + (d.b - l.b) * dk, l.a + (d.a - l.a) * dk); }
-    // --- Dynamic text colour (top bar, menus / popovers, Spotlight) ---
-    // The bar is clear glass over the wallpaper and the windows, so its text follows what is measured BEHIND it (barTone) and flips
-    // light/dark by itself. Menus and Spotlight keep their glass tint but flip their text when the measured backdrop would make the
-    // normal colour unreadable (panelTone). Colours cross-fade (ptk / btk: 1 = white text, 0 = dark text).
-    property int barTone: 0                   // measured behind the bar strip: 1 bright, -1 dark, 0 not measured yet
-    // the bar's text, glyphs and logo are always white (no longer flipped dark over a bright wallpaper or in Light mode); the bar's
-    // glass follows it with its dark tint, which keeps white text readable over bright backdrops. barTone is still measured for it.
+    property int barTone: 0
     readonly property bool barTextDark: false
     property real btk: barTextDark ? 0 : 1
     Behavior on btk { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
@@ -782,7 +680,6 @@ Scope {
     property real ptk: panelTextDark ? 0 : 1
     Behavior on ptk { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
     function mixp(l, d) { return Qt.rgba(l.r + (d.r - l.r) * ptk, l.g + (d.g - l.g) * ptk, l.b + (d.b - l.b) * ptk, l.a + (d.a - l.a) * ptk); }
-    // Control Center: light or dark with the panels (what is behind it)
     readonly property bool ccDark: panelDarkMode
     property real ccDk: ccDark ? 1 : 0
     Behavior on ccDk { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
@@ -795,7 +692,7 @@ Scope {
         readonly property color accent: root.accent
         readonly property color fg: root.mixb(Qt.color("#1D1D1F"), Qt.color("#FFFFFF"))
         readonly property color fg2: root.mixb(Qt.rgba(0, 0, 0, 0.55), Qt.rgba(1, 1, 1, 0.62))
-        readonly property color ink: fg              // icons and slider bars (the Control Center's follow the accent)
+        readonly property color ink: fg
         readonly property color ink2: fg2
         readonly property color fg3: root.mixb(Qt.rgba(0, 0, 0, 0.32), Qt.rgba(1, 1, 1, 0.34))
         readonly property color tile: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.42)
@@ -810,7 +707,6 @@ Scope {
         readonly property color cardBorder: dark ? Qt.rgba(1, 1, 1, 0.07) : Qt.rgba(0, 0, 0, 0.08)
         readonly property color switchOff: dark ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(0, 0, 0, 0.16)
     }
-    // Spotlight: always white text and icons on dark glass, whatever is behind it (no auto contrast, no Light-mode dark text)
     QtObject {
         id: spotPal
         readonly property bool dark: true
@@ -840,7 +736,7 @@ Scope {
         readonly property color accent: root.accent
         readonly property color fg: root.mixp(Qt.color("#1D1D1F"), Qt.color("#FFFFFF"))
         readonly property color fg2: root.mixp(Qt.rgba(0, 0, 0, 0.55), Qt.rgba(1, 1, 1, 0.62))
-        readonly property color ink: fg              // icons and slider bars (the Control Center's follow the accent)
+        readonly property color ink: fg
         readonly property color ink2: fg2
         readonly property color fg3: root.mixp(Qt.rgba(0, 0, 0, 0.32), Qt.rgba(1, 1, 1, 0.34))
         readonly property color tile: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.42)
@@ -862,7 +758,7 @@ Scope {
         readonly property color accent: root.accent
         readonly property color fg: root.mixp(Qt.color("#1D1D1F"), Qt.color("#FFFFFF"))
         readonly property color fg2: root.mixp(Qt.rgba(0, 0, 0, 0.55), Qt.rgba(1, 1, 1, 0.62))
-        readonly property color ink: fg              // icons and slider bars (the Control Center's follow the accent)
+        readonly property color ink: fg
         readonly property color ink2: fg2
         readonly property color fg3: root.mixp(Qt.rgba(0, 0, 0, 0.32), Qt.rgba(1, 1, 1, 0.34))
         readonly property color tile: root.mixc(Qt.rgba(1, 1, 1, 0.42), Qt.rgba(1, 1, 1, 0.10))
@@ -880,12 +776,10 @@ Scope {
     QtObject {
         id: ccPal
         readonly property bool dark: root.ccDark
-        // the Control Center follows the selected UI font like everything else (Open Runde by default)
         readonly property string fam: root.fontFamily
         readonly property color accent: root.accent
         readonly property color fg: root.mixp(Qt.color("#1D1D1F"), Qt.color("#FFFFFF"))
         readonly property color fg2: root.mixp(Qt.rgba(0, 0, 0, 0.55), Qt.rgba(1, 1, 1, 0.62))
-        // icons and slider bars: a shade of the accent while "Tint the interface" is on (text stays white / black)
         readonly property color ink: root.accentUi ? root.accentInk : fg
         readonly property color ink2: root.accentUi ? Qt.rgba(root.accentInk.r, root.accentInk.g, root.accentInk.b, 0.75) : fg2
         readonly property color fg3: root.mixp(Qt.rgba(0, 0, 0, 0.32), Qt.rgba(1, 1, 1, 0.34))
@@ -902,16 +796,12 @@ Scope {
         readonly property color switchOff: root.ccMix(Qt.rgba(0, 0, 0, 0.16), Qt.rgba(1, 1, 1, 0.22))
     }
 
-    // --- Reusable components ---
-    // (inline components don't see ids of this file, so everything arrives through properties / `t` = palette)
-
-    // Hand-drawn monochrome glyphs on an 18×18 grid (no icon theme needed)
     component Glyph: Canvas {
         id: gl
         property string kind: ""
         property color color: "white"
-        property real level: 3          // speaker / sun intensity 0..3, wifi bars 0..3, battery 0..100
-        property bool flag: false       // "disabled" slash for wifi / bluetooth
+        property real level: 3
+        property bool flag: false
         width: 18; height: 18
         antialiasing: true
         onKindChanged: requestPaint()
@@ -938,7 +828,6 @@ Scope {
                 for (var i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
                 if (fill) { ctx.closePath(); ctx.fill(); } else ctx.stroke();
             }
-            // filled polygon with rounded corners (radius r), used by the media icons
             function rpoly(p, r) {
                 var n = p.length / 2;
                 ctx.beginPath();
@@ -1052,7 +941,6 @@ Scope {
                 circ(9, 9.4, 2.7); ctx.stroke();
                 line(6.8, 3, 11.2, 3);
             } else if (k === "gamepad") {
-                // game controller: rounded body, d-pad, two buttons
                 ctx.beginPath();
                 ctx.moveTo(5, 5); ctx.lineTo(13, 5);
                 ctx.bezierCurveTo(16.4, 5, 17.4, 9.5, 16.6, 12.6); ctx.bezierCurveTo(16.1, 14.4, 14.2, 14.6, 13.1, 13.2);
@@ -1063,7 +951,6 @@ Scope {
                 circ(12.4, 8.0, 0.9); ctx.fill();
                 circ(14.0, 9.6, 0.9); ctx.fill();
             } else if (k === "ethernet") {
-                // Apple's Ethernet symbol: <···>
                 poly([5.2, 4.6, 1.6, 9, 5.2, 13.4], false);
                 poly([12.8, 4.6, 16.4, 9, 12.8, 13.4], false);
                 circ(6.5, 9, 1.1); ctx.fill();
@@ -1075,12 +962,10 @@ Scope {
                 rrect(4.2, 3.4, 3.4, 11.2, 0.7); ctx.fill();
                 rrect(10.4, 3.4, 3.4, 11.2, 0.7); ctx.fill();
             } else if (k === "keyboard") {
-                // keyboard: outline, a row of keys, the space bar (kept sparse: it is drawn at ~16 px)
                 rrect(1.5, 3.8, 15, 10.4, 2.4); ctx.stroke();
                 for (var kr = 0; kr < 4; kr++) { circ(5.1 + kr * 2.6, 7.4, 0.85); ctx.fill(); }
                 line(6, 10.8, 12, 10.8);
             } else if (k === "livewall") {
-                // a picture frame with the state in it: bars while the animated wallpaper plays, a triangle while it is paused
                 rrect(1.8, 3.2, 14.4, 11.6, 2.6); ctx.stroke();
                 if (flag) rpoly([7.3, 6.3, 12, 9, 7.3, 11.7], 0.5);
                 else { rrect(6.5, 6.4, 1.9, 5.2, 0.5); ctx.fill(); rrect(9.6, 6.4, 1.9, 5.2, 0.5); ctx.fill(); }
@@ -1195,7 +1080,6 @@ Scope {
             } else if (k === "close") {
                 line(5, 5, 13, 13); line(13, 5, 5, 13);
             } else if (k === "dropper") {
-                // eyedropper drawn along its own axis, then turned 45°: squeeze bulb up right, collar, glass tube, pointed tip down left
                 ctx.save(); ctx.translate(9, 9); ctx.rotate(-PI / 4);
                 rrect(2.6, -2.9, 4.8, 5.8, 2); ctx.stroke();
                 line(1.2, -2.9, 1.2, 2.9);
@@ -1209,37 +1093,36 @@ Scope {
                 }
                 circ(9, 9, 5.6); ctx.stroke();
             } else if (k.indexOf("m_") === 0) {
-                // --- Apple-menu icons (drawn after the macOS ones; 18x18 grid, 1.5 px strokes) ---
                 ctx.lineWidth = 1.4;
                 var ell = function (cx, cy, rx, ry, fill) {
                     ctx.save(); ctx.translate(cx, cy); ctx.scale(rx, ry); ctx.beginPath(); ctx.arc(0, 0, 1, 0, PI * 2); ctx.restore();
                     if (fill) ctx.fill(); else ctx.stroke();
                 };
-                if (k === "m_about") {                       // Linux penguin (Tux), outline
+                if (k === "m_about") {
                     ell(9, 9.2, 4.6, 6.6, false);
                     ctx.lineWidth = 1.1; ell(9, 11.6, 2.7, 3.5, false); ctx.lineWidth = 1.4;
                     circ(7.5, 6.2, 0.85); ctx.fill(); circ(10.5, 6.2, 0.85); ctx.fill();
                     poly([7.7, 7.6, 10.3, 7.6, 9, 9.1], true);
                     ell(6.1, 16.3, 2.1, 0.95, true); ell(11.9, 16.3, 2.1, 0.95, true);
                     line(4.5, 10, 3.1, 13.6); line(13.5, 10, 14.9, 13.6);
-                } else if (k === "m_settings") {             // System Settings: ring with a half-disc
+                } else if (k === "m_settings") {
                     circ(9, 9, 6.7); ctx.stroke();
                     ctx.beginPath(); ctx.arc(9, 9, 3.2, -PI / 2, PI / 2, false); ctx.closePath(); ctx.fill();
                     line(9, 5.6, 9, 12.4);
-                } else if (k === "m_sleep") {                // Sleep: ring, lower half filled
+                } else if (k === "m_sleep") {
                     circ(9, 9, 6.7); ctx.stroke();
                     ctx.beginPath(); ctx.arc(9, 9, 6.7, 0, PI, false); ctx.closePath(); ctx.fill();
-                } else if (k === "m_restart") {              // Restart: left-pointing triangle
+                } else if (k === "m_restart") {
                     ctx.lineWidth = 1.5;
                     poly([12.6, 3.6, 4.6, 9, 12.6, 14.4, 12.6, 3.6], false);
-                } else if (k === "m_power") {                // Shut Down
+                } else if (k === "m_power") {
                     ctx.beginPath(); ctx.arc(9, 9.6, 5.8, -PI / 2 + 0.7, -PI / 2 - 0.7 + PI * 2, false); ctx.stroke();
                     line(9, 2.6, 9, 8.4);
-                } else if (k === "m_lock") {                 // Lock Screen: padlock
+                } else if (k === "m_lock") {
                     rrect(4, 8, 10, 7.6, 1.8); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(6.4, 8); ctx.lineTo(6.4, 6.4); ctx.arc(9, 6.4, 2.6, PI, 0, false); ctx.lineTo(11.6, 8); ctx.stroke();
                     circ(9, 11.8, 1.1); ctx.fill();
-                } else if (k === "m_logout") {               // Log Out: ring with a person
+                } else if (k === "m_logout") {
                     circ(9, 9, 6.7); ctx.stroke();
                     circ(9, 7.2, 1.9); ctx.fill();
                     ctx.beginPath(); ctx.arc(9, 14.4, 4.2, PI * 1.22, PI * 1.78, false); ctx.stroke();
@@ -1248,38 +1131,32 @@ Scope {
         }
     }
 
-    // Liquid Glass slab (liquidglass.frag) or a flat translucent fallback
-    // the Liquid Glass pane of the bar's menus and popovers: LiquidPane.qml (shared with the Dock's right-click menu)
     component LGlass: LiquidPane { accentTint: root.accentTintVec }
 
-    // Context for a group of glass slabs that all read ONE shared backdrop texture, so a whole panel full of
-    // tiles and buttons costs a single backdrop capture instead of one per slab.
     component GlassCtx: QtObject {
-        property var src: null                          // the ShaderEffectSource holding the backdrop
-        property rect srcRect: Qt.rect(0, 0, 1, 1)      // where that texture sits, in `frame` coordinates
-        property Item frame: null                       // coordinate space of srcRect (the popover layer)
+        property var src: null
+        property rect srcRect: Qt.rect(0, 0, 1, 1)
+        property Item frame: null
         property bool liquid: false
         property url shaderUrl: ""
         property bool dark: true
         property real tint: 0.4
         property real strength: 1.0
-        property real blur: 5               // base backdrop blur radius, px (settings slider)
-        property real blurMul: 1.0          // scales the backdrop blur radius of every slab in this context
-        property real liquidMul: 1.0        // scales refraction / dispersion / magnify of every slab in this context
-        property real paneOpacity: 1.0      // <1 lets the compositor blur show through the shader pane
+        property real blur: 5
+        property real blurMul: 1.0
+        property real liquidMul: 1.0
+        property real paneOpacity: 1.0
         property real rim: 0.45
-        property real rimTint: 0            // 1 = rim + border line take a brighter shade of the glass's own local colour
-        property real ringW: 0              // width (px) of the thin border line along the edge, 0 = none
-        property color borderTint: "#8A9AB5"   // wallpaper's dominant colour, for the MenuBorder drawn over each slab
-        property real borderAmount: 1          // strength of that MenuBorder
-        property bool whiteEdge: true       // the light inner ring of the non-liquid pane (off for Spotlight: dark outline only)
+        property real rimTint: 0
+        property real ringW: 0
+        property color borderTint: "#8A9AB5"
+        property real borderAmount: 1
+        property bool whiteEdge: true
         property real grain: 0.03
         property bool debug: false
         signal failed()
     }
 
-    // Glass context for a bar popover, built the way the Control Center builds its own (blurred copy of the backdrop around the
-    // popover + a GlassCtx), so the popover's background is drawn by the same GGlass / CornerBorder as the Control Center pages.
     component PopGlassCtx: Item {
         id: pg
         required property Item pop
@@ -1287,8 +1164,8 @@ Scope {
         required property var source
         property real fullW: pop.width
         property real fullH: pop.height
-        property bool fromCC: false                 // opened from the Control Center: keeps the global blur setting
-        readonly property real topBarBlur: root.glassBlur   // menus from the top bar follow the Blur slider like everything else
+        property bool fromCC: false
+        readonly property real topBarBlur: root.glassBlur
         property alias ctx: pgc
         readonly property real m: 64 * root.barPopupScale
         ShaderEffectSource {
@@ -1338,7 +1215,6 @@ Scope {
         }
     }
 
-    // One Liquid Glass slab (tile, button, pill, panel) sampling the shared backdrop of its GlassCtx
     component GGlass: Item {
         id: gg
         required property var gx
@@ -1347,10 +1223,9 @@ Scope {
         property real strengthMul: 1.0
         property real tintMul: 1.0
         property real shadowAmt: 0.5
-        property real flatInner: 0          // 1 = drop the darker inner edge shading (needs the rebuilt liquidglass shader)
+        property real flatInner: 0
         readonly property real pad: 10
 
-        // position inside the popover layer; reads every ancestor's x/y so it re-evaluates when anything moves
         function framePos() {
             var px = 0, py = 0, it = gg;
             while (it && it !== gx.frame) { px += it.x; py += it.y; it = it.parent; }
@@ -1362,7 +1237,6 @@ Scope {
             visible: !gg.gx.liquid
             anchors.fill: parent
             radius: gg.cornerR
-            // identical to the Dock's "Normal Blur" pane: a translucent tint over the compositor blur
             color: gg.gx.dark ? Qt.rgba(0.10, 0.10, 0.11, gg.gx.tint) : Qt.rgba(1, 1, 1, gg.gx.tint * 0.55)
             border.width: 1
             border.color: gg.gx.dark ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(0, 0, 0, 0.12)
@@ -1416,18 +1290,14 @@ Scope {
         }
     }
 
-    // Control Center tile: its own Liquid Glass slab (children are laid on top of it)
     component CCTile: Item {
         id: tile
         required property var t
         required property var gx
         property real radius: 34
-        // the whole tile is the button: a click anywhere fires clicked(); the round icon inside only shows the on / off state
         property bool on: false
         property string onTint: ""
         property bool clickable: false
-        // small icon-only tiles (the "circle buttons"): when on, the whole tile turns white. Wide tiles keep their glass
-        // (only the round icon inside them turns white), so their text colours stay as they are.
         readonly property bool whole: on && width <= 110
         readonly property color fg: whole ? root.ccOnInk : t.fg
         readonly property color fg2: whole ? Qt.rgba(root.ccOnInk.r, root.ccOnInk.g, root.ccOnInk.b, 0.55) : t.fg2
@@ -1435,7 +1305,7 @@ Scope {
         scale: (clickable && tma.pressed) ? 0.97 : 1
         Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutBack; easing.overshoot: 2.4 } }
         GGlass { anchors.fill: parent; gx: tile.gx; cornerR: tile.radius; thickness: 22; shadowAmt: 0; flatInner: 1 }
-        Rectangle {     // enabled (small tiles only): the whole tile background is solid white
+        Rectangle {
             anchors.fill: parent
             radius: tile.radius
             color: root.ccOnFill
@@ -1452,7 +1322,6 @@ Scope {
         MouseArea { id: tma; anchors.fill: parent; enabled: tile.clickable; hoverEnabled: true; onClicked: tile.clicked() }
     }
 
-    // small glass pill button ("Edit Controls", "Done", "Reset")
     component CCPill: Item {
         id: pl
         required property var t
@@ -1477,13 +1346,11 @@ Scope {
         MouseArea { id: pla; anchors.fill: parent; hoverEnabled: true; onClicked: pl.clicked() }
     }
 
-    // round glyph button: Liquid Glass disc, accent-coloured glass when "on"
-    // Contour glow (hover): a thin light line along the rounded outline + soft halo, brightest near the cursor
     component ContourGlow: ShaderEffect {
         id: cgl
         property real cornerR: 24
         property bool hovered: false
-        property point at: Qt.point(width / 2, height / 2)      // cursor, in the shape's coordinates
+        property point at: Qt.point(width / 2, height / 2)
         property real pad: 14
         property color glowColor: "white"
         anchors.fill: parent
@@ -1512,11 +1379,10 @@ Scope {
         property real shadow: 0
         signal clicked()
         property bool bounce: false
-        property bool glass: true       // false: a flat circle instead of a Liquid Glass disc
-        property bool matchMenuBorder: false // use the same outline primitive as Spotlight's search pill
-        property bool plain: false      // icon only: no glass disc and no click area of its own (the tile is the button)
-        readonly property bool inWide: plain && parent && parent.width > 110     // icon on a wide (two-cell) tile
-        // icon on a small (one-cell) tile = a "circle button": a little smaller circle with a bigger icon
+        property bool glass: true
+        property bool matchMenuBorder: false
+        property bool plain: false
+        readonly property bool inWide: plain && parent && parent.width > 110
         readonly property bool circleBtn: plain && parent && parent.width <= 110
         width: circleBtn ? 21 : d; height: width
         scale: (bounce && bma.pressed) ? 0.88 : 1
@@ -1527,15 +1393,13 @@ Scope {
         Rectangle {
             anchors.fill: parent
             radius: b.width / 2
-            // enabled: solid white fill (the icon carries the accent colour); off: grey circle only on wide tiles
             color: b.on ? (b.plain ? root.ccOnFill : "white")
-                        : (b.plain ? (b.inWide ? (b.t.dark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.14))      // wide tile: grey circle while off
-                                               : Qt.rgba(1, 1, 1, 0))                                                 // small tile: none
-                                   : (!b.glass ? (b.t.dark ? Qt.rgba(1, 1, 1, bma.containsMouse ? 0.22 : 0.16) : Qt.rgba(0, 0, 0, bma.containsMouse ? 0.18 : 0.14))   // flat, no glass
+                        : (b.plain ? (b.inWide ? (b.t.dark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.14))
+                                               : Qt.rgba(1, 1, 1, 0))
+                                   : (!b.glass ? (b.t.dark ? Qt.rgba(1, 1, 1, bma.containsMouse ? 0.22 : 0.16) : Qt.rgba(0, 0, 0, bma.containsMouse ? 0.18 : 0.14))
                                                : (bma.containsMouse ? (b.t.dark ? Qt.rgba(1, 1, 1, 0.04) : Qt.rgba(1, 1, 1, 0.09)) : Qt.rgba(1, 1, 1, 0))))
             Behavior on color { ColorAnimation { duration: 320; easing.type: Easing.OutCubic } }
         }
-        // state flip: the icon dips, turns a touch and springs back (motion), while the fill fades
         property real pop: 0
         onOnChanged: popAnim.restart()
         SequentialAnimation {
@@ -1555,8 +1419,6 @@ Scope {
         MouseArea { id: bma; anchors.fill: parent; enabled: !b.plain; hoverEnabled: true; onClicked: b.clicked() }
     }
 
-    // The simple Control Center controls (one tap = one action or switch): a round icon, and, when the tile is two cells wide, its title and a status
-    // line beside it. One cell wide it is just the icon, so every control built on this can be resized in Edit Controls / Settings.
     component CCSimpleTile: CCTile {
         id: stl
         property string kind: ""
@@ -1577,13 +1439,11 @@ Scope {
             x: 60; anchors.verticalCenter: parent.verticalCenter
             width: parent.width - 60 - 8
             spacing: 1
-            // long titles ("Lock Screen", "Power Mode", translations) shrink a little instead of being cut off
             Text { width: parent.width; elide: Text.ElideRight; fontSizeMode: Text.HorizontalFit; minimumPixelSize: 10; text: stl.title; color: stl.fg; font.family: root.fontForWeight(Font.DemiBold, stl.t.fam); font.pixelSize: 13; font.weight: Font.DemiBold }
             MorphText { visible: stl.status !== ""; animateWidth: false; duration: 420; width: parent.width; elide: Text.ElideRight; text: stl.status; color: stl.fg2; font.family: root.fontForWeight(Font.Normal, stl.t.fam); font.pixelSize: 12 }
         }
     }
 
-    // thin-line slider: icon at each end, slim rounded track between them
     component CCSlider: Item {
         id: s
         required property var t
@@ -1592,22 +1452,18 @@ Scope {
         property string rightKind: "sun"
         property real leftLevel: 1
         property real rightLevel: 3
-        property var gx: null               // glass context: when set, the knob turns into Liquid Glass while it is held
-        property real glassMul: 1.0         // refraction boost for the knob (the macOS-style panel runs its glass very softly)
+        property var gx: null
+        property real glassMul: 1.0
         signal moved(real v)
         height: 28
-        property bool tileHover: false        // the pointer is anywhere over the tile that holds this slider
+        property bool tileHover: false
         readonly property bool hovering: sma.containsMouse || sma.pressed || tileHover
-        // knob animation state: hover pops a rounded square in, holding it springs it bigger and turns it to glass
         property real hoverT: hovering ? 1 : 0
         Behavior on hoverT { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.2 } }
         property real pressT: sma.pressed ? 1 : 0
         Behavior on pressT { NumberAnimation { duration: sma.pressed ? 420 : 300; easing.type: Easing.OutBack; easing.overshoot: 3.0 } }
         readonly property real trackX: 28
         readonly property real trackW: Math.max(1, s.width - 28 - 26)
-        // jiggle: the knob stretches, leans and wobbles when the value moves; how hard depends on how fast it moves.
-        // `vel` is the smoothed speed (px/ms); `jig` chases a target set from it through a spring, so it overshoots and rings
-        // out after the movement stops (the target goes back to 0 shortly after the last change).
         property real vel: 0
         property real jig: 0
         property real lastV: value
@@ -1648,25 +1504,23 @@ Scope {
             kind: s.rightKind; level: s.rightLevel
             color: s.t.ink2
         }
-        // the knob: a rounded square on hover; held, it grows with a little spring and becomes Liquid Glass
         Item {
             id: knob
             readonly property real kw: 21 + 6 * s.pressT
             readonly property real kh: 14 + 3 * s.pressT
             width: Math.max(1, kw); height: Math.max(1, kh)
-            x: s.trackX + Math.max(0, Math.min(1, s.value)) * s.trackW - width / 2 - s.jig * 3     // trails a little behind when moving
+            x: s.trackX + Math.max(0, Math.min(1, s.value)) * s.trackW - width / 2 - s.jig * 3
             anchors.verticalCenter: parent.verticalCenter
             visible: s.hoverT > 0.01
             opacity: Math.min(1, s.hoverT * 1.6)
             scale: 0.5 + 0.5 * s.hoverT
             rotation: s.jig * 7
-            transform: Scale {      // squash and stretch along the movement: longer and flatter the faster it goes
+            transform: Scale {
                 origin.x: knob.width / 2; origin.y: knob.height / 2
                 xScale: 1 + 0.32 * Math.min(1.5, Math.abs(s.jig))
                 yScale: 1 - 0.16 * Math.min(1.5, Math.abs(s.jig))
             }
             readonly property real rad: Math.max(2, Math.min(height / 2, 8 + 3 * s.pressT))
-            // solid white-ish square (fades out while the glass takes over)
             Rectangle {
                 anchors.fill: parent
                 radius: knob.rad
@@ -1679,7 +1533,6 @@ Scope {
                 opacity: Math.min(1, s.pressT * 1.6)
                 sourceComponent: Item {
                     GGlass { anchors.fill: parent; gx: s.gx; cornerR: knob.rad; thickness: 16; strengthMul: s.glassMul * 0.85; shadowAmt: 0.5 }
-                    // the slider bar seen through the glass: the part of the track that lies under the knob
                     Item {
                         anchors.fill: parent
                         clip: true
@@ -1696,9 +1549,7 @@ Scope {
                             color: Qt.rgba(s.t.fg.r, s.t.fg.g, s.t.fg.b, 0.9)
                         }
                     }
-                    // edge: the same border as the Control Center buttons (thin, brighter shade of the background, fading out at the top-right and bottom-left corners, a bit translucent)
                     CornerBorder { z: 2; anchors.fill: parent; cornerR: knob.rad; dark: s.gx.dark; tint: s.gx.borderTint; amount: s.gx.borderAmount; lineW: 0.8 }
-                    // glassy sheen: a soft specular highlight along the top, fading out towards the middle
                     Rectangle {
                         anchors.fill: parent
                         radius: knob.rad
@@ -1722,7 +1573,6 @@ Scope {
         }
     }
 
-    // one device row of the sound popover: round icon (accent when it is the active device), name, optional second line
     component AudioRow: Item {
         id: ar
         required property var t
@@ -1773,7 +1623,6 @@ Scope {
         MouseArea { id: arMa; anchors.fill: parent; hoverEnabled: true; onClicked: ar.clicked() }
     }
 
-    // --- notification card contents (used by the popups and by the notification centre) ---
     component NotifBody: Item {
         id: nb
         required property var t
@@ -1815,7 +1664,6 @@ Scope {
         }
         Column {
             id: textCol
-            // a notification updated in place (same id, new text): blur out, refocus on the new wording
             property real refocus: 0
             layer.enabled: refocus > 0.001
             layer.effect: MultiEffect { blurEnabled: true; blurMax: 32; blur: textCol.refocus; autoPaddingEnabled: true }
@@ -1879,7 +1727,6 @@ Scope {
         }
     }
 
-    // --- settings window pieces ---
     component PRow: Item {
         id: r
         required property var t
@@ -1926,7 +1773,6 @@ Scope {
         borderTint: root.menuBorderColor
         onGlassFailed: root.glassState = "failed"
     }
-    // same slider as the Control Center (see GlassSlider.qml)
     component PSlider: GlassSlider {
         required property var t
         decimals: 2
@@ -1979,7 +1825,6 @@ Scope {
         }
     }
 
-    // --- State & data sources ---
     SystemClock { id: clock; precision: root.showSeconds ? SystemClock.Seconds : SystemClock.Minutes }
 
     readonly property string clockText: {
@@ -1989,29 +1834,25 @@ Scope {
         return root.showDate ? I18n.locale().toString(d, "ddd d MMM") + "  " + t : t;
     }
 
-    // active app
     function lookup(appId) {
         if (!appId) return null;
         var e = DesktopEntries.byId(appId);
         if (!e && DesktopEntries.heuristicLookup) e = DesktopEntries.heuristicLookup(appId);
         return e;
     }
-    // the empty desktop has the keyboard (DesktopFocus.qml): no app is active, the menu bar names the Desktop
     readonly property bool desktopFocused: hub ? hub.desktopFocused === true : false
     readonly property var activeTl: desktopFocused ? null : ToplevelManager.activeToplevel
     readonly property string activeAppId: activeTl ? (activeTl.appId || "") : ""
     readonly property string appName: {
         if (activeAppId === "") return I18n.tr("Desktop");
-        // YukiShell's own windows (all "org.quickshell")
         if (activeAppId === "org.quickshell") return (activeTl.title === "Clock" || activeTl.title === "App Store") ? I18n.tr(activeTl.title)
                                                      : (activeTl.title === "YukiShell Settings" ? I18n.tr("System Settings") : "YukiShell");
         var e = lookup(activeAppId);
         return e ? e.name : activeAppId;
     }
-    // Hyprland's view of the focused window (floating / fullscreen / pinned / pid ...), refreshed when a menu opens
     property var activeWin: null
     function refreshActive() { if (!awProc.running) awProc.running = true; }
-    onActiveTlChanged: { refreshActive(); swTrack(); }      // swTrack = window-switcher recent-app order
+    onActiveTlChanged: { refreshActive(); swTrack(); }
     Process {
         id: awProc
         command: ["hyprctl", "-j", "activewindow"]
@@ -2032,18 +1873,14 @@ Scope {
         { id: "window", label: I18n.tr("Window") }
     ]
 
-    // audio
     readonly property var sink: Pipewire.defaultAudioSink
     PwObjectTracker { objects: [root.sink] }
     readonly property real volume: (sink && sink.audio) ? sink.audio.volume : 0
     readonly property bool muted: (sink && sink.audio) ? sink.audio.muted : false
-    // The OSD mirrors hardware-key changes as well as changes made from this shell.
     property bool osdReady: false
     property bool osdVisible: false
     property string osdKind: "volume"
     property real osdValue: 0
-    // The OSD is for hardware keys only: changes made from this shell (Control Center, volume popover, bar scroll,
-    // device switching) open a short quiet window for their kind, during which the resulting change is not shown.
     property real osdQuietVolUntil: 0
     property real osdQuietBrightUntil: 0
     function osdQuiet(kind, ms) {
@@ -2051,13 +1888,12 @@ Scope {
         if (kind === "brightness") osdQuietBrightUntil = Math.max(osdQuietBrightUntil, t);
         else osdQuietVolUntil = Math.max(osdQuietVolUntil, t);
     }
-    // --- UI sounds (synthesized macOS-style set in ~/.local/share/sounds/yukishell, see yukishell-make-sounds.py) ---
     readonly property string soundDir: Quickshell.env("HOME") + "/.local/share/sounds/yukishell"
     property var soundLast: ({})
     function playSound(name, vol) {
         if (!uiSounds || gaming) return;
         var now = Date.now(), last = soundLast[name] || 0;
-        if (now - last < 90) return;                 // a burst of volume steps -> one pop per step, not a buzz
+        if (now - last < 90) return;
         soundLast[name] = now;
         Quickshell.execDetached(["pw-play", "--volume=" + ((vol === undefined ? 0.8 : vol) * uiSoundVolume).toFixed(3), soundDir + "/" + name + ".wav"]);
     }
@@ -2080,7 +1916,6 @@ Scope {
     readonly property var micSource: Pipewire.defaultAudioSource
     PwObjectTracker { objects: [root.micSource] }
     readonly property bool micMuted: (micSource && micSource.audio) ? micSource.audio.muted : true
-    // Power Mode tile: the profile from power-profiles-daemon, re-read whenever Control Center opens
     property string powerProfile: "balanced"
     Process { id: ppGetBar; command: ["powerprofilesctl", "get"]; stdout: StdioCollector { onStreamFinished: { var v = text.trim(); if (v !== "") root.powerProfile = v; } } }
     function refreshPowerProfile() { if (!ppGetBar.running) ppGetBar.running = true; }
@@ -2094,7 +1929,6 @@ Scope {
     readonly property real micVolume: (micSource && micSource.audio) ? micSource.audio.volume : 0
     function setMicVolume(v) { if (micSource && micSource.audio) { micSource.audio.muted = false; micSource.audio.volume = Math.max(0, Math.min(1, v)); } }
 
-    // Device lists come straight from the PipeWire graph, so plugging in headphones / a headset updates the picker at once.
     PwObjectTracker { objects: Pipewire.nodes.values }
     function audioDevices(wantOutput) {
         var ns = Pipewire.nodes.values, out = [];
@@ -2108,7 +1942,6 @@ Scope {
         out.sort(function (a, b) { return String(a.description || a.name).localeCompare(String(b.description || b.name)); });
         return out;
     }
-    // Group playback streams by application: one control per app, even if it owns multiple output streams.
     property int audioTick: 0
     function audioApps() {
         var tick = audioTick, ns = Pipewire.nodes.values, groups = {}, out = [];
@@ -2136,8 +1969,6 @@ Scope {
         return out;
     }
     readonly property var appAudioStreams: audioApps()
-    // The list of apps the sliders are built from only changes when an app appears or goes away. appAudioStreams is rebuilt on
-    // every volume tick, and feeding it straight to the Repeater destroyed the slider under your finger mid-drag.
     property var appAudioKeys: []
     function syncAppKeys() {
         var k = [], l = appAudioStreams;
@@ -2169,20 +2000,18 @@ Scope {
         if (f === "hdmi" || f === "tv" || f === "monitor" || /hdmi|displayport|display port/.test(t)) return "monitor";
         return "speaker";
     }
-    // "Family 17h HD Audio Controller Analog Stereo" -> ["Family 17h HD Audio Controller", "Analog Stereo"]
     function audioSplit(d) {
         d = String(d || "");
         var m = /^(.*?)\s+((?:Analog|Digital|Pro|Stereo|Mono|Speaker|Headphones|Headset|Microphone|Line|HDMI|DisplayPort|S\/PDIF|Surround)\b.*)$/i.exec(d);
         return (m && m[1].length > 2) ? [m[1], m[2]] : [d, ""];
     }
-    function chooseAudio(n) {      // make this device the default; wpctl ships with WirePlumber, pactl is the fallback
+    function chooseAudio(n) {
         if (!n) return;
         osdQuiet("volume", 1500);
         Quickshell.execDetached(["sh", "-c", "wpctl set-default \"$1\" 2>/dev/null || pactl \"$3\" \"$2\"", "sh", String(n.id), String(n.name),
                                  (n.type !== undefined ? ((n.type & PwNodeType.Sink) !== 0) : n.isSink) ? "set-default-sink" : "set-default-source"]);
     }
 
-    // battery
     readonly property var bat: UPower.displayDevice
     readonly property bool hasBattery: bat !== null && bat !== undefined && bat.isPresent
     readonly property real batPct: {
@@ -2193,17 +2022,15 @@ Scope {
     readonly property bool charging: hasBattery && (bat.state === UPowerDeviceState.Charging
                                                      || bat.state === UPowerDeviceState.FullyCharged)
 
-    // media
     PlayerPicker { id: playerPick }
     readonly property var player: playerPick.player
 
-    // wifi
     property bool wifiOn: true
-    property bool hasWifi: true                 // a Wi-Fi adapter exists (a desktop with only Ethernet has none: the switch and tile are then unavailable)
-    property bool hasBt: true                   // a Bluetooth adapter exists (/sys/class/bluetooth)
+    property bool hasWifi: true
+    property bool hasBt: true
     property string wifiSsid: ""
     property int wifiSignal: 0
-    property bool ethernetUp: false             // a wired connection is up (shown with Apple's <···> symbol when Wi-Fi isn't in use)
+    property bool ethernetUp: false
     readonly property bool showEthernet: ethernetUp && wifiSsid === ""
     readonly property int wifiLevel: !wifiOn ? 0 : (wifiSsid === "" ? 0 : (wifiSignal > 66 ? 3 : (wifiSignal > 33 ? 2 : 1)))
     function refreshWifi() { if (!wifiProc.running) wifiProc.running = true; }
@@ -2214,7 +2041,6 @@ Scope {
             onStreamFinished: {
                 var l = text.split("\n");
                 root.hasWifi = !l.some(function (x) { return x.trim() === "nohw"; });
-                // nmcli reports the radio "enabled" even with no adapter at all: without one, Wi-Fi is simply off
                 root.wifiOn = root.hasWifi && (l[0] || "").trim() === "enabled";
                 root.ethernetUp = l.some(function (x) { return x.trim() === "eth"; });
                 var a = (l[1] || "").trim();
@@ -2233,13 +2059,11 @@ Scope {
         settleTimer.restart();
     }
 
-    // wifi network list (feeds the Wi-Fi popover)
-    property var wifiNets: []                  // [{ ssid, signal, secure, inUse, saved }]
+    property var wifiNets: []
     property bool wifiScanning: false
-    property string wifiBusy: ""               // ssid currently being joined
+    property string wifiBusy: ""
     property string wifiError: ""
     function sigLevel(s) { return s > 66 ? 3 : (s > 33 ? 2 : 1); }
-    // split an `nmcli -t` line on unescaped colons (and unescape \: and \\)
     function splitNm(line) {
         var out = [], cur = "";
         for (var i = 0; i < line.length; i++) {
@@ -2352,13 +2176,12 @@ Scope {
     }
     Timer { id: connectionRefresh; interval: 1200; onTriggered: root.refreshConnections() }
 
-    // --- Bluetooth ---
     property bool btOn: false
     property int btConnected: 0
     property string btConnectedName: ""
     property bool btScanning: false
-    property var btDevices: []             // [ { mac, name, icon, connected, paired } ]
-    property string btBusy: ""             // mac of device currently connecting/disconnecting
+    property var btDevices: []
+    property string btBusy: ""
     property string btError: ""
 
     function btIconFor(name) {
@@ -2373,13 +2196,10 @@ Scope {
     }
 
     function refreshBt() { if (!btProc.running) btProc.running = true; }
-    // One line per known device: D:<mac> <paired 0|1> <connected 0|1> <battery %> <name>   (tab separated).
-    // Every device is asked with "bluetoothctl info", because the "devices Paired|Connected" filters only exist in
-    // newer BlueZ versions: older ones ignore the argument and print every device (so everything looked connected).
     Process {
         id: btProc
         command: ["sh", "-c",
-            "[ -n \"$(ls /sys/class/bluetooth 2>/dev/null)\" ] || { echo A:0; echo P:; exit 0; }; echo A:1; "      // no adapter: nothing to ask (bluetoothctl would block for its whole timeout, every poll)
+            "[ -n \"$(ls /sys/class/bluetooth 2>/dev/null)\" ] || { echo A:0; echo P:; exit 0; }; echo A:1; "
             + "p=$(timeout 4 bluetoothctl show 2>/dev/null </dev/null | grep -i 'Powered:' | head -n1); echo \"P:$p\"; "
             + "timeout 4 bluetoothctl devices 2>/dev/null </dev/null | while read -r _ mac name; do "
             + "[ -n \"$mac\" ] || continue; "
@@ -2402,7 +2222,6 @@ Scope {
                     var f = l.substring(2).split("\t");
                     if (f.length < 5 || !f[0]) continue;
                     var mac = f[0], isPair = f[1] === "1", isConn = f[2] === "1", name = (f[4] || "").trim() || mac;
-                    // BlueZ names an unnamed device after its address with dashes: show those last
                     if (isConn) { connCount++; if (!firstConnName) firstConnName = name; }
                     devList.push({ mac: mac, name: name, connected: isConn, paired: isPair, bat: f[3] || "", icon: root.btIconFor(name) });
                 }
@@ -2419,8 +2238,6 @@ Scope {
         }
     }
 
-    // Discovery only lasts while bluetoothctl stays alive (BlueZ stops it when the client exits), so "scan on" has to
-    // run for a while with --timeout instead of being fired and forgotten.
     function scanBt() {
         if (!root.btOn || btScanProc.running) return;
         root.btScanning = true;
@@ -2443,7 +2260,6 @@ Scope {
         if (connected) {
             btActionProc.command = ["sh", "-c", "bluetoothctl disconnect \"$1\" >/dev/null 2>&1 </dev/null; exit 0", "sh", mac];
         } else {
-            // pair first when needed (with a simple agent, no PIN prompt), trust, then connect
             btActionProc.command = ["sh", "-c",
                 "d=\"$1\"; "
                 + "fail() { m=$(printf '%s\\n' \"$1\" | grep -iE 'fail|error|not available|timeout|rejected|canceled' | tail -n1); "
@@ -2470,7 +2286,6 @@ Scope {
     }
     Timer { id: btAfter; interval: 800; onTriggered: root.refreshBt() }
 
-    // power: a soft-blocked adapter (rfkill, e.g. after Airplane Mode) refuses "power on", so unblock it first
     function toggleBt() {
         root.btOn = !root.btOn;
         Quickshell.execDetached(["sh", "-c",
@@ -2480,8 +2295,6 @@ Scope {
         settleTimer.interval = 1500;
         settleTimer.restart();
     }
-    // Airplane Mode is rfkill's real state: every radio this machine has is blocked. A PC with no radio at all (no Wi-Fi card, no
-    // Bluetooth adapter) has nothing to block, so the mode stays off and its tile is greyed out instead of reading "on".
     property bool hasRadios: false
     property bool airplane: false
     function refreshAirplane() { if (!rfProc.running) rfProc.running = true; }
@@ -2499,7 +2312,6 @@ Scope {
     function toggleAirplane() {
         if (!hasRadios) return;
         var turnOn = !airplane;
-        // bluetoothctl waits forever when there is no adapter, so it only runs when rfkill knows a Bluetooth device
         sh(turnOn ? "rfkill block all"
                   : "rfkill unblock all; sleep 0.5; rfkill list bluetooth 2>/dev/null | grep -q . && timeout 5 bluetoothctl power on");
         airplane = turnOn;
@@ -2507,13 +2319,10 @@ Scope {
         settleTimer.restart();
     }
     Timer { id: settleTimer; interval: 900; onTriggered: { root.refreshWifi(); root.refreshBt(); root.refreshAirplane(); } }
-    // every 6 s while a panel shows them (Control Center, Wi-Fi / Bluetooth menus, Settings), every 20 s otherwise for the bar icons;
-    // opening a panel refreshes at once
     readonly property bool radioUiOpen: popCount > 0 || (hub && hub.dock && hub.dock.prefsOpen === true)
     onRadioUiOpenChanged: if (radioUiOpen) { refreshWifi(); refreshBt(); refreshAirplane(); }
     Timer { interval: root.radioUiOpen ? 6000 : 20000; repeat: true; running: true; triggeredOnStart: true; onTriggered: { root.refreshWifi(); root.refreshBt(); root.refreshAirplane(); } }
 
-    // brightness
     property real brightness: 0.5
     function refreshBrightness() { if (brightProc.running || brightWrite.running || brightSync.running || brightSettle.running || brightDirty || Date.now() - brightTouched < 2500) return; brightProc.running = true; }
     Process {
@@ -2523,15 +2332,13 @@ Scope {
             onStreamFinished: {
                 var f = text.trim().split(",");
                 if (f.length >= 4) { var p = parseInt(f[3]); if (!isNaN(p)) root.brightness = p / 100; }
-                root.brightLaptop = f.length >= 4 && f[0] !== "yuki";   // yuki-brightness getm = an external monitor over DDC/CI
+                root.brightLaptop = f.length >= 4 && f[0] !== "yuki";
             }
         }
     }
-    // Live brightness: one write in flight at a time; when it finishes, the newest slider value is sent right away
-    // (leading + trailing throttle, ~12 updates/s over DDC/CI) instead of waiting for the drag to stop.
     property bool brightDirty: false
     property int brightSent: -1
-    property double brightTouched: 0                  // when the user last changed it (the poll must not fight a drag)
+    property double brightTouched: 0
     Process {
         id: brightWrite
         onRunningChanged: if (!running && root.brightDirty) root.brightFlush()
@@ -2546,8 +2353,6 @@ Scope {
         brightWrite.running = true;
     }
     function brightUser() { brightTouched = Date.now(); brightFlush(); brightSettle.restart(); }
-    // The monitor can silently drop a write that arrives too quickly after the previous one, so the slider (our intent) and the
-    // screen disagree. Once the user has stopped, read the real value back and rewrite until it matches; the result is the truth.
     Timer {
         id: brightSettle
         interval: 350
@@ -2559,11 +2364,10 @@ Scope {
     }
     Process {
         id: brightSync
-        onRunningChanged: if (!running) { root.brightTouched = Date.now() - 2600; root.refreshBrightness(); }   // show what the monitor really has
+        onRunningChanged: if (!running) { root.brightTouched = Date.now() - 2600; root.refreshBrightness(); }
     }
     function setBrightness(v) { osdQuiet("brightness", 1800); brightness = Math.max(0.01, Math.min(1, v)); brightUser(); }
     onBrightnessChanged: showOsd("brightness", brightness)
-    // hardware keys: like the sliders, but the on-screen display is shown (no quiet window)
     function hwVolume(d) {
         if (!sink || !sink.audio) return;
         var v = Math.max(0, Math.min(1, Math.round((sink.audio.volume + d) * 100) / 100));
@@ -2586,9 +2390,6 @@ Scope {
     // (DDC/CI, cached for 30 s by yuki-brightness) or no brightness control at all is polled slowly. Opening Control Center refreshes it too.
     property bool brightLaptop: true
     Timer { interval: root.brightLaptop ? 850 : (root.radioUiOpen ? 6000 : 30000); repeat: true; running: true; onTriggered: root.refreshBrightness() }
-    // --- Keyboard layout ---
-    // Hyprland's event gives an immediate update; a small reconciliation poll handles dropped events and
-    // keyboards whose active keymap changes without a usable activelayout payload.
     readonly property var kbNames: ({
         us: "English (US)", gb: "English (UK)", ca: "Canadian", au: "English (Australian)", ie: "Irish", in: "Indian",
         ru: "Russian", ua: "Ukrainian", by: "Belarusian", bg: "Bulgarian", rs: "Serbian", hr: "Croatian", si: "Slovenian", mk: "Macedonian",
@@ -2621,8 +2422,6 @@ Scope {
         "turkish": "TR", "tr": "TR",
         "greek": "EL", "gr": "EL"
     })
-    // fcitx5's tray item: what the bar shows for the input method that is on. From its icon name (fcitx-pinyin, fcitx_bamboo, ...)
-    // or, for one not listed, the first letters of its name (the tray tooltip). A plain keyboard layout -> "" (keyboard glyph).
     function imLabelFor(icon, name) {
         var i = icon.toLowerCase(), n = name.toLowerCase();
         if (i.indexOf("keyboard") >= 0 || n.indexOf("keyboard") === 0 || (i === "" && n === "")) return "";
@@ -2633,9 +2432,6 @@ Scope {
         var w = name || icon;
         return w.replace(/[^A-Za-z]/g, "").substring(0, 2).toUpperCase() || w.substring(0, 1);
     }
-    // fcitx5 doesn't tell anyone when Ctrl+Space switches the input method (no D-Bus signal, and its tray item keeps the old
-    // icon), so assets/imwatch.py asks it a few times a second over one D-Bus connection and prints the input method when it
-    // changes. Runs only while fcitx5's item is on the bar; "" = no answer (then the tray item's own data is used).
     property string fcitxIM: ""
     readonly property bool imTrayShown: {
         if (!barEnabled || !showTray) return false;
@@ -2653,7 +2449,7 @@ Scope {
     }
     function refreshKeyboardLayout() { if (!kbdProc.running) kbdProc.running = true; }
     Timer {
-        interval: 5000; repeat: true          // Hyprland's activelayout event updates at once; this only catches a missed one
+        interval: 5000; repeat: true
         running: root.barEnabled && root.barWidgetEnabled("keyboard") && root.kbLayouts.length > 1
         onTriggered: root.refreshKeyboardLayout()
     }
@@ -2721,7 +2517,7 @@ Scope {
         var n = kbLayouts.length;
         if (n < 2) return;
         i = ((i % n) + n) % n;
-        kbIndex = i; keyboardLayout = kbLayouts[i].code.substring(0, 2).toUpperCase();    // show it right away, the event confirms it
+        kbIndex = i; keyboardLayout = kbLayouts[i].code.substring(0, 2).toUpperCase();
         Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(i)]);
         kbEventRefresh.restart();
     }
@@ -2739,9 +2535,6 @@ Scope {
         }
     }
 
-    // --- Privacy indicators ---
-    // Computed from the live PipeWire graph: a link only counts while it is Active, so the dots appear the moment an app starts
-    // using the microphone / a camera / a screen-share and vanish as soon as it stops. No polling, no pw-dump.
     PwObjectTracker { objects: Pipewire.linkGroups.values }
     function computePrivacy() {
         var mic = [], cam = [], share = [], L = Pipewire.linkGroups.values;
@@ -2755,7 +2548,6 @@ Scope {
             var who = String(tp["application.name"] || tp["node.description"] || t.description || tp["node.name"] || t.name || I18n.tr("An app"))
                 .replace(/\s+(input|output)$/i, "");
             if ((t.type & PwNodeType.AudioInStream) === PwNodeType.AudioInStream) {
-                // an app is recording from a real source (a monitor of a sink is "listening to the computer", not a microphone)
                 if ((s.type & PwNodeType.Sink) !== 0) continue;
                 if (String(tp["media.name"]).toLowerCase() === "peak detect" || String(tp["application.id"]).indexOf("pavucontrol") >= 0) continue;
                 add(mic, who);
@@ -2784,12 +2576,7 @@ Scope {
         if (recording) a.push({ k: "rec", glyph: "monitor", c: "#BF5AF2", title: I18n.tr("Screen Recording"), sub: I18n.tr("Recording ") + recTime() });
         return a;
     }
-    // --- screen recording ---
-    // A recorder and the glass's live window captures all pull frames from Hyprland; together they made it cut our Wayland
-    // connection ("invalid object NN") and the shell died. So the window captures sit out while recording (hub.captureQuiet),
-    // the recorder starts only after they have settled, and it can never outlive the shell: before, every crash left a
-    // wf-recorder behind that kept recording (that is where the extra wf-recorder processes came from).
-    property bool recRun: false                 // wf-recorder is allowed to run (it follows `recording` after a short delay)
+    property bool recRun: false
     property real recGuardUntil: 0
     Timer { id: recStartDelay; interval: 900; onTriggered: if (root.recording) root.recRun = true }
     Process {
@@ -2820,28 +2607,24 @@ Scope {
         }
     }
     function toggleRecording() {
-        if (Date.now() < recGuardUntil) return;          // a double click must not start two recorders
+        if (Date.now() < recGuardUntil) return;
         recGuardUntil = Date.now() + 1500;
         if (!recording) {
             recordFile = Quickshell.env("HOME") + "/Videos/Screen-Recording-" + Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss") + ".mp4";
             recSecs = 0;
-            recording = true;                            // the glass captures go quiet right away ...
-            recStartDelay.restart();                     // ... and the recorder follows once they have
+            recording = true;
+            recStartDelay.restart();
         } else {
             recStartDelay.stop();
             recording = false;
             if (recRun) {
-                // ask the recorder to finish (SIGINT: it writes the end of the file); recRun goes false when it has exited
                 Quickshell.execDetached(["sh", "-c", "kill -INT \"$(cat \"${XDG_RUNTIME_DIR:-/tmp}/yukibar-recorder.pid\" 2>/dev/null)\" 2>/dev/null || pkill -INT -x wf-recorder"]);
                 recKill.restart();
             }
         }
     }
-    Timer { id: recKill; interval: 10000; onTriggered: root.recRun = false }      // it did not finish by itself: stop the process
+    Timer { id: recKill; interval: 10000; onTriggered: root.recRun = false }
     Timer { interval: 1000; repeat: true; running: root.recRun; onTriggered: root.recSecs++ }
-    // reapOrphans: helpers an earlier YukiShell started and left behind when it exited or crashed (their parent is gone, so init
-    // adopted them) are ended once at start-up: recorders (finished cleanly with SIGINT), Keep Awake inhibitors (which blocked sleep
-    // even with Keep Awake off), wallpaper-folder watchers and visualizers. Today's helpers die with the shell (OwnedProcess.qml).
     Process {
         id: reapOrphans
         running: true
@@ -2875,7 +2658,6 @@ Scope {
     } }
     function updateFileSearch(q) { fileQuery=q; fileHits=[]; fileSearchPending=true; fileDebounce.restart(); }
 
-    // focus / night shift / keep awake
     property bool dnd: false
     onNotifDndChanged: if (dnd !== notifDnd) dnd = notifDnd
     onDndChanged: if (notifDnd !== dnd) notifDnd = dnd
@@ -2889,14 +2671,10 @@ Scope {
     property bool keepAwake: false
     OwnedProcess {
         id: awakeProc
-        // the `sleep` under systemd-inhibit gets its own parent-death signal, so it never outlives the inhibitor either
         cmd: ["systemd-inhibit", "--what=idle:sleep", "--who=yukibar", "--why=Keep Awake", "setpriv", "--pdeathsig", "TERM", "--", "sleep", "infinity"]
         running: root.keepAwake
     }
 
-    // --- Menus ---
-    // Hyprland shortcuts shown next to menu items: read from the list hypr/scripts/keys.lua writes (default keys) plus the user's own
-    // choices from Settings -> Keyboard -> Keyboard Shortcuts, so a changed shortcut shows up in the menus too. hk("Lock Screen") -> "Super+L"
     property var bindKeys: ({})
     function parseBinds() {
         var map = {};
@@ -2924,7 +2702,6 @@ Scope {
     function mc(label, run) { return { kind: "item", label: label, shortcut: "", run: run, confirm: true }; }
     function msep() { return { kind: "sep" }; }
     function ico(item, g) { item.glyph = g; return item; }
-    // Hyprland 0.55+ is configured and driven in Lua: `hyprctl dispatch` takes a Lua expression (the old "killactive" style strings fail).
     function hlx(expr) { Quickshell.execDetached(["hyprctl", "dispatch", expr]); }
     function disp(expr) { return function () { root.hlx(expr); }; }
     // Menu shortcuts are sent to the focused window with Hyprland's sendshortcut (no extra tool needed).
@@ -2968,7 +2745,6 @@ Scope {
     function mchk(label, shortcut, checked, run) { return { kind: "item", label: label, shortcut: shortcut || "", run: run, checked: checked === true }; }
     function dis(item, off) { if (off) item.disabled = true; return item; }
 
-    // what kind of app is focused, so the menus can offer the right shortcuts
     function appKind(id) {
         var c = (id || "").toLowerCase();
         function any(list) { for (var i = 0; i < list.length; i++) if (c.indexOf(list[i]) >= 0) return true; return false; }
@@ -2978,7 +2754,7 @@ Scope {
         if (any(["code", "codium", "cursor", "dev.zed", "kate", "gedit", "sublime", "geany", "neovide", "emacs", "jetbrains", "pycharm", "intellij", "clion", "webstorm"])) return "editor";
         return "";
     }
-    function shot(region) {      // "" = whole screen, "sel" = pick an area (frozen-screen picker), otherwise "x,y WxH"
+    function shot(region) {
         if (region === "sel") shotStart();
         else shotFinish(region, "");
     }
@@ -2999,7 +2775,7 @@ Scope {
     function forceQuitActive(aw) {
         if (aw && aw.pid > 0) Quickshell.execDetached(["kill", "-9", String(Math.floor(aw.pid))]);
     }
-    function helpFor(id, n) {    // man page if there is one, otherwise a web search
+    function helpFor(id, n) {
         var c = (id || "").toLowerCase().replace(/[^a-z0-9._+-]/g, "");
         if (c === "") return;
         var q = encodeURIComponent(n + " linux help").replace(/'/g, "%27");
@@ -3020,10 +2796,9 @@ Scope {
         if (!spotlightEnabled && launcher === "") return;
         spotWant = "home";
         if (launcher !== "") sh(launcher);
-        else spotRequest++;                       // every bar window listens and the focused screen opens Spotlight
+        else spotRequest++;
     }
     function spotOpen(mode) { if (!spotlightEnabled) return; spotWant = mode; spotRequest++; }
-    // qs -c YukiShell ipc call controlcenter toggle | open | close   (works with the menu bar switched off too)
     signal ccRequest(bool open)
     IpcHandler {
         target: "controlcenter"
@@ -3031,9 +2806,6 @@ Scope {
         function open(): void { root.ccRequest(true); }
         function close(): void { root.ccRequest(false); }
     }
-    // Laptop / keyboard hardware keys (volume, mute, brightness). The compositor must bind the keys (the installer's
-    // yukishell.lua does); the shell then does the work itself, so the numbers, the on-screen display and the UI sounds
-    // all stay in step.   qs -c YukiShell ipc call hardware volumeUp | volumeDown | mute | micMute | brightnessUp | brightnessDown
     IpcHandler {
         target: "hardware"
         function volumeUp(): void { root.hwVolume(0.05); }
@@ -3051,14 +2823,10 @@ Scope {
         function apps(): void { root.spotOpen("apps"); }
     }
 
-    // --- CLIPBOARD HISTORY + EMOJI (Spotlight panels) ---
-    // History comes from cliphist; its `wl-paste --watch` watchers are started here (unless you already run them), and every
-    // new entry also gets a timestamp in ~/.cache/yukibar/clip-times so the list can say "Copied 4:11 pm".
-    property string clipState: "unknown"      // unknown | ok | external | missing
-    property var clipEntries: []              // newest first
+    property string clipState: "unknown"
+    property var clipEntries: []
     property bool clipLoading: false
     readonly property string clipDir: Quickshell.env("HOME") + "/.cache/yukibar"
-    // the system's default colour emoji font (asked from fontconfig); Noto Color Emoji until that answers
     property string emojiFont: "Noto Color Emoji"
     Process {
         running: true
@@ -3095,12 +2863,8 @@ Scope {
         command: ["sh", "-c",
             "if ! command -v wl-paste >/dev/null 2>&1 || ! command -v cliphist >/dev/null 2>&1; then echo missing; exit 0; fi; "
             + "mkdir -p \"$HOME/.cache/yukibar/clip\"; "
-            // watchers an earlier YukiShell started and left behind (their parent is gone): they are ours, end them first, or they
-            // would count as "external" and this shell would never run its own
             + "for p in $(pgrep -x wl-paste 2>/dev/null); do pp=$(ps -o ppid= -p \"$p\" | tr -d ' '); "
             + "if [ \"$pp\" = 1 ] && tr '\\0' ' ' < /proc/$p/cmdline 2>/dev/null | grep -q '.cache/yukibar'; then kill \"$p\"; fi; done; "
-            // look at real wl-paste processes only (`pgrep -f` also matched this very shell, so it always answered "external"
-            // and the watchers below never started)
             + "ext=0; for p in $(pgrep -x wl-paste 2>/dev/null); do "
             + "if tr '\\0' ' ' < /proc/$p/cmdline 2>/dev/null | grep -q cliphist; then ext=1; fi; done; "
             + "if [ $ext = 1 ]; then echo external; else echo ok; fi"]
@@ -3197,7 +2961,6 @@ Scope {
         sh("cliphist decode " + id + " | wl-copy");
         if (paste === undefined ? clipAutoPaste : paste) pasteSoon();
     }
-    // a clipboard entry dropped on the desktop: open it (image -> viewer, URL -> browser, text -> editor)
     function clipOpen(en) {
         var id = parseInt(en.id);
         if (isNaN(id)) return;
@@ -3217,7 +2980,6 @@ Scope {
         clipEntries = [];
         sh("cliphist wipe; rm -f \"$HOME/.cache/yukibar/clip-times\" \"$HOME/.cache/yukibar/clip/\"*");
     }
-    // paste into the app that had focus before Spotlight (terminals paste with Ctrl+Shift+V)
     property var pasteFn: null
     function pasteSoon() {
         pasteFn = appKind(activeAppId) === "terminal" ? keys(["ctrl", "shift"], "v") : keys(["ctrl"], "v");
@@ -3225,9 +2987,6 @@ Scope {
     }
     Timer { id: pasteTimer; interval: 230; onTriggered: if (root.pasteFn) root.pasteFn() }
 
-    // emoji: search by name / keyword, categories, recents
-    // Data comes from the system's own Unicode files when they exist (emoji-test.txt = every emoji with its official name and
-    // category, CLDR annotations = search keywords), so it always matches your installed emoji font. EmojiData.js is the fallback.
     property var emojiList: EmojiData.list
     property string emojiSource: "bundled"
     property bool emojiTried: false
@@ -3258,7 +3017,7 @@ Scope {
     }
     function emojiLoad(out) {
         var iT = out.indexOf("@@TEST@@\n"), iC = out.indexOf("@@CLDR@@\n");
-        if (iT < 0 || iC < iT) return;                                  // no emoji-test.txt on this system: keep EmojiData.js
+        if (iT < 0 || iC < iT) return;
         var testTxt = out.substring(iT + 9, iC), cldrTxt = out.substring(iC + 9), m, i;
         function unesc(x) { return x.replace(/&quot;/g, "\"").replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"); }
         var kw = {}, re = /<annotation cp="([^"]+)"( type="tts")?>([^<]*)<\/annotation>/g;
@@ -3274,18 +3033,18 @@ Scope {
             var ln = lines[i];
             if (ln.charAt(0) === "#") {
                 m = /^# group: (.+)$/.exec(ln);
-                if (m) cat = cats[m[1].trim()] !== undefined ? cats[m[1].trim()] : -1;      // "Component" (skin tones, hair) -> skipped
+                if (m) cat = cats[m[1].trim()] !== undefined ? cats[m[1].trim()] : -1;
                 continue;
             }
             if (cat < 0) continue;
             m = /^[0-9A-F ]+;\s*(\S+)\s*#\s*(\S+)\s+E\d+(?:\.\d+)?\s+(.+)$/.exec(ln);
             if (!m || m[1] !== "fully-qualified") continue;
             var name = m[3].trim();
-            if (name.indexOf("skin tone") >= 0) continue;                  // tone variants would triple the grid; the base emoji is kept
+            if (name.indexOf("skin tone") >= 0) continue;
             var extra = (kw[m[2].replace(/\uFE0F/g, "")] || "").replace(/ \| /g, " ");
             list.push([m[2], name, extra, cat, (name + " " + extra).toLowerCase()]);
         }
-        if (list.length < 800) return;                                  // looks wrong, keep the bundled list
+        if (list.length < 800) return;
         root.emojiList = list;
         root.emojiSource = "system";
     }
@@ -3298,7 +3057,6 @@ Scope {
                 var p = L[i][4].indexOf(q);
                 if (p < 0) continue;
                 var nm = L[i][1].toLowerCase();
-                // exact name, name starts with it, exact keyword (e.g. "smile" -> grinning face), a word of the name, anything else
                 hits.push([nm === q ? 0 : (nm.indexOf(q) === 0 ? 1 : ((" " + L[i][2] + " ").indexOf(" " + q + " ") >= 0 ? 2
                            : (nm.indexOf(" " + q) >= 0 ? 3 : (p === 0 ? 4 : 5)))), i]);
             }
@@ -3322,9 +3080,7 @@ Scope {
         if (clipAutoPaste) pasteSoon();
     }
 
-    // the YukiShell logo: the icon of YukiShell's own windows in the Alt+Tab switcher
     readonly property string logoPath: decodeURIComponent(String(Qt.resolvedUrl("assets/yukishell-logo.png")).replace(/^file:\/\//, ""))
-    // --- applications for Spotlight ---
     function iconSrc(name) {
         var fb = Quickshell.iconPath("application-x-executable", true);
         if (!name) return fb;
@@ -3518,7 +3274,6 @@ Scope {
                         m.push((files ? mi("Preferences\u2026", "Ctrl+Shift+,", keys(["ctrl", "shift"], "comma")) : mi("Preferences\u2026", "Ctrl+,", keys(["ctrl"], "comma"))));
                     }
                     m.push(msep());
-                    // hide-window remembers where the window was, so showing it puts it back exactly there (Super+Alt+S toggles)
                     m.push(mi(I18n.tr("Hide ") + n, hk("Hide or Show Window"), function () { root.sh("~/.config/hypr/bin/hide-window hide"); }));
                     m.push(mi("Show Hidden Windows", "", function () { root.sh("~/.config/hypr/bin/hide-window show"); }));
                     m.push(msep());
@@ -3637,11 +3392,8 @@ Scope {
         return m;
     }
 
-    // --- SCREENSHOT (Print key) ---
-    // Same flow as Noctalia: every output is snapshotted first (grim), the frozen frame is shown dimmed, you drag a region and
-    // the final PNG is cropped from that frozen frame, so nothing that moves while you select ends up in the picture.
-    property bool shotOpen: false             // the picker overlay is showing
-    property bool shotBusy: false             // taking the snapshots
+    property bool shotOpen: false
+    property bool shotBusy: false
     property int shotId: 0
     readonly property string shotTmp: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
     readonly property string shotFinishScript: [
@@ -3660,11 +3412,10 @@ Scope {
         "[ \"$f\" = \"$tmp\" ] && rm -f \"$tmp\"",
         "true"
     ].join("\n")
-    // geom: "" = whole screen, "x,y WxH" = that area, "@" = `tmpPath` already holds the finished PNG (from the picker)
     function shotFinish(geom, tmpPath) {
         playSound("shutter", 0.8);
         var tmp = tmpPath || (shotTmp + "/yukishot-out-" + Date.now() + ".png");
-        var save = screenshotSave || !screenshotClipboard;          // never end up with nowhere to put it
+        var save = screenshotSave || !screenshotClipboard;
         Quickshell.execDetached(["sh", "-c", shotFinishScript, "sh", screenshotDir, save ? "1" : "0", screenshotClipboard ? "1" : "0",
                                  screenshotNotify ? "1" : "0", tmp, geom]);
     }
@@ -3694,7 +3445,6 @@ Scope {
         }
     }
     IpcHandler {
-        // menu actions with a keyboard shortcut (hypr/scripts/shell.lua)
         target: "actions"
         function recording(): void { root.toggleRecording(); }
         function pickColor(): void { root.pickColor(); }
@@ -3720,7 +3470,7 @@ Scope {
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
             readonly property url snap: "file://" + root.shotTmp + "/yukishot-" + root.shotId + "-" + modelData.name + ".ppm"
-            readonly property real k: frozen.implicitWidth > 0 ? frozen.implicitWidth / width : 1     // snapshot pixels per logical pixel
+            readonly property real k: frozen.implicitWidth > 0 ? frozen.implicitWidth / width : 1
             property real ax: 0
             property real ay: 0
             property real px: 0
@@ -3741,7 +3491,7 @@ Scope {
             }
             Timer {
                 id: grabTimer
-                interval: 40                         // let the cut-out settle at its final size before it is grabbed
+                interval: 40
                 onTriggered: {
                     var out = root.shotTmp + "/yukishot-out-" + Date.now() + ".png";
                     var kk = shw.k;
@@ -3771,7 +3521,6 @@ Scope {
                 Image { id: frozen; anchors.fill: parent; source: shw.snap; fillMode: Image.Stretch; smooth: true }
                 Rectangle { anchors.fill: parent; color: "black"; opacity: 0.42 }
 
-                // the selected area, undimmed. This item is what gets cropped, so nothing else may be drawn inside it
                 Item {
                     id: cut
                     visible: shw.hasSel
@@ -3787,7 +3536,6 @@ Scope {
                     border.color: "white"
                 }
 
-                // size badge follows the pointer while selecting
                 Rectangle {
                     visible: shw.hasSel && !shw.grabbing
                     x: Math.max(8, Math.min(shw.width - width - 8, shw.px + 14))
@@ -3847,34 +3595,18 @@ Scope {
         }
     }
 
-    // --- Animated wallpaper: plays unless it was told to stop ---
-    // The wallpaper keeps playing behind windows (they are translucent, a frozen picture shows through). It stops only
-    //   * by hand: the menu bar button (wallUserPaused), and
-    //   * with "Pause behind windows" on: while tiled windows hide a monitor's desktop or one is fullscreen there.
-    // Game Mode stops it on its own (SIGSTOP in yukishell-gaming.sh). One check per window event (open / close / move /
-    // workspace / fullscreen), nothing in between.
     readonly property bool videoWall: wallpaperVideo !== ""
-    property var wallPaused: ({})          // output -> mpvpaper paused (video wallpaper)
-    property string wallCovList: "?"       // the held outputs last written to $XDG_RUNTIME_DIR/yukishell-wallpaused
-    // output -> its desktop is completely hidden behind windows (or one is fullscreen). Always tracked: the desktop
-    // widgets stop drawing on covered screens (culling).
+    property var wallPaused: ({})
+    property string wallCovList: "?"
     property var screenCovered: ({})
-    // output -> a window is FULLSCREEN there: only then do the desktop widgets stop drawing (a focused or tiled
-    // window that merely covers the desktop keeps them alive)
     property var screenFullscreen: ({})
-    // the wallpaper of this output is held (mpvpaper paused) / the glass videos of it are paused (plus Game Mode)
     function wallHold(name) { return wallUserPaused || (wallPauseCovered && screenCovered[name] === true); }
     function wallIdle(name) { return gaming || wallHold(name); }
 
-    // --- one clock for every copy of the animated wallpaper ---
-    // The desktop video is mpvpaper; the glass (bar, Dock, desktop widgets, Settings) plays a small copy of the same clip. Each copy used
-    // to start from 0 at its own moment, so the glass showed the wallpaper ahead of or behind the desktop. mpv is the clock: its position
-    // is read over its IPC socket once a second, and every LiveWall lines itself up with it (LiveWall.qml).
-    // mpv runs one player per monitor; the first monitor's is the clock (they start together and play at the same rate).
     readonly property QtObject wallClock: QtObject {
-        property bool ok: false        // a fresh reading from a playing mpv
-        property real pos: 0           // mpv's time-pos, seconds
-        property real at: 0            // Date.now() when it was read
+        property bool ok: false
+        property real pos: 0
+        property real at: 0
     }
     readonly property bool wallClockWanted: glassVideo !== "" && Quickshell.screens.length > 0 && !wallIdle(Quickshell.screens[0].name)
     onWallClockWantedChanged: { if (!wallClockWanted) { wallClock.ok = false; mpvSock.connected = false; } }
@@ -3887,7 +3619,6 @@ Scope {
                 var o; try { o = JSON.parse(line); } catch (e) { return; }
                 if (o.request_id !== 71) return;
                 if (typeof o.data !== "number") { root.wallClock.ok = false; return; }
-                // the answer left mpv about half way between asking and reading it
                 var now = Date.now();
                 root.wallClock.pos = o.data;
                 root.wallClock.at = now - Math.min(20, (now - root.wallClockAsked) / 2);
@@ -3900,7 +3631,6 @@ Scope {
         interval: 1000; repeat: true; triggeredOnStart: true
         running: root.wallClockWanted
         onTriggered: {
-            // mpvpaper is restarted with every new wallpaper (and by its supervisor after a crash): reconnect when the socket went away
             if (!mpvSock.connected) { mpvSock.connected = true; return; }
             root.wallClockAsked = Date.now();
             mpvSock.write('{"command":["get_property","time-pos"],"request_id":71}\n');
@@ -3911,11 +3641,10 @@ Scope {
     function wallApply() {
         if (!videoWall) return;
         var next = {}, names = Object.keys(screenCovered);
-        if (names.length === 0) return;                     // not probed yet
+        if (names.length === 0) return;
         for (var i = 0; i < names.length; i++) next[names[i]] = wallHold(names[i]);
         for (var k in next) if (next[k] !== (wallPaused[k] === true))
             Quickshell.execDetached([wallPauseScript, k, next[k] ? "pause" : "resume"]);
-        // which outputs are held, for a video player that (re)starts later: yukishell-setwall.sh pauses it straight away
         var cov = []; for (var n in next) if (next[n]) cov.push(n);
         if (cov.join(",") !== wallCovList) {
             wallCovList = cov.join(",");
@@ -3947,8 +3676,6 @@ Scope {
                 var sameF = true;
                 for (var f in fullMap) if (fullMap[f] !== (root.screenFullscreen[f] === true)) sameF = false;
                 if (!sameF) root.screenFullscreen = fullMap;
-                // a monitor not probed before counts as a change too: with nothing covered the map would otherwise stay empty,
-                // and wallApply() (which waits for the first probe) would never pause or resume the wallpaper
                 var same = Object.keys(next).length === Object.keys(root.screenCovered).length;
                 for (var q in next) if (!(q in root.screenCovered) || next[q] !== (root.screenCovered[q] === true)) same = false;
                 if (!same) root.screenCovered = next;
@@ -3957,7 +3684,7 @@ Scope {
         }
     }
     Timer { id: coverDelay; interval: 300; onTriggered: if (!coverProbe.running) coverProbe.running = true }
-    Timer { interval: 1500; running: true; onTriggered: coverDelay.restart() }      // first check after start-up
+    Timer { interval: 1500; running: true; onTriggered: coverDelay.restart() }
     onVideoWallChanged: { wallPaused = ({}); if (videoWall) coverDelay.restart(); else wallUserPaused = false; }
     Connections {
         target: Hyprland
@@ -3968,18 +3695,11 @@ Scope {
         }
     }
 
-    // --- Animated wallpaper in the glass: one small copy, never the full video ---
-    // Every glass (bar, Dock, Settings, each desktop widget) runs its own decoder. Decoding the original (often 4K) video that many times is
-    // what used to take gigabytes. The glass is blurred and refracted anyway, so it plays a 720 px copy instead, at the clip's own frame
-    // rate up to 60 fps like the desktop copy (it was 30 fps, visibly choppier than the wallpaper next to it) (cached in
-    // ~/.cache/yukishell/glass, built once with ffmpeg at low priority). Until that copy exists the glass shows the still picture.
-    // Without ffmpeg (or if the build fails) the original video is used, so the switch still works.
-    property var glassProxy: ({})              // video path -> small copy, ready
-    property var glassProxyFailed: ({})        // video path -> true when no copy could be made
-    property string glassProxyFor: ""          // the video the build process is working on right now
+    property var glassProxy: ({})
+    property var glassProxyFailed: ({})
+    property string glassProxyFor: ""
     readonly property int glassProxyWidth: 720
-    readonly property int glassProxyFps: 60       // a cap (-fpsmax): 24/30 fps clips keep their own rate
-    // the one player of the animated wallpaper for all the glass (needs the YukiVideo plugin; without it each LiveWall plays its own)
+    readonly property int glassProxyFps: 60
     Loader {
         id: wallPlayer
         Component.onCompleted: setSource(Qt.resolvedUrl("WallPlayer.qml"), { host: root })
@@ -3993,7 +3713,7 @@ Scope {
     }
     function glassProxyEnsure() {
         if (!liveWallGlass || wallpaperVideo === "" || glassProxy[wallpaperVideo] || glassProxyFailed[wallpaperVideo] === true) return;
-        if (glassProxyBuild.running) return;                      // onExited calls this again for whatever is current by then
+        if (glassProxyBuild.running) return;
         glassProxyFor = wallpaperVideo;
         glassProxyBuild.command = ["sh", "-c", [
             'v="$1"; w="$2"; f="$3"',
@@ -4029,9 +3749,8 @@ Scope {
     }
     onLiveWallGlassChanged: glassProxyEnsure()
     onWallpaperVideoChanged: glassProxyEnsure()
-    Timer { interval: 2500; running: true; onTriggered: root.glassProxyEnsure() }      // the saved settings are in by now
+    Timer { interval: 2500; running: true; onTriggered: root.glassProxyEnsure() }
 
-    // --- Game mode ---
     readonly property string gamingScript: Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-gaming.sh"
     property bool gamingApplied: false
     onGamingChanged: gamingApply.restart()
@@ -4045,9 +3764,7 @@ Scope {
             if (root.uiSounds) Quickshell.execDetached(["pw-play", "--volume=0.6", root.soundDir + "/tink.wav"]);
         }
     }
-    // a crash while Game Mode was on leaves Hyprland without blur/animations: put them back at start
     Timer { interval: 1500; running: true; onTriggered: { if (!root.gaming) Quickshell.execDetached([root.gamingScript, "off"]); else gamingApply.restart(); } }
-    // Automatic: on while the focused window is a fullscreen game
     readonly property var gameClassRe: /^(steam_app_\d+|gamescope|org\.vinegarhq\.sober|sober|robloxplayer.*|minecraft.*|com\.mojang.*|lutris|heroic|.*\.exe|osu!?|cs2|dota2|hl2_linux|factorio|terraria.*|stardew.*)$/i
     Process {
         id: gameProbe
@@ -4071,14 +3788,13 @@ Scope {
     }
     onGamingAutoChanged: { if (!gamingAuto) gamingAutoActive = false; else gameProbeDelay.restart(); }
 
-    // --- Settings persistence ---
     readonly property string settingsSig: settingKeys.map(function (k) { return (k === "ccSizes" || k === "ccPos") ? JSON.stringify(root[k]) : String(root[k]); }).join("|")
     property bool settingsReady: false
     onSettingsSigChanged: if (settingsReady) saveTimer.restart()
     Timer { id: saveTimer; interval: 400; onTriggered: root.saveSettings() }
 
     function saveSettings() {
-        if (ccSnap) return;                                 // Edit Controls is open: saved by its Save button
+        if (ccSnap) return;
         var o = {};
         for (var i = 0; i < settingKeys.length; i++) {
             var k = settingKeys[i];
@@ -4094,7 +3810,6 @@ Scope {
             try { root[k] = o[k]; } catch (err) { }
         }
     }
-    // inherit look from yukidock first, then yukibar's own file wins
     FileView {
         id: dockStore
         path: root.dockConfigDir + "/settings.json"
@@ -4121,7 +3836,7 @@ Scope {
                 if (saved.ccGapPx === undefined && saved.ccSpacing !== undefined) root.ccGapPx = ({ tight: 3, normal: 6, loose: 10 })[saved.ccSpacing] || 6;
             } catch (err) { }
             if ((root.wallpaperDirs || []).length === 0 && (root.wallpaperDir || "").trim() !== "") root.wallpaperDirs = [root.wallpaperDir.trim()];
-            root.wallpaperDir = "";                                     // the old single-folder setting now lives in wallpaperDirs
+            root.wallpaperDir = "";
             if (!root.ccMigGame) {
                 root.ccMigGame = true;
                 var cg = root.ccControls.slice();
@@ -4132,7 +3847,7 @@ Scope {
                 var cl = root.ccControls.slice();
                 if (cl.indexOf("record") < 0) { var fi = cl.indexOf("focus"); cl.splice(fi >= 0 ? fi + 1 : cl.length, 0, "record"); root.ccControls = cl; }
             }
-            if (root.ccControls.indexOf("darkmode") >= 0)               // the Dark Mode tile was removed
+            if (root.ccControls.indexOf("darkmode") >= 0)
                 root.ccControls = root.ccControls.filter(function (x) { return x !== "darkmode"; });
             root.settingsReady = true;
             inputApplyT.restart();
@@ -4143,11 +3858,7 @@ Scope {
         onLoadFailed: { root.ccMigRec = true; root.ccMigGame = true; root.settingsReady = true; if (root.barStyle === "liquid") root.startGlass(); }
     }
 
-    // --- LIQUID GLASS BACKEND (same pipeline as yukidock) ---
-    property string glassState: "idle"       // idle -> building -> ready | failed
-    // liquidBase: the glass can run. The backdrops (what the glass refracts) load from then on, behind the plain style;
-    // liquidActive (the glass actually shown) follows once the wallpaper is decoded and the backdrops had a moment to fill, so a
-    // (re)start never shows the glass bending an empty or half-loaded backdrop (a dark or colourful flash)
+    property string glassState: "idle"
     readonly property bool liquidBase: barStyle === "liquid" && glassState === "ready" && !gaming
     property bool glassWarm: false
     readonly property bool glassWarmWanted: liquidBase && (!hub || hub.wallpaperReady)
@@ -4170,7 +3881,6 @@ Scope {
         id: qsbProc
         command: ["sh", "-c",
             "mkdir -p \"$(dirname \"$2\")\"; "
-            // already compiled from this very source (it is newer than the .frag): nothing to do, the glass is ready at once
             + "[ -s \"$2\" ] && [ \"$2\" -nt \"$1\" ] && exit 0; "
             + "for q in qsb qsb6 qsb-qt6 /usr/lib/qt6/bin/qsb /usr/lib64/qt6/bin/qsb /usr/lib/qt/bin/qsb; do "
             + "  if command -v \"$q\" >/dev/null 2>&1; then \"$q\" --qt6 -o \"$2\" \"$1\" && exit 0; fi; "
@@ -4183,7 +3893,6 @@ Scope {
         onExited: (code, status) => root.glassState = (code === 0 ? "ready" : "failed")
     }
 
-    // wallpaper the glass refracts (override -> Noctalia settings.toml -> awww/swww/hyprpaper)
     readonly property var wallpaperMap: hub ? hub.wallpaperMap : ({})
     Binding { target: root.hub; property: "barWantsWallpaper"; value: root.liquidBase }
     function wallpaperFor(screenName) {
@@ -4198,14 +3907,12 @@ Scope {
         if (p.indexOf("file://") === 0) return p;
         return "file://" + encodeURI(p).replace(/#/g, "%23").replace(/\?/g, "%3F");
     }
-    property color wallpaperAccent: "#8A9AB5"      // most common colour of the current wallpaper
-    property string wallpaperAccentFor: ""         // image the accent above was sampled from
-    // the menu border: same hue as the wallpaper's dominant colour, lifted (dark panels) or deepened (light panels)
-    // so it stays readable on the glass whatever the wallpaper is
+    property color wallpaperAccent: "#8A9AB5"
+    property string wallpaperAccentFor: ""
     readonly property color menuBorderColor: {
         var c = wallpaperAccent;
         var h = c.hslHue < 0 ? 0 : c.hslHue, sat = c.hslSaturation, l = c.hslLightness;
-        var s2 = sat < 0.06 ? sat : Math.max(0.28, Math.min(0.75, sat));     // greys stay grey
+        var s2 = sat < 0.06 ? sat : Math.max(0.28, Math.min(0.75, sat));
         var l2 = panelDarkMode ? Math.max(0.66, Math.min(0.86, l * 0.5 + 0.50))
                                : Math.max(0.30, Math.min(0.52, l * 0.5 + 0.05));
         return Qt.hsla(h, s2, l2, 1);
@@ -4225,12 +3932,9 @@ Scope {
         awwwQueryProc.running = true;
     }
     Timer { id: wallpaperColorTimer; interval: 500; onTriggered: root.sampleWallpaperColor() }
-    // wallpapers changed from outside the shell (another tool, a script): notice within half a minute.
-    // Cheap: it only re-reads the wallpaper's path and re-samples when that path differs.
     Timer { interval: 30000; repeat: true; running: root.barEnabled && !root.gaming; onTriggered: root.sampleWallpaperColor() }
     Process {
         id: awwwQueryProc
-        // always exits 0 (even without awww installed) so the sampler below runs on the fallback wallpaper path
         command: ["sh", "-c", "awww query -j 2>/dev/null || swww query -j 2>/dev/null || true"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -4254,10 +3958,9 @@ Scope {
                 var p = path || fallback;
                 if (p.indexOf("file://") === 0) p = decodeURIComponent(p.substring(7));
                 if (p === "") return;
-                if (p === root.wallpaperAccentFor && !root.wallpaperSampleForce) return;   // same picture, nothing to do
+                if (p === root.wallpaperAccentFor && !root.wallpaperSampleForce) return;
                 root.wallpaperSampleForce = false;
                 wallpaperColorProc.samplePath = p;
-                // [0] = first frame only (animated gifs); ImageMagick 7 (magick) or 6 (convert)
                 wallpaperColorProc.command = ["sh", "-c",
                     'f="$1"; for t in magick convert; do command -v "$t" >/dev/null 2>&1 && ' +
                     '{ "$t" "${f}[0]" -alpha off -resize 64x64! -colors 8 -depth 8 -format %c histogram:info:- 2>/dev/null && exit 0; }; done; exit 0',
@@ -4281,16 +3984,13 @@ Scope {
         }
     }
 
-    // live window geometry for the backdrop (polled only while a glass popover is open)
     readonly property var monData: hub ? hub.monData : []
     readonly property var glassClients: hub ? hub.glassClients : []
     property int popCount: 0
     onBarEnabledChanged: { if (!barEnabled) popCount = 0; clipStart(); }
     Binding { target: root.hub; property: "barWantsGeo"; value: root.liquidActive }
-    // window captures are admitted by the shared gate in shell.qml (hub.tlFor): 0.2 s after a window appears, one every 110 ms
 
     Component.onCompleted: {
-        // GTK / portal apps (color-scheme) follow the shell's dark look
         Quickshell.execDetached(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "prefer-dark"]);
         syncAppKeys();
         Quickshell.execDetached(["mkdir", "-p", configDir]);
@@ -4300,25 +4000,18 @@ Scope {
         refreshConnections();
     }
 
-    // --- Settings ---
-    // The settings window now lives in YukiDock.qml (one window for the whole shell).
     function openSettings(pane) { if (hub) hub.openSettings(pane || "menubar"); }
 
-    // --- The bar ---
-    // --- Notifications ---
-    // Receives org.freedesktop.Notifications on D-Bus (stop dunst / mako / swaync first - only one daemon can own the name).
-    // IPC: qs -c YukiShell ipc call notifications open | close | clear   (opens on the focused screen)
     signal notifPopRequest(bool open)
-    property bool notifDnd: false            // Do Not Disturb: still stored in the centre, but no popups
-    property int notifBannerSecs: 6          // how long a banner stays up (urgent ones: 10 s, or what the app asked for)
-    property var notifMutedApps: []          // apps whose banners and sounds are off; they still land in Notification Center
-    property var notifAppsSeen: []           // every app that sent something, for the per-app list in Settings
-    // Focus: Do Not Disturb on a schedule and/or while a window is fullscreen, on top of the manual switch
+    property bool notifDnd: false
+    property int notifBannerSecs: 6
+    property var notifMutedApps: []
+    property var notifAppsSeen: []
     property bool focusSchedule: false
-    property int focusFrom: 1320             // minutes after midnight (22:00)
-    property int focusTo: 420                // 07:00
+    property int focusFrom: 1320
+    property int focusTo: 420
     property bool focusFullscreen: false
-    property bool focusAllowUrgent: true     // urgent notifications still show during Do Not Disturb
+    property bool focusAllowUrgent: true
     property bool scheduleNow: false
     function inFocusSchedule() {
         var d = new Date(), m = d.getHours() * 60 + d.getMinutes();
@@ -4329,18 +4022,17 @@ Scope {
     onFocusToChanged: scheduleNow = inFocusSchedule()
     readonly property bool fullscreenNow: activeWin !== null && Number(activeWin.fullscreen) === 2
     readonly property bool dndActive: notifDnd || (focusSchedule && scheduleNow) || (focusFullscreen && fullscreenNow)
-    property bool lockShowNotifs: true       // the lock screen lists unread notifications (app + time only)
+    property bool lockShowNotifs: true
     onLockShowNotifsChanged: lockNotifWrite()
-    property string lockWallpaper: ""        // "" = the desktop wallpaper, else a picture just for the lock screen
-    property real notifBlur: 14              // blur of the notification glass (smooth two-pass Gaussian, same method as the Blur slider)
+    property string lockWallpaper: ""
+    property real notifBlur: 14
     property int notifUnread: 0
     property int notifSeq: 0
     property var notifRefs: ({})
-    ListModel { id: notifHist }              // notification centre history, newest first
+    ListModel { id: notifHist }
     readonly property int notifHistCount: notifHist.count
-    ListModel { id: notifToasts }            // popups currently on screen, newest first
+    ListModel { id: notifToasts }
 
-    // switched off: no daemon at all, so mako / dunst / swaync can own the D-Bus name instead
     Loader {
         active: root.notificationsEnabled
         sourceComponent: NotificationServer {
@@ -4357,7 +4049,6 @@ Scope {
         for (var i = 0; i < model.count; i++) if (model.get(i).nid === id) return i;
         return -1;
     }
-    // System notifications get the UI sound; apps (Discord, Spotify, browsers...) play their own, so they stay silent here
     readonly property var systemNotifApps: ["", "yukibar", "yukishell", "settings", "system", "notify-send", "networkmanager", "network",
         "power", "upower", "battery", "udiskie", "udisks", "disks", "polkit", "systemd", "screenshot", "grim", "hyprland", "bluetooth", "blueman", "updates", "pacman"]
     function isSystemNotif(n) {
@@ -4389,15 +4080,12 @@ Scope {
         if (rec.app !== "" && root.notifAppsSeen.indexOf(rec.app) < 0) root.notifAppsSeen = root.notifAppsSeen.concat([rec.app]).slice(-40);
         var muted = root.notifMutedApps.indexOf(rec.app) >= 0;
         if (!muted && (!root.dndActive || (urg === 2 && root.focusAllowUrgent)) && !root.notifOpen) {
-            // the screenshot has its own shutter sound
             if (root.isSystemNotif(n) && !(rec.app === "yukibar" && rec.summary.indexOf("Screenshot") === 0)) root.playSound(root.alertSound, 0.7);
             notifToasts.insert(0, rec);
             while (notifToasts.count > 4) notifToasts.remove(notifToasts.count - 1);
         }
         if (!root.notifOpen) root.notifUnread++;
         try { n.closed.connect(function () { root.notifToastRemove(id); }); } catch (e) {}
-        // apps that update a notification in place (progress, now playing...): push the new text into the popup and
-        // the history, the popup then blur-morphs to it
         function upd(role, val) {
             var i = notifIndex(notifToasts, id); if (i >= 0) notifToasts.setProperty(i, role, val || "");
             var j = notifIndex(notifHist, id); if (j >= 0) notifHist.setProperty(j, role, val || "");
@@ -4405,8 +4093,6 @@ Scope {
         try { n.summaryChanged.connect(function () { upd("summary", n.summary); }); } catch (e) {}
         try { n.bodyChanged.connect(function () { upd("body", n.body); }); } catch (e) {}
     }
-    // --- lock screen: the unread notifications, privacy-safe (app name, app icon, time - never the text) ---
-    // written to ~/.cache/yukishell/lock-notifs.json, which YukiLock watches
     onNotifUnreadChanged: lockNotifSave.restart()
     Connections { target: notifHist; function onCountChanged() { lockNotifSave.restart(); } }
     Timer { id: lockNotifSave; interval: 300; onTriggered: root.lockNotifWrite() }
@@ -4439,11 +4125,10 @@ Scope {
         var n = root.notifRefs[id];
         if (n) { try { n.dismiss(); } catch (e) {} delete root.notifRefs[id]; }
     }
-    // Clear All: every card in Notification Center turns to dust (staggered), then the list is emptied
     signal notifDustAll()
     property bool notifClearing: false
-    property var notifMergeFrom: ({})        // nid -> {x, y, w} of its popup (ui coordinates) at the moment the panel opened
-    property bool notifFlying: false          // cards are flying from the popups into the panel
+    property var notifMergeFrom: ({})
+    property bool notifFlying: false
     onNotifMergeFromChanged: { if (Object.keys(notifMergeFrom).length > 0) { notifFlying = true; flyEnd.restart(); } }
     Timer { id: flyEnd; interval: 900; onTriggered: root.notifFlying = false }
     onNotifOpenChanged: if (!notifOpen) notifMergeFrom = ({})
@@ -4476,26 +4161,24 @@ Scope {
         notifToastRemove(id);
     }
 
-    // --- Wallpaper picker (ctrl + alt + w) ---
-    //   hl.bind("CTRL + ALT + W", hl.dsp.exec_cmd("qs -c YukiShell ipc call wallpapers toggle"))
-    property string wallpaperDir: ""          // the old single-folder setting: folded into wallpaperDirs when the settings load
-    property var wallpaperDirs: []            // folders the wallpapers are picked from; [] = ~/Pictures/Wallpapers
-    property var wallpaperFavs: []            // favourite image paths, shown first
-    property string wallpaperVideo: ""        // animated wallpaper (video) playing right now, "" = a still picture
-    property string wpRestorePath: ""         // the picture the picker set last: put back at every start (awww does not keep it after a reboot)
-    property var wpThumbs: ({})               // video path -> cached thumbnail
-    property var wpPreviews: ({})             // video path -> small looping animated WebP (no video player in the shell)
-    property string wallpaperCmd: ""          // "" = auto (awww / swww / hyprpaper); or your own command, {} = the image path
-    property real wpBlur: 40                  // blur of the picker glass
+    property string wallpaperDir: ""
+    property var wallpaperDirs: []
+    property var wallpaperFavs: []
+    property string wallpaperVideo: ""
+    property string wpRestorePath: ""
+    property var wpThumbs: ({})
+    property var wpPreviews: ({})
+    property string wallpaperCmd: ""
+    property real wpBlur: 40
     property bool wpOpen: false
     property string wpStatus: ""
-    property var wpDirList: []                // images found in the folders
-    property var wpFolders: []                // the folders that exist right now (what is watched)
-    property var wpDirCount: ({})             // folder -> number of images in it
-    property var wpFavOk: ({})                // favourites that still exist on disk
-    property var wpFiles: []                  // favourites first, then the rest { path, name, fav }
-    property string wpQuery: ""               // search filter
-    readonly property var wpShown: {          // what the grid shows (wpFiles filtered by the search)
+    property var wpDirList: []
+    property var wpFolders: []
+    property var wpDirCount: ({})
+    property var wpFavOk: ({})
+    property var wpFiles: []
+    property string wpQuery: ""
+    readonly property var wpShown: {
         var q = root.wpQuery.trim().toLowerCase(), f = root.wpFiles;
         if (q === "") return f;
         var out = [];
@@ -4520,7 +4203,7 @@ Scope {
     }
     readonly property var wpDirsEff: { root.wallpaperDirs; return root.wpResolveDirs(); }
     readonly property string wpDirEff: wpDirsEff[0]
-    readonly property bool wpDefaultDirs: (root.wallpaperDirs || []).length === 0      // nothing chosen yet: the default folder is created when it is missing
+    readonly property bool wpDefaultDirs: (root.wallpaperDirs || []).length === 0
     function wpName(path) {
         var n = path.substring(path.lastIndexOf("/") + 1);
         var k = n.lastIndexOf(".");
@@ -4539,7 +4222,7 @@ Scope {
             if (seen[f]) continue;
             out.push({ path: f, name: root.wpName(f), fav: false, video: root.wpIsVideo(f), thumb: root.wpThumbs[f] || "", preview: root.wpPreviews[f] || "" });
         }
-        if (JSON.stringify(out) !== JSON.stringify(root.wpFiles)) root.wpFiles = out;       // unchanged: keep the grids where they are
+        if (JSON.stringify(out) !== JSON.stringify(root.wpFiles)) root.wpFiles = out;
     }
     function wpParse(text) {
         var lines = text.split("\n"), dir = [], seenDir = {}, ok = {}, th = {}, pv = {}, folders = [];
@@ -4552,7 +4235,6 @@ Scope {
             else if (l === "W:0") root.wpWatchBroken = true;
             else if (l.indexOf("F:") === 0) ok[l.substring(2)] = true;
         }
-        // images per folder (a file counts for the folder it sits under, the deepest one when folders are nested)
         var counts = {}, fl = root.wpDirsEff;
         for (var c = 0; c < fl.length; c++) counts[fl[c]] = 0;
         for (var n = 0; n < dir.length; n++) {
@@ -4565,13 +4247,12 @@ Scope {
         var sameList = dir.join("\n") === root.wpDirList.join("\n") && JSON.stringify(ok) === JSON.stringify(root.wpFavOk);
         root.wpThumbs = th;
         root.wpPreviews = pv;
-        if (!sameList) {                                  // nothing new on disk: leave the grids alone (they would jump back to the top)
+        if (!sameList) {
             root.wpDirList = dir;
             root.wpFavOk = ok;
         }
         root.wpRebuild();
 
-        // Return the file list immediately; build missing video thumbnails in a separate process.
         var videos = [];
         for (var j = 0; j < dir.length; j++) if (root.wpIsVideo(dir[j])) videos.push(dir[j]);
         if (videos.length && !wpThumbBuild.running) {
@@ -4582,9 +4263,6 @@ Scope {
                 '  if [ ! -s "$t" ]; then ffmpeg -loglevel error -y -ss 1 -i "$v" -frames:v 1 -vf "scale=360:-2" "$t" </dev/null >/dev/null 2>&1; fi',
                 '  [ -s "$t" ] && printf "T:%s\\t%s\\n" "$v" "$t"',
                 'done',
-                // everything a switch to one of these needs (preview, desktop copy, glass copy), built one video after another at low
-                // priority. It used to start a build per video at once, and only for videos without a preview yet: most never got their
-                // copies, so picking one waited 10-15 s for them while the old video kept playing
                 's="$HOME/.config/hypr-yukishell/scripts/yukishell-setwall.sh"',
                 '[ -x "$s" ] && setsid nice -n 15 "$s" --prepare-all "$@" >/dev/null 2>&1 </dev/null &'
             ].join("\n");
@@ -4622,7 +4300,7 @@ Scope {
         wpScan.command = ["sh", "-c", script, "sh", root.wpDefaultDirs ? "1" : "0", String(dirs.length)].concat(dirs, root.wallpaperFavs || []);
         wpScan.running = true;
     }
-    property bool wpRescan: false                 // a change came in while a scan was running: scan once more when it ends
+    property bool wpRescan: false
     function wpSetDirs(list) {
         var out = [], seen = {};
         for (var i = 0; i < list.length; i++) {
@@ -4631,7 +4309,6 @@ Scope {
             while (d.length > 1 && d.charAt(d.length - 1) === "/") d = d.substring(0, d.length - 1);
             if (d !== "" && !seen[d]) { seen[d] = true; out.push(d); }
         }
-        // just the default folder is the same as nothing chosen: keep the setting empty so the default stays the default
         if (out.length === 1 && out[0] === root.wpResolveOne("")) out = [];
         root.wallpaperDirs = out;
         root.wpStatus = "";
@@ -4639,7 +4316,6 @@ Scope {
     }
     function wpAddDir(d) {
         var cur = root.wpDefaultDirs ? [] : root.wpDirsEff.slice();
-        // the first folder added next to the default one keeps the default: it is what the user had until now
         if (root.wpDefaultDirs) cur = [root.wpResolveOne("")];
         cur.push(d);
         root.wpSetDirs(cur);
@@ -4655,13 +4331,11 @@ Scope {
     }
     function wpIsVideo(p) { return /[.](mp4|webm|mkv|mov|m4v)$/i.test(p || ""); }
     readonly property string setwallScript: Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-setwall.sh"
-    // --- light / dark wallpaper pairs (macOS "Automatic / Light / Dark / Dynamic") ---
-    property string wallpaperAppearance: "dark"     // light | dark | dynamic (time of day); an old "auto" means dark
+    property string wallpaperAppearance: "dark"
     property string wpPairLight: ""
     property string wpPairDark: ""
     readonly property bool wpHasPair: wpPairLight !== "" && wpPairDark !== ""
     readonly property string dynwallScript: Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-dynwall.sh"
-    // "<name>-Light.ext" <-> "<name>-Dark.ext" in the same folder (from the folder scan)
     function wpPairOf(path) {
         var m = /^(.*[-_ ])(light|dark)(\.[a-z0-9]+)$/i.exec(path || "");
         if (!m) return null;
@@ -4674,9 +4348,6 @@ Scope {
         return m[2].toLowerCase() === "light" ? { light: path, dark: cand } : { light: cand, dark: path };
     }
     function hhmmToMin(t) { var m = /T(\d+):(\d+)/.exec(t || ""); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : -1; }
-    // Sets a picture as the real desktop wallpaper: awww first (its daemon is started if needed), then the other daemons.
-    // $1 = image path. Also stops a running animated wallpaper (mpvpaper) so it does not stay on top of the picture.
-    // Clear the watched state before stopping mpvpaper; otherwise the live-wallpaper supervisor respawns it.
     readonly property string stopVideoScript: [
         'state="$HOME/.config/yukishell/wallpaper-video"',
         'rm -f "$state" "$HOME/.config/yukishell/wallpaper-video-play" "$HOME/.config/yukishell/wallpaper-video-glass"',
@@ -4723,14 +4394,13 @@ Scope {
         root.wallpaperVideo = "";
         root.wallpaperPath = p;
         try { if (root.hub && root.hub.dock) root.hub.dock.wallpaperPath = p; } catch (e) {}
-        if (p === root.wpAppliedPair) return;                         // already on screen
+        if (p === root.wpAppliedPair) return;
         root.wpAppliedPair = p;
-        wpApplyProc.command = ["sh", "-c", root.awwwScript, "sh", p];  // the real desktop wallpaper, through awww
+        wpApplyProc.command = ["sh", "-c", root.awwwScript, "sh", p];
         wpApplyProc.running = true;
     }
     onWallpaperAppearanceChanged: wpApplyAppearance()
     Timer { interval: 60000; repeat: true; running: root.wpHasPair && root.wallpaperAppearance === "dynamic" && !root.gaming; onTriggered: root.wpApplyAppearance() }
-    // at start: scan the folder, then pick up a pair for the wallpaper already in use
     Timer { interval: 1500; running: true; onTriggered: root.wpRefresh() }
     onWpDirListChanged: {
         if (wpHasPair) return;
@@ -4743,7 +4413,6 @@ Scope {
         var pair = wpPairOf(path);
         if (pair) { wpPairLight = pair.light; wpPairDark = pair.dark; root.wpAppliedPair = ""; wpApplyAppearance(); return; }
         wpPairLight = ""; wpPairDark = ""; root.wpAppliedPair = "";
-        // animated wallpapers go through yukishell-setwall.sh (mpvpaper for videos); pictures are always set with awww below
         if (root.wpIsVideo(path)) {
             root.wallpaperVideo = path;
             setwallProc.command = [root.setwallScript, path];
@@ -4752,15 +4421,13 @@ Scope {
         }
         root.wallpaperVideo = "";
         root.wpRestorePath = path;
-        root.wallpaperPath = path;                                            // the glass refracts the new image straight away
+        root.wallpaperPath = path;
         try { if (root.hub && root.hub.dock) root.hub.dock.wallpaperPath = path; } catch (e) {}
         var cmd = (root.wallpaperCmd || "").trim();
         var script = cmd !== "" ? root.stopVideoScript + "\n" + cmd.split("{}").join('"$1"') : root.awwwScript;
         wpApplyProc.command = ["sh", "-c", script, "sh", path];
         wpApplyProc.running = true;
     }
-    // Wallpaper that survives a reboot: awww / mpvpaper start empty at login, so the shell puts the last choice back.
-    // A picture is skipped when awww already shows it; light/dark pairs are handled by wpApplyAppearance.
     function wpRestore() {
         if (wpHasPair) return;
         if (wallpaperVideo !== "") {
@@ -4776,7 +4443,6 @@ Scope {
         wpApplyProc.command = ["sh", "-c", script, "sh", p];
         wpApplyProc.running = true;
     }
-    // (an animated wallpaper is usually playing by now: yuki-start starts it at login, and then this leaves it alone)
     Timer { interval: 1000; running: true; onTriggered: root.wpRestore() }
     Process {
         id: setwallProc
@@ -4800,9 +4466,7 @@ Scope {
         root.wpOpen = !root.wpOpen;
         if (root.wpOpen) root.wpRefresh();
     }
-    // A wallpaper folder from the panel's chips opens in a floating terminal in the free space beside the panel (right, else left, else
-    // the bottom-right corner), so the panel can stay open: it is an overlay and would hide a terminal opened underneath it.
-    property string wpTermAddr: ""          // that terminal while it is open (Hyprland address without 0x)
+    property string wpTermAddr: ""
     property real wpTermAsked: 0
     function wpOpenFolder(dir, panel, scr) {
         var sx = scr ? scr.x : 0, sy = scr ? scr.y : 0, sw = scr ? scr.width : 1920, sh = scr ? scr.height : 1080;
@@ -4831,7 +4495,7 @@ Scope {
         var fp = root.hub && root.hub.dock ? root.hub.dock.filePicker : null;
         if (!fp) { root.wpStatus = "The folder chooser is not ready yet."; return; }
         var wasOpen = root.wpOpen;
-        root.wpOpen = false;                       // the overlay would sit on top of the picker window, so hide it meanwhile
+        root.wpOpen = false;
         fp.pick({ mode: "folder", title: I18n.tr("Add a wallpaper folder"), startDir: root.wpDirEff }, function (path) {
             if (path !== "") root.wpAddDir(path);
             if (wasOpen) root.wpOpen = true;
@@ -4845,17 +4509,14 @@ Scope {
     }
     Process { id: wpThumbBuild; stdout: StdioCollector { onStreamFinished: root.wpMergeThumbs(text) } }
 
-    // --- the folders are watched: a picture dropped in (or deleted) shows up in the pickers by itself ---
-    // inotifywait reports changes under every folder; a burst of them (copying a whole directory) becomes one rescan.
-    // Without inotify-tools the lists are re-read now and then while a picker is open instead.
     property bool wpWatchBroken: false
     property int wpWatchFails: 0
-    property bool wpWatchPause: false                          // set while the folder list changes so the watcher restarts with the new one
+    property bool wpWatchPause: false
     onWpFoldersChanged: { wpWatchPause = true; wpWatchResume.restart(); }
     Timer { id: wpWatchResume; interval: 300; onTriggered: root.wpWatchPause = false }
     function wpWatchHit(line) {
         wpWatchFails = 0;
-        wpWatchDebounce.interval = line.indexOf("CREATE") >= 0 && line.indexOf("CLOSE_WRITE") < 0 ? 2500 : 900;   // a file still being written: wait for it
+        wpWatchDebounce.interval = line.indexOf("CREATE") >= 0 && line.indexOf("CLOSE_WRITE") < 0 ? 2500 : 900;
         wpWatchDebounce.restart();
     }
     Timer { id: wpWatchDebounce; onTriggered: root.wpRefresh() }
@@ -4865,44 +4526,35 @@ Scope {
         cmd: ["inotifywait", "-m", "-r", "-q", "--format", "%e|%w%f", "-e", "close_write", "-e", "moved_to", "-e", "moved_from", "-e", "delete", "-e", "create"].concat(root.wpFolders)
         stdout: SplitParser { onRead: line => root.wpWatchHit(line) }
         onExited: {
-            if (!root.wpWatchOn) return;                       // stopped on purpose (the folders changed)
-            // it ended by itself (a folder vanished, no inotify watches left): try again in a while, and give up after a few tries
+            if (!root.wpWatchOn) return;
             if (++root.wpWatchFails >= 3) root.wpWatchBroken = true;
             wpWatchRetry.restart();
         }
     }
     readonly property bool wpWatchOn: root.wpFolders.length > 0 && !root.wpWatchBroken && !root.wpWatchPause && !wpWatchRetry.running
     Timer { id: wpWatchRetry; interval: 15000 }
-    Timer {                                                    // fallback without inotify-tools
+    Timer {
         interval: 20000; repeat: true
         running: root.wpWatchBroken && (root.wpOpen || root.wpPaneOpen)
         onTriggered: root.wpRefresh()
     }
-    property bool wpPaneOpen: false                            // the Settings wallpaper pane is showing (set by the pane)
+    property bool wpPaneOpen: false
     onWallpaperFavsChanged: if (wpOpen) wpRebuild()
     IpcHandler {
         target: "wallpapers"
         function toggle(): void { root.wpToggle(); }
-        // qs -c YukiShell ipc call wallpapers appearance auto|light|dark|dynamic
         function set(path: string): void { root.wpApply(path); }
         function appearance(mode: string): void { if (["auto", "light", "dark", "dynamic"].indexOf(mode) >= 0) root.wallpaperAppearance = mode; }
         function open(): void { if (!root.wpOpen) root.wpToggle(); }
         function close(): void { root.wpOpen = false; }
     }
 
-    // --- WORKSPACES (centre of the bar) ---
-    // Workspace numbers on the bar (Settings -> Menu Bar -> Workspace numbers); the real workspace ids stay numeric.
-    //   han      一 二 三 … 十, 十一 … 二十 …            katakana  イチ ニ サン … ジュウ, ジュウイチ …
-    //   hangul   일 이 삼 … 십, 십일 … 이십 …            roman     I II III IV …
-    //   numbers  1 2 3 …                                  auto      the interface language: Chinese -> han, Japanese -> katakana,
-    //                                                               Korean -> hangul, any other -> numbers
     property string wsNumerals: "han"
     readonly property string wsStyle: {
         if (wsNumerals !== "auto") return wsNumerals;
         var c = language === "auto" ? I18n.code() : language;
         return c.indexOf("zh") === 0 ? "han" : c === "ja" ? "katakana" : c === "ko" ? "hangul" : "numbers";
     }
-    // the same structure in all three: units, then "ten" (no "one" before ten: 十, ジュウ, 십), then units again
     function cjkNum(n, d, ten) {
         if (n < 10) return d[n];
         if (n < 20) return ten + d[n - 10];
@@ -4912,11 +4564,11 @@ Scope {
     function zhNum(n) {
         return cjkNum(n, ["", "\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d", "\u4e03", "\u516b", "\u4e5d"], "\u5341");
     }
-    function kanaNum(n) {      // イチ ニ サン ヨン ゴ ロク ナナ ハチ キュウ, ten ジュウ
+    function kanaNum(n) {
         return cjkNum(n, ["", "\u30a4\u30c1", "\u30cb", "\u30b5\u30f3", "\u30e8\u30f3", "\u30b4", "\u30ed\u30af", "\u30ca\u30ca",
                           "\u30cf\u30c1", "\u30ad\u30e5\u30a6"], "\u30b8\u30e5\u30a6");
     }
-    function hangulNum(n) {    // 일 이 삼 사 오 육 칠 팔 구, ten 십
+    function hangulNum(n) {
         return cjkNum(n, ["", "\uc77c", "\uc774", "\uc0bc", "\uc0ac", "\uc624", "\uc721", "\uce60", "\ud314", "\uad6c"], "\uc2ed");
     }
     function romanNum(n) {
@@ -4926,15 +4578,14 @@ Scope {
         return o;
     }
     function wsLabel(n) {
-        if (n <= 0) return "" + n;                     // special workspaces keep their own (negative) id
+        if (n <= 0) return "" + n;
         var st = wsStyle;
         return st === "katakana" ? kanaNum(n) : st === "hangul" ? hangulNum(n) : st === "roman" ? romanNum(n)
              : st === "numbers" ? "" + n : zhNum(n);
     }
-    // a cell is 22 px, wider when its label needs it (ジュウキュウ, XVIII); measured in the current workspace's bold weight
     FontMetrics { id: wsFm; font.family: root.fontForWeight(Font.DemiBold, root.fontFamily); font.pixelSize: 13; font.weight: Font.DemiBold }
     function wsCellW(n) { return Math.max(22, Math.ceil(wsFm.advanceWidth(wsLabel(n))) + 12); }
-    function hlWorkspace(sel) {      // Hyprland 0.55+ (Lua) workspace switch
+    function hlWorkspace(sel) {
         Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ workspace = \"" + sel + "\" })"]);
     }
     // The counter shows the workspaces Hyprland really has (0.55+ creates and destroys them on demand), nothing more.
@@ -4959,13 +4610,11 @@ Scope {
         }
         var fw = Hyprland.focusedWorkspace;
         if (fw && fw.id > 0 && ids.indexOf(fw.id) < 0) ids.push(fw.id);
-        if (ids.length === 0) ids.push(1);                    // never an empty counter
+        if (ids.length === 0) ids.push(1);
         ids.sort(function (a, b) { return a - b; });
         return ids;
     }
-    // Which workspaces have a window comes from `hyprctl clients`, not from Quickshell's own list of Hyprland windows: that list keeps a
-    // ghost of every window that closed while the shell was reloading (a workspace then looked busy but was empty when you went there).
-    property var wsCounts: ({})                // workspace id -> mapped windows on it
+    property var wsCounts: ({})
     property bool wsAgain: false
     function wsOccupied(id) { return (wsCounts[id] || 0) > 0; }
     Process {
@@ -4991,19 +4640,12 @@ Scope {
     Timer { id: wsKick; interval: 120; onTriggered: { if (wsProbe.running) root.wsAgain = true; else wsProbe.running = true; } }
     Timer { interval: 15000; running: root.barEnabled && root.barWidgetEnabled("workspaces"); repeat: true; triggeredOnStart: true; onTriggered: wsKick.restart() }
 
-    // --- Window switcher (alt + tab) ---
-    // Hyprland binds (put these in hyprland.conf, and remove any existing ALT+TAB bind):
-    //   bind   = ALT, TAB, exec, qs -c YukiShell ipc call switcher next
-    //   bind   = ALT SHIFT, TAB, exec, qs -c YukiShell ipc call switcher prev
-    //   bindrt = ALT, Alt_L, exec, qs -c YukiShell ipc call switcher commit     # optional safety net: switch on ALT release
-    // (use the same `qs ...` prefix you use for the Spotlight bind). Hold ALT, tap TAB to cycle, release ALT to switch.
-    // Layer namespace: "yukiswitch" (only needed for a blur layerrule if you are NOT using the Liquid Glass style).
-    property real switcherBlur: 15           // blur of the switcher glass (smooth Gaussian; less than Spotlight / notifications)
-    property string switcherStyle: "glass"   // glass (Liquid Glass) | frosted | opaque - Settings -> Desktop & Dock
+    property real switcherBlur: 15
+    property string switcherStyle: "glass"
     property bool swOpen: false
-    property var swApps: []                  // open apps, most recently used first: { appId, name, icon, win, count }
+    property var swApps: []
     property int swIndex: 0
-    property var swMru: []                   // recently focused toplevels, newest first
+    property var swMru: []
     function swTrack() {
         var t = root.activeTl;
         if (!t) return;
@@ -5021,14 +4663,13 @@ Scope {
         var vals = ToplevelManager.toplevels.values, all = [];
         for (var i = 0; i < vals.length; i++) all.push(vals[i]);
         var order = [];
-        if (root.activeTl && all.indexOf(root.activeTl) >= 0) order.push(root.activeTl);       // the app you are in comes first
+        if (root.activeTl && all.indexOf(root.activeTl) >= 0) order.push(root.activeTl);
         for (var m = 0; m < root.swMru.length; m++) if (all.indexOf(root.swMru[m]) >= 0 && order.indexOf(root.swMru[m]) < 0) order.push(root.swMru[m]);
         for (var j = 0; j < all.length; j++) if (order.indexOf(all[j]) < 0) order.push(all[j]);
         var seen = {}, apps = [];
         for (var k = 0; k < order.length; k++) {
             var t = order[k], id = t.appId || "";
             if (id === "") continue;
-            // YukiShell's own windows (all "org.quickshell") are separate apps: Clock, System Settings
             if (id === "org.quickshell") id = t.title === "Clock" ? "yukishell-clock"
                                              : (t.title === "App Store" ? "yukishell-appstore"
                                              : (t.title === "YukiShell Settings" ? "systemsettings" : id));
@@ -5045,16 +4686,12 @@ Scope {
             var apps = root.swBuild();
             if (apps.length === 0) return;
             root.swApps = apps;
-            // 0 = the app you are in, so the first TAB lands on the previous one; from the desktop the first TAB lands on the
-            // app you were just in
             root.swIndex = root.desktopFocused ? -1 : 0;
             root.swOpen = true;
         }
         var n = root.swApps.length;
         root.swIndex = (root.swIndex + (dir >= 0 ? 1 : n - 1)) % n;
     }
-    // The switcher layer holds EXCLUSIVE keyboard focus while open, and Hyprland can refuse to focus / switch
-    // workspace while an exclusive layer is up. So: close the layer first, then dispatch a moment later.
     property var swPending: null
     Timer {
         id: swFocusTimer
@@ -5063,7 +4700,6 @@ Scope {
             var t = root.swPending;
             root.swPending = null;
             if (!t) return;
-            // Hyprland 0.55+ is Lua: `hyprctl dispatch` takes a Lua expression, the old "focuswindow ..." strings fail.
             var lua = "";
             if (t.ws > 0) lua += "hl.dispatch(hl.dsp.focus({ workspace = \"" + t.ws + "\" })); ";
             lua += "hl.dispatch(hl.dsp.focus({ window = \"" + (t.addr !== "" ? "address:" + t.addr : "class:^(" + t.cls + ")$") + "\" })); ";
@@ -5080,7 +4716,7 @@ Scope {
         try { Hyprland.refreshToplevels(); } catch (e) {}
         var ts = Hyprland.toplevels.values, hit = null, i;
         for (i = 0; i < ts.length; i++) if (ts[i].wayland === a.win) { hit = ts[i]; break; }
-        if (!hit) {                                   // handle did not match: fall back to class (+ title)
+        if (!hit) {
             var cls = (a.cls || a.appId || "").toLowerCase(), ttl = a.win.title || "", loose = null;
             for (i = 0; i < ts.length; i++) {
                 if (root.hub && root.hub.tlGhost(ts[i])) continue;
@@ -5120,10 +4756,6 @@ Scope {
             id: perScreen
             required property var modelData
 
-        // --- the bar's background lives in its OWN layer (namespace "yukibarbg") ---
-        // Hyprland blurs a whole layer or none of it, and the bar window also carries the popovers, so the bar strip is a separate
-        // layer just under the bar: it paints a translucent fill (Settings -> Menu Bar -> Bar background) and takes no input.
-        // Blur it with:  layerrule = blur, yukibarbg   +   layerrule = ignorealpha 0.05, yukibarbg
         PanelWindow {
             id: barBgWin
             screen: perScreen.modelData
@@ -5135,8 +4767,6 @@ Scope {
             mask: Region { }
 
             WlrLayershell.namespace: "yukibarbg"
-            // Top, not Bottom: on Bottom it sat under the windows, so it only ever blurred the wallpaper - over a
-            // window there was nothing behind it to blur. It is declared before the bar itself, so it stacks under it.
             WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
@@ -5168,22 +4798,21 @@ Scope {
                 id: ui
                 anchors.fill: parent
 
-                property string pop: ""          // "", apple, app, file, edit, view, window, help, cc, cal
+                property string pop: ""
                 property real menuX: 0
-                property real calSrcW: 0          // width of the clock the calendar grows out of
+                property real calSrcW: 0
                 property var menuModel: []
                 property string armed: ""
                 property int calYear: 2026
                 property int calMonth: 0
-                property string wifiPrompt: ""      // ssid whose password field is open in the Wi-Fi popover
-                property bool ccEdit: false         // Control Center is in "Edit Controls" mode
-                property string ccPage: ""          // "" = the control grid, "wifi" = the Wi-Fi list shown inside the Control Center
+                property string wifiPrompt: ""
+                property bool ccEdit: false
+                property string ccPage: ""
                 onCcPageChanged: wifiPrompt = ""
-                property var trayItem: null         // SystemTrayItem whose menu is open in the tray popover
-                property var trayStack: []          // submenu path (QsMenuEntry objects) inside that menu
+                property var trayItem: null
+                property var trayStack: []
                 Timer { interval: 400; repeat: true; running: ui.pop === "vol"; onTriggered: root.audioTick++ }
                 readonly property bool toastScreen: Quickshell.screens.length === 1 || (Hyprland.focusedMonitor !== null && Hyprland.focusedMonitor.name === win.modelData.name)
-                // the Control Center IPC: the focused screen opens it
                 Connections {
                     target: root
                     function onCcRequest(open) {
@@ -5192,7 +4821,6 @@ Scope {
                     }
                 }
                 readonly property bool toastsShown: toastScreen && notifToasts.count > 0
-                // notifications arriving with no panel open: measure what's behind the banners
                 onToastsShownChanged: if (toastsShown && pop === "") root.measureTone(win.modelData.x + ui.width - 374, win.modelData.y + root.barH + 8, 364, 90)
 
                 function openTray(item, x) {
@@ -5218,7 +4846,7 @@ Scope {
                 }
                 Timer {
                     interval: 4000; repeat: true
-                    running: (ui.pop === "wifi" || (ui.pop === "cc" && ui.ccPage === "wifi")) && ui.wifiPrompt === ""     // paused while typing so the list doesn't rebuild under the cursor
+                    running: (ui.pop === "wifi" || (ui.pop === "cc" && ui.ccPage === "wifi")) && ui.wifiPrompt === ""
                     onTriggered: root.scanWifi()
                 }
                 Timer {
@@ -5227,20 +4855,16 @@ Scope {
                     onTriggered: root.scanBt()
                 }
 
-                // Spotlight state
-                property string spMode: "home"          // home | actions | apps
+                property string spMode: "home"
                 property string spQuery: ""
                 property string spHoverLabel: ""
                 property int spSel: 0
                 property var spExpanded: ({})
-                property bool clipMenu: false           // the round "..." menu of the Clipboard panel
-                property bool spCalm: false             // Spotlight was opened by the clipboard / emoji shortcut: plain fade, no springy pop
+                property bool clipMenu: false
+                property bool spCalm: false
                 property bool spReqCalm: false
-                property int emCat: 0                   // emoji category tab (0 = recents)
-                property bool spHover: false            // spSel was just changed by the pointer, so lists must not scroll to it
-                // A row takes the highlight only when the pointer really MOVES over it. The results are rebuilt whenever a window
-                // changes (a browser tab's title is enough), and each new row that appeared under a resting pointer counted as
-                // "entered": the highlight jumped to whatever row sat under the pointer, then back.
+                property int emCat: 0
+                property bool spHover: false
                 property point spPtr: Qt.point(-1e6, -1e6)
                 function spPointerMoved(item, mx, my) {
                     var p = item.mapToGlobal(mx, my);
@@ -5310,7 +4934,7 @@ Scope {
                         if (spMode === "clip" && (ev.modifiers & Qt.ShiftModifier) && n > 0) {
                             var it = spResults[Math.min(spSel, n - 1)];
                             pop = "";
-                            root.clipPick(it, false);       // Shift+Return: copy only, don't paste
+                            root.clipPick(it, false);
                         } else spEnter();
                         ev.accepted = true;
                     }
@@ -5321,7 +4945,6 @@ Scope {
                     o[name] = !o[name];
                     spExpanded = o;
                 }
-                // gutter for check marks when any entry of the open menu has one
                 readonly property bool menuLead: {
                     for (var i = 0; i < menuModel.length; i++) if (menuModel[i].checked !== undefined || menuModel[i].glyph !== undefined) return true;
                     return false;
@@ -5330,7 +4953,6 @@ Scope {
                     target: root
                     function onActiveWinChanged() { if (ui.isMenu) ui.menuModel = root.menuModelFor(ui.pop); }
                 }
-                // bounding box of all glass that is on screen right now (popovers, notification popups) + a refraction margin
                 readonly property rect glassRect: {
                     var items = [menuPop, cc, cal, wifiPop, btPop, trayPop, notifPop, toastArea, volPop, kbPop, levelOsd], x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, any = false;
                     for (var i = 0; i < items.length; i++) {
@@ -5350,7 +4972,7 @@ Scope {
                     armed = "";
                     wifiPrompt = "";
                     spHoverLabel = "";
-                    if (pop !== "cc" && ccEdit) { root.ccEditCancel(); ccEdit = false; }   // closed without Save
+                    if (pop !== "cc" && ccEdit) { root.ccEditCancel(); ccEdit = false; }
                     if (pop !== "cc") ccPage = "";
                     root.notifOpen = (pop === "notif");
                     if (root.notifOpen) root.notifUnread = 0;
@@ -5369,7 +4991,7 @@ Scope {
                         if (!(!fm || fm.name === win.modelData.name || Quickshell.screens.length === 1)) return;
                         var want = root.spotWant;
                         if (ui.pop === "spot") {
-                            if (want === "home" || want === ui.spMode) ui.pop = "";    // same key again closes it
+                            if (want === "home" || want === ui.spMode) ui.pop = "";
                             else ui.spSetMode(want);
                         } else {
                             ui.spReqCalm = (want === "clip" || want === "emoji");
@@ -5418,37 +5040,24 @@ Scope {
                 }
                 readonly property var calData: { clock.date; return calCells(); }
 
-                // --- Liquid Glass backdrop: wallpaper + live windows behind the popovers, in screen coordinates ---
-                // The backdrop (wallpaper + one capture per window) used to be built from scratch every time a popover opened,
-                // which is the "wallpaper first, windows a moment later" delay. It now stays alive, so a popover opens on
-                // ready-made, current window pixels.
                 Loader {
                     id: glassBackdrop
                     active: root.liquidBase
                     sourceComponent: backdropComp
                     onLoaded: item.region = Qt.binding(function () { return ui.glassRect; })
                 }
-                // --- Layered glass, cheaply: one snapshot of the WHOLE screen (wallpaper, widgets, every window and layer) ---
-                // taken while the pointer is on the bar (before a menu opens, so the menu isn't in it). Menus and popovers
-                // refract that real picture of what's behind them. Falls back to the live backdrop when there's no fresh one
-                // (e.g. a popover opened from the keyboard).
                 ScreencopyView {
                     id: screenSnap
                     x: 0; y: 0
                     width: win.modelData.width; height: win.modelData.height
-                    opacity: 0                      // only ever captured by the glass, never drawn itself
-                    captureSource: root.liquidActive && !root.captureQuiet && !glassBackdrop.item ? win.modelData : null     // fallback only
+                    opacity: 0
+                    captureSource: root.liquidActive && !root.captureQuiet && !glassBackdrop.item ? win.modelData : null
                     live: false
                     paintCursor: false
                     property real takenAt: 0
                     function grab() { if (captureSource && typeof captureFrame === "function") { captureFrame(); takenAt = Date.now(); } }
                 }
                 property bool snapFresh: false
-                // a moment after a popover starts opening (its rect is known), measure what's behind it: the area AROUND the panel with
-                // the panel left out, the same reading the live re-measuring uses (spotWin.measureLive). Reading the panel's own area
-                // while it was still fading in disagreed with that live reading over a mixed wallpaper, so a menu opened with dark text
-                // and turned white ~1 s later; with hysteresis the open reading also keeps the current colour unless the other one is
-                // clearly more readable.
                 Timer {
                     id: toneT; interval: 20
                     onTriggered: {
@@ -5457,8 +5066,6 @@ Scope {
                         root.measureAround(win.modelData, Qt.rect(win.modelData.x + r.x + 64, win.modelData.y + r.y + 64, r.width - 128, r.height - 128), false);
                     }
                 }
-                // the bar changed size: the old whole-screen snapshot shows the windows where they WERE, so drop it, take a new one if
-                // the pointer is on the bar, and re-measure what is behind the open panel
                 Connections {
                     target: root
                     function onBarRelayout() {
@@ -5468,18 +5075,14 @@ Scope {
                         else if (barHover.hovered && ui.pop === "") screenSnap.grab();
                     }
                 }
-                // The live backdrop (wallpaper + desktop widgets + live window captures) is always the source, so a window dragged
-                // under an open menu keeps moving. The one-shot screen snapshot is only a fallback while the backdrop is not up.
                 readonly property Item glassSrc: glassBackdrop.item ? glassBackdrop.item : ((snapFresh && screenSnap.hasContent) ? screenSnap : null)
                 HoverHandler {
                     id: barHover
                     onHoveredChanged: if (hovered && ui.pop === "") screenSnap.grab()
                 }
-                // refresh while the pointer rests on the bar with nothing open; a snapshot is "fresh" for 3 s
                 Timer { interval: 600; repeat: true; running: barHover.hovered && ui.pop === ""; onTriggered: screenSnap.grab() }
                 Timer { interval: 250; repeat: true; running: true; onTriggered: ui.snapFresh = (Date.now() - screenSnap.takenAt) < 3000 || (ui.pop !== "" && ui.snapFresh) }
 
-                // keeps the (otherwise unseen) backdrop rendering so its window captures stay valid; draws one 1%-opaque pixel
                 ShaderEffectSource {
                     sourceItem: glassBackdrop.item
                     hideSource: true
@@ -5492,18 +5095,14 @@ Scope {
                     id: backdropComp
                     Item {
                         id: bd
-                        // never drawn on screen: only captured by the glass (a ShaderEffectSource ignores its source's own
-                        // opacity). Without this, window captures (e.g. Spotify's player) showed through the panel mid-animation.
                         opacity: 0
-                        property bool hostShown: true      // false while the window hosting this backdrop is hidden (set by its Loader)
-                        property bool onDemand: false      // a window that is only shown now and then (Spotlight, switcher, wallpapers)
-                        property rect region: Qt.rect(0, 0, 0, 0)      // the glass that is on screen right now (set by its Loader); windows behind it stay live while recording
+                        property bool hostShown: true
+                        property bool onDemand: false
+                        property rect region: Qt.rect(0, 0, 0, 0)
                         x: 0; y: 0
                         width: win.modelData.width
                         height: win.modelData.height
 
-                        // placeholder for a wallpaper that can't be found or loaded. Not shown while it is still loading: the glass then
-                        // stays clear instead of flashing these colours after every restart
                         Rectangle {
                             z: -3
                             anchors.fill: parent
@@ -5526,31 +5125,22 @@ Scope {
                             sourceSize.width: bd.width
                             smooth: true
                         }
-                        // animated wallpaper: plays behind the glass (menus, bar, Spotlight, switcher) only while "Animated wallpaper in glass" is on
-                        // (root.glassVideo is "" otherwise, and then no decoder exists at all)
                         LiveWall {
                             id: barWall
                             z: -2
                             anchors.fill: parent
                             video: root.glassVideo
                             live: true
-                            // this backdrop is loaded in four windows (bar, Spotlight, switcher, wallpaper picker). A hidden one's player
-                            // pauses, and is gone for good a minute later; the window's next opening starts a new one right away
                             paused: root.wallIdle(win.modelData.name) || !bd.hostShown
                             startDelay: bd.onDemand ? 250 : -1
                             clock: root.wallClock
                         }
 
-                        // the desktop widgets (they sit on the desktop layer, below every window), drawn from the same
-                        // content as the real ones, so the glass shows them under the live windows
                         Repeater {
                             model: (root.hub && root.hub.widgets && Quickshell.screens.length > 0 && win.modelData.name === Quickshell.screens[0].name)
                                    ? root.hub.widgets.model : null
                             delegate: Item {
                                 id: mw
-                                // only while glass that can show them is open (a popover / Spotlight / the switcher / ...). The bar strip never
-                                // reaches the widgets, and each copy's own glass re-rendered the whole full-screen backdrop on every vsync
-                                // (100 times a second here, measured) even with nothing open. Hiding is instant: no copy is rebuilt.
                                 visible: ui.anyVisible || levelOsd.visible || spotWin.openish || swWin.visible || wpWin.visible
                                 required property string wid
                                 required property string wtype
@@ -5568,7 +5158,7 @@ Scope {
                                 WidgetVisual {
                                     anchors.fill: parent
                                     host: root.hub.widgets
-                                    wallItem: barWall               // the backdrop's own player, not one more per widget
+                                    wallItem: barWall
                                     wtype: mw.wtype; wstyle: mw.wstyle; wsize: mw.wsize; wmode: mw.wmode; wsrc: mw.wsrc
                                     wlay: root.hub.widgets.layoutOf(mw.wspan, mw.wtype)
                                     sx: mw.x; sy: mw.y
@@ -5589,16 +5179,10 @@ Scope {
                                 required property real ww
                                 required property real wh
                                 required property real wz
-                                required property bool gone      // window closed: capture is released first, the item is swept shortly after
+                                required property bool gone
                                 property alias cap: sv
                                 x: wx; y: wy; width: ww; height: wh; z: wz
-                                // The capture source survives the window leaving the visible workspace (the item itself is swept 0.6 s later): flipping
-                                // between workspaces used to destroy and re-create it every time, and every new source asks the compositor for a frame at
-                                // once, a burst of requests exactly when windows come and go. It is released when the window is really gone (tlFor: null).
                                 readonly property var tl: { if (!root.hub) return null; var t = root.hub.tlTick; return root.hub.tlFor(addr); }
-                                // behind the glass that is on screen right now (popover / panel + refraction margin)?
-                                // the terminal a wallpaper-folder chip opened, beside the panel: not captured while it is not behind the glass (closing a
-                                // window that was being captured with the panel open is what took the shell down)
                                 readonly property bool folderTerm: root.wpTermAddr !== "" && String(addr).replace(/^0x/, "") === root.wpTermAddr
                                 readonly property bool onGlass: bd.region.width > 0 && x < bd.region.x + bd.region.width && x + width > bd.region.x
                                                                 && y < bd.region.y + bd.region.height && y + height > bd.region.y
@@ -5606,38 +5190,22 @@ Scope {
                                     id: sv
                                     anchors.fill: parent
                                     captureSource: gw.tl
-                                    // a see-through window (kitty's glass background, a faded Dolphin) comes from Hyprland drawn over black: give it back the
-                                    // transparency it has on screen, or the glass shows a dark slab where the wallpaper shines through (hub.winAlpha, capalpha.frag)
                                     readonly property var wa: root.hub ? root.hub.winAlpha(gw.addr) : ({ bg: 1, win: 1 })
                                     opacity: wa.win
                                     layer.enabled: wa.bg < 0.999
                                     layer.effect: ShaderEffect { property real bgAlpha: sv.wa.bg; fragmentShader: Qt.resolvedUrl("capalpha.frag.qsb") }
-                                    // While a screen recording / screen share runs the window captures sit out (root.captureQuiet). `hush` follows it
-                                    // with a random 0.6 s spread, so dozens of captures never start or stop in the same instant (that burst, with a
-                                    // recorder pulling frames at the same time, is what the compositor choked on).
                                     property bool hush: root.captureQuiet
                                     Connections {
                                         target: root
                                         function onCaptureQuietChanged() { hushT.interval = 20 + Math.random() * 600; hushT.restart(); }
                                     }
                                     Timer { id: hushT; onTriggered: sv.hush = root.captureQuiet }
-                                    // ON DEMAND, never live and never "just to keep it warm". A window is only asked for frames while glass that can show it is on
-                                    // screen: a popover / Spotlight / the switcher (every window), or the bar strip itself (a window that reaches it). The backdrop
-                                    // keeps the last frame otherwise, and the first frame is requested the moment a window becomes needed.
-                                    // Why: Hyprland throws away a frame that is still in flight when its window closes, and the shell's own destroy() of that
-                                    // frame then hits a dead object ("wl_display error 0: invalid object NNN"): the whole Wayland connection is cut and the shell
-                                    // restarts (seen while switching workspaces and closing windows). A frame is in flight for ~10 ms, so the fewer requests are
-                                    // made (live mode kept one in flight ~90 % of the time) the less likely a close lands in the middle of one.
-                                    // While recording only the windows behind visible glass refresh, slowly.
                                     readonly property bool glassUp: ui.anyVisible || levelOsd.visible || spotWin.openish || swWin.visible || wpWin.visible
-                                    // a window that really reaches the bar strip (floating / fullscreen); tiled ones start below it (bar + gap)
                                     readonly property bool onBar: root.barGlass && root.liquidActive && gw.y < root.barH + 4
                                     readonly property bool need: !gw.gone && !root.captureHeld && bd.hostShown && (!sv.hush || gw.onGlass) && (glassUp || onBar)
                                                                  && (!gw.folderTerm || gw.onGlass)
                                     onNeedChanged: { if (need && captureSource !== null && typeof captureFrame === "function") captureFrame(); }
                                     onCaptureSourceChanged: {
-                                        // a window that appears while it is needed grabs its first frame at once (a short delay: asking before the capture
-                                        // context exists only logged "no recording context is ready")
                                         if (captureSource !== null && need) firstShot.restart();
                                     }
                                     Timer {
@@ -5646,8 +5214,6 @@ Scope {
                                         onTriggered: { if (sv.need && sv.captureSource !== null && typeof sv.captureFrame === "function") sv.captureFrame(); }
                                     }
                                     Timer {
-                                        // glass is open over the windows: full rate (Real-time glass; 4 per second with it off); only the bar strip
-                                        // sees this window: 4 per second
                                         interval: sv.hush ? 150 : ((sv.glassUp && root.glassRealtime) ? 33 : 250); repeat: true
                                         running: sv.need && sv.captureSource !== null
                                         onTriggered: { if (typeof sv.captureFrame === "function") sv.captureFrame(); }
@@ -5656,7 +5222,6 @@ Scope {
                             }
                         }
 
-                        // take a brand-new frame of every window (after the bar changed size and the windows moved / resized)
                         function recapture() {
                             for (var q = 0; q < wrep.count; q++) {
                                 var it = wrep.itemAt(q);
@@ -5672,9 +5237,6 @@ Scope {
                             for (i = 0; i < root.monData.length; i++)
                                 if (root.monData[i].name === win.modelData.name) mon = root.monData[i];
                             if (!mon) return;
-                            // workspaces on screen, by NAME: since Hyprland 0.57 a special workspace (special:hidden, where Super+Alt+S
-                            // keeps hidden windows) has no "id" in the JSON, and an empty monitor slot matched those windows (undefined ===
-                            // undefined), so hidden windows showed up in the glass
                             var ws = [mon.activeWorkspace && mon.activeWorkspace.name ? mon.activeWorkspace.name : "\u0000none"];
                             if (mon.specialWorkspace && mon.specialWorkspace.name) ws.push(mon.specialWorkspace.name);
                             var zoneBottom = bd.height;
@@ -5695,7 +5257,6 @@ Scope {
                             }
                             for (var k in want) wm.append(want[k]);
                         }
-                        // a closed window first lets go of its capture (gone -> captureSource null), the item itself is removed a moment later
                         Timer {
                             id: sweep
                             interval: 600
@@ -5717,16 +5278,11 @@ Scope {
                     height: (ui.pop !== "" && ui.pop !== "spot") ? ui.height : root.barH
                 }
 
-                // One shared, blurred copy of the backdrop behind the menu bar strip. The strip itself, the hover tiles under its buttons
-                // and the workspace pills are all Liquid Glass slabs (GGlass) on it, so they cost one capture together.
                 ShaderEffectSource {
                     id: bhSrc
-                    readonly property real m: 64                // refraction + blur reach around the strip
+                    readonly property real m: 64
                     sourceItem: root.liquidActive ? ui.glassSrc : null
                     hideSource: true
-                    // always live: the menu bar strip and the workspace pills are glass on this capture too, so they follow the animated
-                    // wallpaper (and a wallpaper change) at once. Live only while hovered, they kept the last frame: after switching to a
-                    // still wallpaper the bar went on showing the old video until a restart.
                     live: true
                     visible: false
                     sourceRect: Qt.rect(-m, -m, ui.width + 2 * m, root.barH + 2 * m)
@@ -5758,15 +5314,12 @@ Scope {
                     debug: root.glassDebug
                     onFailed: root.glassState = "failed"
                 }
-                // the glass under a hover tile / workspace pill (GlassHover.glass); null without Liquid Glass (the frosted tile then)
                 Component {
                     id: barTileGlassComp
                     GGlass { gx: barCtx; cornerR: 8; thickness: 10; strengthMul: 1.0; shadowAmt: 0 }
                 }
                 readonly property Component barTileGlass: barCtx.liquid ? barTileGlassComp : null
 
-                // Liquid Glass menu bar strip: the bar itself refracts the live backdrop (wallpaper + windows), like the popovers.
-                // Settings -> Menu Bar -> "Liquid Glass bar". Sits under every bar item.
                 GGlass {
                     id: barGlassStrip
                     visible: root.barGlass && barCtx.liquid
@@ -5780,7 +5333,6 @@ Scope {
                     shadowAmt: 1
                 }
 
-                // click-away layer (under the popovers and the bar)
                 MouseArea {
                     anchors.fill: parent
                     z: 5
@@ -5789,8 +5341,6 @@ Scope {
                     onPressed: ui.pop = ""
                 }
 
-                // Hardware-key feedback (volume / brightness): a Liquid Glass capsule at the top right, a little below the
-                // menu bar like macOS Tahoe. It refracts the live backdrop through the same shader as the popovers.
                 Item {
                     id: levelOsd
                     z: 1000
@@ -5821,8 +5371,8 @@ Scope {
                         onShaderError: root.glassState = "failed"
                         rimTint: 1
                         ringW: 1.4
-                        shadowAmt: 0        // no outer drop shadow
-                        flatInner: 1        // no darker inner edge shading
+                        shadowAmt: 0
+                        flatInner: 1
                     }
                     MenuBorder {
                         z: 2
@@ -5830,7 +5380,7 @@ Scope {
                         cornerR: height / 2
                         dark: root.effDark
                         tint: root.menuBorderColor
-                        outline: false      // no dark hairline around the capsule
+                        outline: false
                     }
                     Glyph {
                         x: 20; anchors.verticalCenter: parent.verticalCenter
@@ -5839,7 +5389,6 @@ Scope {
                         level: root.osdKind === "brightness" ? 3 : (root.osdValue < 0.34 ? 1 : (root.osdValue < 0.67 ? 2 : 3))
                         color: "white"
                     }
-                    // segmented level bar: bright segments are filled, the rest are dim
                     Row {
                         id: osdBar
                         x: 62; anchors.verticalCenter: parent.verticalCenter
@@ -5852,14 +5401,12 @@ Scope {
                                 required property int index
                                 width: osdBar.segW; height: 4; radius: 2
                                 color: "white"
-                                // partial last segment fades proportionally
                                 opacity: Math.max(0.28, Math.min(1, root.osdValue * osdBar.n - index) * 0.95)
                                 Behavior on opacity { NumberAnimation { duration: 90 } }
                             }
                         }
                     }
                 }
-                // --- the bar itself ---
                 Rectangle {
                     id: barBg
                     visible: root.barEnabled
@@ -5867,10 +5414,9 @@ Scope {
                     x: 0; y: 0
                     width: ui.width
                     height: root.barH
-                    color: "transparent"      // Tahoe: the bar is fully clear, no fill and no border on any side
+                    color: "transparent"
                     MouseArea { anchors.fill: parent; onClicked: ui.pop = "" }
 
-                    // --- left: Apple menu + app menus ---
                     Row {
                         id: leftRow
                         x: 8
@@ -5953,7 +5499,6 @@ Scope {
                         }
                     }
 
-                    // --- centre: workspaces (minimal, text only) ---
                     Row {
                         id: wsRow
                         visible: root.barWidgetEnabled("workspaces")
@@ -5965,8 +5510,6 @@ Scope {
                         spacing: 0
                         readonly property var mon: Hyprland.monitorFor(perScreen.modelData)
                         readonly property int activeId: mon && mon.activeWorkspace ? mon.activeWorkspace.id : (Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : -1)
-                        // workspaces in use that sit next to each other share ONE background: the first of a run draws it across the run
-                        // (0 = this one is empty, or continues the run of the one before it)
                         function runAt(i) {
                             var ids = root.wsIds;
                             if (!root.wsOccupied(ids[i]) || (i > 0 && root.wsOccupied(ids[i - 1]))) return 0;
@@ -5984,7 +5527,6 @@ Scope {
                                 readonly property bool busy: root.wsOccupied(modelData)
                                 readonly property int run: { root.wsCounts; root.wsIds; return wsRow.runAt(index); }
                                 width: root.wsCellW(modelData); height: 28
-                                // the run's background (later workspaces in the row draw their labels on top of it)
                                 GlassHover {
                                     id: wsRun
                                     property int cells: 1
@@ -6025,7 +5567,6 @@ Scope {
                         }
                     }
 
-                    // --- right: tray, status items, control center, clock ---
                     Row {
                         id: rightRow
                         anchors.right: parent.right
@@ -6036,7 +5577,6 @@ Scope {
                         scale: root.barWidgetScale
                         spacing: 0
 
-                        // tray
                         Repeater {
                             model: root.showTray ? SystemTray.items : null
                             delegate: Item {
@@ -6044,9 +5584,6 @@ Scope {
                                 required property var modelData
                                 width: 26; height: 28
                                 BarHover { glass: ui.barTileGlass; id: trHl; dark: bpal.dark; area: trMa; hot: trMa.containsMouse; pressed: trMa.pressed; open: ui.pop === "tray" && ui.trayItem === tray.modelData }
-                                // fcitx5 (the input method): its own icon changes look with every input method (a grey symbolic
-                                // keyboard, a coloured Pinyin icon, the Bamboo logo), so the bar draws it in its own colour instead:
-                                // a keyboard while typing plain letters, a short label while an input method is on
                                 readonly property bool isIM: String(modelData.id).toLowerCase() === "fcitx"
                                 readonly property string imLabel: !isIM ? ""
                                     : root.fcitxIM !== "" ? root.imLabelFor(root.fcitxIM, "")
@@ -6095,7 +5632,6 @@ Scope {
                             }
                         }
 
-                        // animated wallpaper: pause / resume by hand (only while the wallpaper is a video)
                         Item {
                             id: wallBtn
                             readonly property bool shown: root.showWallButton && root.videoWall
@@ -6106,7 +5642,6 @@ Scope {
                             Glyph { anchors.centerIn: parent; scale: wallHl.lift; width: 16; height: 16; kind: "livewall"; flag: wallBtn.idle; color: wallBtn.idle ? bpal.fg2 : bpal.fg }
                             MouseArea { id: wallMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.wallUserPaused = !root.wallUserPaused }
                         }
-                        // Bluetooth has its own optional widget; it remains visible when the radio is off.
                         Item {
                             id: btBtn
                             visible: root.barWidgetEnabled("bluetooth") && root.hasBt
@@ -6115,7 +5650,6 @@ Scope {
                             Glyph { anchors.centerIn: parent; scale: btHl.lift; width: 15; height: 15; kind: "bluetooth"; color: root.btOn && root.btConnected > 0 ? bpal.fg : bpal.fg2 }
                             MouseArea { id: btMa; anchors.fill: parent; hoverEnabled: true; onClicked: ui.openPop("bt", btBtn.mapToItem(ui, 0, 0).x) }
                         }
-                        // volume (opens a popover with just the volume slider)
                         Item {
                             id: volBtn
                             visible: root.barWidgetEnabled("volume")
@@ -6130,7 +5664,6 @@ Scope {
                                 onWheel: wheel => root.setVolume(root.volume + (wheel.angleDelta.y > 0 ? 0.03 : -0.03))
                             }
                         }
-                        // keyboard layout: click = next layout, right-click = pick from a list, scroll = cycle
                         Item {
                             id: kbBtn
                             visible: root.barWidgetEnabled("keyboard") && root.kbLayouts.length > 1
@@ -6155,7 +5688,6 @@ Scope {
                                 onWheel: wheel => root.cycleKeyboardLayout(wheel.angleDelta.y > 0 ? -1 : 1)
                             }
                         }
-                        // battery
                         Item {
                             visible: root.hasBattery
                             width: root.hasBattery ? batRow.width + 14 : 0; height: 28
@@ -6201,7 +5733,6 @@ Scope {
                             }
                             MouseArea { id: batMa; anchors.fill: parent; hoverEnabled: true; onClicked: ui.openPop("cc", 0) }
                         }
-                        // notification system (bell)
                         Item {
                             id: bellBtn
                             visible: root.barWidgetEnabled("notifications")
@@ -6216,7 +5747,6 @@ Scope {
                             }
                             MouseArea { id: bellMa; anchors.fill: parent; hoverEnabled: true; onClicked: ui.openPop("notif", bellBtn.mapToItem(ui, 0, 0).x) }
                         }
-                        // wifi
                         Item {
                             id: wifiBtn
                             visible: root.barWidgetEnabled("wifi")
@@ -6225,7 +5755,6 @@ Scope {
                             Glyph { anchors.centerIn: parent; scale: wifiHl.lift; width: 16; height: 16; kind: root.showEthernet ? "ethernet" : "wifi"; level: root.wifiOn ? (root.wifiLevel || 1) : 3; flag: !root.wifiOn && !root.showEthernet; color: (root.wifiOn || root.showEthernet) ? bpal.fg : bpal.fg2 }
                             MouseArea { id: wifiMa; anchors.fill: parent; hoverEnabled: true; onClicked: ui.openPop("wifi", wifiBtn.mapToItem(ui, 0, 0).x) }
                         }
-                        // search
                         Item {
                             visible: root.showSearch
                             width: root.showSearch ? 28 : 0; height: 28
@@ -6233,17 +5762,14 @@ Scope {
                             Glyph { anchors.centerIn: parent; scale: srchHl.lift; width: 15; height: 15; kind: "search"; color: bpal.fg }
                             MouseArea { id: srchMa; anchors.fill: parent; hoverEnabled: true; onClicked: { if (root.launcher !== "") { ui.pop = ""; root.search(); } else ui.openPop("spot", 0); } }
                         }
-                        // control center
                         Item {
                             id: ccBtn
                             visible: root.ccEnabled && root.barWidgetEnabled("controlCenter")
-                            // the widget grows to the right while a privacy dot is showing, so the dot sits beside the icon
                             readonly property bool dotsOn: root.privacyAny && root.barWidgetEnabled("privacy")
                             width: (root.ccEnabled && root.barWidgetEnabled("controlCenter")) ? 30 + (dotsOn ? ccDots.width + 2 : 0) : 0; height: 28
                             Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                             BarHover { glass: ui.barTileGlass; id: ccHl; dark: bpal.dark; area: ccMa; hot: ccMa.containsMouse; pressed: ccMa.pressed; open: ui.pop === "cc" }
                             Glyph { x: 7; anchors.verticalCenter: parent.verticalCenter; scale: ccHl.lift; width: 16; height: 16; kind: "cc"; color: bpal.fg }
-                            // privacy dots like macOS: orange = microphone, green = camera, purple = screen sharing / recording
                             Row {
                                 id: ccDots
                                 visible: ccBtn.dotsOn
@@ -6263,7 +5789,6 @@ Scope {
                             }
                             MouseArea { id: ccMa; anchors.fill: parent; hoverEnabled: true; onClicked: ui.openPop("cc", 0) }
                         }
-                        // clock
                         Item {
                             id: clockBtn
                             visible: root.barWidgetEnabled("clock")
@@ -6280,7 +5805,7 @@ Scope {
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
                                 font.letterSpacing: 0.1
-                                font.hintingPreference: Font.PreferNoHinting    // hinting snapped the x-height down and made the text look flat
+                                font.hintingPreference: Font.PreferNoHinting
                                 font.kerning: true
                                 renderType: Text.QtRendering
                                 verticalAlignment: Text.AlignVCenter
@@ -6294,11 +5819,9 @@ Scope {
                 Item {
                     id: volPop
                     z: 10
-                    // same morph as the Wi-Fi popover, growing out of the speaker icon (menuX is the icon's centre here)
     readonly property real ps: root.barPopupScale
                     readonly property real fullW: 330
                     readonly property real fullH: Math.min(volCol.height + 28, ui.height - root.barH - 40)
-                    // the rectangle it grows from (the bar icon, in screen px) and the one it grows into
                     readonly property real srcW: 26
                     readonly property real srcH: 22
                     readonly property real srcX: ui.menuX - 13
@@ -6310,7 +5833,6 @@ Scope {
                     property real openT: opening ? 1 : 0
                     Behavior on openT {
                         id: volPopOpenB
-                        // the speed follows where the animation is heading (set before it starts), never the order bindings update in
                         NumberAnimation {
                             duration: volPopOpenB.targetValue > 0.5 ? 520 : 220
                             easing.type: volPopOpenB.targetValue > 0.5 ? Easing.OutBack : Easing.InOutCubic
@@ -6329,7 +5851,6 @@ Scope {
                     scale: ps
                     transformOrigin: Item.TopLeft
 
-                    // morph blur: only exists while the animation runs, so the open panel is drawn directly (crisp text)
                     readonly property real blurAmt: Math.pow(1 - t, 1.3)
                     readonly property bool morphing: openT > 0.002 && Math.abs(openT - 1) > 0.002
                     layer.enabled: morphing
@@ -6343,8 +5864,8 @@ Scope {
 
                     PopGlassCtx { id: volPopGlass; pop: volPop; frame: ui; source: ui.glassSrc; fullW: volPop.fullW; fullH: volPop.fullH }
                     GGlass { anchors.fill: parent; gx: volPopGlass.ctx; cornerR: Math.min(26, 8 + 18 * volPop.t); thickness: 22; shadowAmt: 0; flatInner: 1 }
-                    MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(26, 8 + 18 * volPop.t); dark: volPopGlass.ctx.dark; tint: volPopGlass.ctx.borderTint; amount: 1 }   // same border as the top-bar menus
-                    MouseArea { anchors.fill: parent }      // clicks inside don't close the popover
+                    MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(26, 8 + 18 * volPop.t); dark: volPopGlass.ctx.dark; tint: volPopGlass.ctx.borderTint; amount: 1 }
+                    MouseArea { anchors.fill: parent }
 
                     Item {
                         anchors.fill: parent
@@ -6383,7 +5904,7 @@ Scope {
                                     rightKind: "speaker"; rightLevel: 3
                                     onMoved: v => root.setVolume(v)
                                 }
-                                MouseArea { width: 28; height: parent.height; onClicked: root.toggleMute() }     // the left speaker icon mutes
+                                MouseArea { width: 28; height: parent.height; onClicked: root.toggleMute() }
                             }
                             Repeater {
                                 model: root.audioOutputs
@@ -6407,7 +5928,6 @@ Scope {
                                     id: appRow
                                     required property string modelData
                                     readonly property var app: root.appByKey(modelData)
-                                    // while dragging, the knob follows the pointer instead of waiting for the next volume update
                                     property bool dragging: false
                                     property real dragV: 0
                                     readonly property real vol: dragging ? dragV : (app ? app.volume : 0)
@@ -6480,7 +6000,6 @@ Scope {
                     }
                 }
 
-                // --- keyboard layout popover (right-click the layout label) ---
                 Item {
                     id: kbPop
                     z: 10
@@ -6563,7 +6082,6 @@ Scope {
                     }
                 }
 
-                // --- notification popups (top right, under the bar) ---
                 Item {
                     id: toastMask
                     x: toastArea.x; y: toastArea.y
@@ -6575,7 +6093,6 @@ Scope {
                     z: 12
                     width: 364
                     x: ui.width - width - 10
-                    // a menu / popover open where the notifications are: they slide down below it, and back up after
                     readonly property real popBottom: {
                         if (ui.pop === "" || ui.pop === "spot") return 0;
                         var items = [menuPop, cc, cal, wifiPop, trayPop, volPop, kbPop], b = 0;
@@ -6594,7 +6111,6 @@ Scope {
                         id: toastCol
                         width: parent.width
                         spacing: 10
-                        // the rest of the stack glides to its new place instead of jumping
                         move: Transition { NumberAnimation { properties: "y"; duration: 770; easing.type: Easing.OutQuint } }
                         Repeater {
                             model: notifToasts
@@ -6611,18 +6127,14 @@ Scope {
                                 property bool shown: false
                                 property bool leaving: false
                                 readonly property int life: timeout > 0 ? timeout : (urgency === 2 ? 10000 : root.notifBannerSecs * 1000)
-                                // t: 0 = a small pill at the right edge (off to the side), 1 = the full card in place
                                 property real t: (shown && !leaving) ? 1 : 0
                                 Behavior on t { NumberAnimation { duration: 770; easing.type: toast.leaving ? Easing.OutCubic : Easing.OutQuint } }
                                 readonly property real tc: Math.max(0, Math.min(1, t))
                                 width: toastCol.width
-                                // the slot grows with the card, so the stack below makes room smoothly
                                 height: tbody.height * (0.35 + 0.65 * tc) + (toastCol.spacing * (tc - 1))
                                 opacity: Math.min(1, tc * 2.2)
                                 Component.onCompleted: shown = true
                                 function dismiss() { if (leaving) return; leaving = true; goneTimer.restart(); }
-                                // Notification Center opened: record this popup's spot and hand over instantly - the card in the
-                                // panel starts exactly here and flies into its slot (one object, no duplicate)
                                 property real mergeDy: 0
                                 Timer { id: handOff; interval: 30; onTriggered: root.notifToastRemove(toast.nid) }
                                 Connections {
@@ -6630,7 +6142,6 @@ Scope {
                                     function onNotifOpenChanged() {
                                         if (!root.notifOpen || toast.leaving || toast.tc < 0.5) return;
                                         var g = tslab.mapToItem(ui, 0, 0);
-                                        // a NEW object, or nothing is notified and the cards never start their flight
                                         var m = {}, old = root.notifMergeFrom;
                                         for (var k in old) m[k] = old[k];
                                         m[toast.nid] = { x: g.x, y: g.y, w: tslab.width };
@@ -6650,7 +6161,6 @@ Scope {
 
                                 LGlass {
                                     id: tslab
-                                    // pill -> card: narrow and short at first, anchored to the right, sliding in from the right
                                     readonly property real slide: (1 - toast.tc) * 46
                                     width: toast.width * (0.42 + 0.58 * toast.tc)
                                     height: Math.max(36, toast.height)
@@ -6685,9 +6195,6 @@ Scope {
                                     anchors.fill: parent
                                     onClicked: { root.notifActivate(toast.nid); toast.dismiss(); }
                                 }
-                                // the slab reveals the content (clip), and inside it the content comes into focus. The blur sits on an
-                                // inner layer with room to spread (auto padding), so it is soft all round instead of a cut-off smear,
-                                // and it eases out gradually as the card settles.
                                 Item {
                                     id: tcontent
                                     x: tslab.x; width: tslab.width; height: toast.height
@@ -6715,14 +6222,9 @@ Scope {
                     }
                 }
 
-                // --- notification centre (bell) r ---
                 Item {
                     id: notifPop
                     z: 10
-                    // same morph as the Wi-Fi popover: one glass shape grows out of the bell. When popups merge in it appears
-                    // at once instead (its cards are the popups) and only the chrome builds in around them.
-                    // while clearing the height tracks the collapsing list frame by frame (never shorter than the empty state),
-                    // so the dust and the shrink are one motion; otherwise it eases to its new size
                     property real fullH: 92 + (notifHist.count === 0 ? 70 : (root.notifClearing ? Math.max(70, nfl.height) : nfl.height)) + 14
                     Behavior on fullH { enabled: !root.notifClearing; NumberAnimation { duration: 560; easing.type: Easing.OutQuint } }
                     readonly property real ps: root.barPopupScale
@@ -6739,7 +6241,6 @@ Scope {
                     property real openT: opening ? 1 : 0
                     Behavior on openT {
                         id: notifPopOpenB
-                        // the speed follows where the animation is heading (set before it starts), never the order bindings update in
                         enabled: !notifPop.merging
                         NumberAnimation {
                             duration: notifPopOpenB.targetValue > 0.5 ? 520 : 220
@@ -6749,7 +6250,6 @@ Scope {
                     }
                     readonly property real t: Math.max(0, Math.min(1, openT))
                     readonly property real contentT: Math.max(0, Math.min(1, (openT - 0.28) / 0.55))
-                    // chrome (glass fill, header, Do Not Disturb): follows the morph, or builds in on its own while popups merge
                     property real chromeM: ui.pop === "notif" ? 1 : 0
                     Behavior on chromeM { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                     readonly property real chrome: merging ? chromeM : contentT
@@ -6774,7 +6274,6 @@ Scope {
                         autoPaddingEnabled: true
                     }
 
-                    // exactly the glass + border of the Wi-Fi / Bluetooth / audio popovers (same context, blur, rim, no drop shadow, no inner shading)
                     PopGlassCtx { id: notifPopGlass; pop: notifPop; frame: ui; source: ui.glassSrc; fullW: notifPop.fullW; fullH: notifPop.fullH }
                     GGlass {
                         anchors.fill: parent
@@ -6785,7 +6284,6 @@ Scope {
                         shadowAmt: 0
                         flatInner: 1
                     }
-                    // same border as the top-bar menus (File, Edit, ...) and the Wi-Fi / audio popovers
                     MenuBorder {
                         z: 2
                         anchors.fill: parent
@@ -6794,9 +6292,8 @@ Scope {
                         tint: notifPopGlass.ctx.borderTint
                         amount: 1
                     }
-                    MouseArea { anchors.fill: parent }      // clicks inside the panel don't close it
+                    MouseArea { anchors.fill: parent }
 
-                    // the content keeps its full size and is revealed by the growing glass (clipped), so nothing reflows mid-morph
                     Item {
                         anchors.fill: parent
                         clip: true
@@ -6840,7 +6337,6 @@ Scope {
                             color: pal.fg
                             font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: 13
                         }
-                        // the same Liquid Glass switch as everywhere else (see GlassSwitch.qml)
                         PSwitch {
                             t: pal
                             anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
@@ -6849,7 +6345,6 @@ Scope {
                         }
                     }
                     Text {
-                        // fades in as the list finishes collapsing (no pop at the end of Clear All)
                         opacity: notifHist.count === 0 ? 1 : 0
                         visible: opacity > 0.01
                         Behavior on opacity { NumberAnimation { duration: 360; easing.type: Easing.OutCubic } }
@@ -6885,24 +6380,20 @@ Scope {
                                     required property int urgency
                                     required property real time
                                     width: ncol.width
-                                    // entrance: grows into the list (cards below glide down), slides in from above, comes into focus
                                     property real inT: 0
                                     property bool snapIn: false
                                     Component.onCompleted: inT = 1
                                     Behavior on inT { enabled: !hcd.snapIn && !root.notifClearing; NumberAnimation { duration: 560; easing.type: Easing.OutQuint } }
-                                    // morph from the popup: the card starts at the popup's spot / width and flies into its slot
                                     property real flipX: 0
                                     property real flipY: 0
                                     property real flipS: 1
                                     function flyFromPopup() {
                                         var f = root.notifMergeFrom[hcd.nid];
                                         if (!f || flipAnim.running) return;
-                                        // the card's final width is the panel's list width (the list may not be laid out yet)
                                         var cw = notifPop.fullW - 24;
                                         if (!(cw > 0)) return;
                                         var here = hcd.mapToItem(ui, 0, 0);
-                                        hcd.flipX = f.x + f.w - (here.x + cw);      // right edges line up (scale origin is the right edge)
-                                        // starts where its popup was, but never above the list's top edge (it would be clipped there)
+                                        hcd.flipX = f.x + f.w - (here.x + cw);
                                         var listTop = nfl.mapToItem(ui, 0, 0).y;
                                         hcd.flipY = Math.max(f.y, listTop) - here.y;
                                         hcd.flipS = Math.max(0.5, Math.min(1.5, f.w / cw));
@@ -6928,10 +6419,8 @@ Scope {
                                         Translate { x: hcd.flipX; y: (hcd.inT - 1) * 18 + hcd.flipY }
                                     ]
                                     z: (flipAnim.running || flyDelay.running) ? 10 : 0
-                                    // after the dust: the gap closes smoothly, then the entry is removed
                                     onDone: { if (root.notifClearing) return; hcd.inT = 0; delT.restart(); }
                                     Timer { id: delT; interval: 560; onTriggered: root.notifDelete(hcd.nid) }
-                                    // during Clear All the slot shrinks while the card turns to dust (one fluid motion)
                                     Timer { id: collapseT; onTriggered: collapseAnim.restart() }
                                     NumberAnimation { id: collapseAnim; target: hcd; property: "inT"; to: 0; duration: 820; easing.type: Easing.InOutCubic }
                                     Connections {
@@ -6968,7 +6457,7 @@ Scope {
                                         urgency: hc.urgency; stamp: hc.time; nowMs: clock.date.getTime()
                                         showTime: true
                                         showClose: hhov.hovered
-                                        onCloseClicked: hcd.dissolve(1)          // dust away, then removed
+                                        onCloseClicked: hcd.dissolve(1)
                                     }
                                 }
                                 }
@@ -6979,11 +6468,9 @@ Scope {
                     }
                 }
 
-                // --- dropdown menu (Apple / app / File / Edit / ...) ---
                 Item {
                     id: menuPop
                     z: 10
-                    // as wide as the longest label + its shortcut needs (at least 260, at most 440)
                     width: {
                         var w = 248;
                         for (var i = 0; i < menuRep.count; i++) { var c = menuRep.itemAt(i); if (c) w = Math.max(w, c.need); }
@@ -7039,7 +6526,6 @@ Scope {
                                 id: it
                                 required property var modelData
                                 readonly property bool isSep: modelData.kind === "sep"
-                                // width this row needs to show its label and shortcut without cutting either
                                 readonly property real need: isSep ? 0 : (ui.menuLead ? 28 : 12) + lbl.implicitWidth + (sc.visible ? sc.implicitWidth + 24 : 12) + 8
                                 readonly property bool armedNow: !isSep && modelData.confirm === true && ui.armed === modelData.label
                                 readonly property bool off: !isSep && modelData.disabled === true
@@ -7122,7 +6608,6 @@ Scope {
                     }
                 }
 
-                // --- system tray menu (right-click a tray icon) ---
                 Item {
                     id: trayPop
                     z: 10
@@ -7135,7 +6620,7 @@ Scope {
                             if (v[i].buttonType !== QsMenuButtonType.None || (v[i].icon && v[i].icon !== "")) return true;
                         return false;
                     }
-                    function clean(t) {     // dbusmenu mnemonics: "_File" -> "File", "__" -> "_"
+                    function clean(t) {
                         return (t || "").replace(/__/g, "\u0001").replace(/_/g, "").replace(/\u0001/g, "_");
                     }
                     width: 260
@@ -7172,7 +6657,6 @@ Scope {
                         debug: root.glassDebug
                         onShaderError: root.glassState = "failed"
                     }
-                    // same border as the top-bar menus (File, Edit, ...)
                     MenuBorder {
                         id: trayBorder
                         z: 2
@@ -7199,7 +6683,6 @@ Scope {
                             id: trayCol
                             width: trayFlick.width
 
-                            // submenu header: click to go back one level
                             Item {
                                 id: trayBack
                                 visible: ui.trayStack.length > 0
@@ -7255,7 +6738,6 @@ Scope {
                                         radius: 6
                                         color: root.accent
                                     }
-                                    // check mark / radio dot / app-provided icon
                                     Text {
                                         visible: !te.isSep && te.modelData.buttonType !== QsMenuButtonType.None && te.modelData.checkState === Qt.Checked
                                         x: 10
@@ -7315,18 +6797,16 @@ Scope {
                     }
                 }
 
-                // --- Wi-Fi list (shared by the top-bar popover and the Control Center page) ---
                 Component {
                     id: wifiContent
                     Column {
                         id: wifiCol
-                        property var pp: pal                // palette: the panel palette in the popover, ccPal in the Control Center
-                        property bool showBack: false       // Control Center page: show the back arrow
+                        property var pp: pal
+                        property bool showBack: false
                         signal back()
                         width: parent ? parent.width : 296
                         spacing: 6
 
-                        // header: title + on/off switch
                         Item {
                             width: parent.width; height: 32
                             Item {
@@ -7346,7 +6826,7 @@ Scope {
                                 anchors.right: parent.right; anchors.rightMargin: 4
                                 anchors.verticalCenter: parent.verticalCenter
                                 checked: root.wifiOn
-                                enabled: root.hasWifi           // no Wi-Fi adapter: the switch can't be used
+                                enabled: root.hasWifi
                                 opacity: root.hasWifi ? 1 : 0.4
                                 onToggled: { root.toggleWifi(); wifiAfter.restart(); }
                             }
@@ -7392,7 +6872,6 @@ Scope {
                             font.family: root.fontForWeight(Font.DemiBold, pp.fam); font.pixelSize: 11; font.weight: Font.DemiBold
                         }
 
-                        // the list
                         Flickable {
                             id: wifiFlick
                             visible: root.wifiOn && root.wifiNets.length > 0
@@ -7484,7 +6963,6 @@ Scope {
                                             }
                                         }
 
-                                        // password field (secured network that has no saved profile)
                                         Item {
                                             visible: nr.prompting
                                             width: parent.width; height: 42
@@ -7572,23 +7050,17 @@ Scope {
                     }
                 }
 
-                // --- Wi-Fi networks ---
                 Item {
                     id: wifiPop
                     z: 10
-                    // --- morph: the popover is ONE glass shape that grows out of the Wi-Fi icon (or the Control Center tile)
-                    // into the full menu, while the whole thing starts out of focus and sharpens as it opens. Closing folds it
-                    // back into the icon and blurs it out again.
                     readonly property real ps: root.barPopupScale
                     readonly property real fullW: 320
                     readonly property real fullH: (wifiLoad.item ? wifiLoad.item.height : 120) + 24
                     readonly property bool fromCC: ui.menuX >= ui.width - 1
-                    // the rectangle it grows from (in screen px)
                     readonly property real srcW: fromCC ? 44 : 26
                     readonly property real srcH: fromCC ? 30 : 22
                     readonly property real srcX: fromCC ? ui.width - 64 : ui.menuX + 1
                     readonly property real srcY: fromCC ? root.barH + 36 : Math.max(0, (root.barH - 22) / 2)
-                    // the rectangle it grows into
                     readonly property real dstX: Math.max(6, Math.min(ui.width - fullW * ps - 8, ui.menuX + 14 - fullW * ps / 2))
                     readonly property real dstY: root.barH + 6
 
@@ -7596,16 +7068,13 @@ Scope {
                     property real openT: opening ? 1 : 0
                     Behavior on openT {
                         id: wifiPopOpenB
-                        // the speed follows where the animation is heading (set before it starts), never the order bindings update in
                         NumberAnimation {
                             duration: wifiPopOpenB.targetValue > 0.5 ? 520 : 220
                             easing.type: wifiPopOpenB.targetValue > 0.5 ? Easing.OutBack : Easing.InOutCubic
                             easing.overshoot: 0.7
                         }
                     }
-                    // clamped copy for things that must not overshoot
                     readonly property real t: Math.max(0, Math.min(1, openT))
-                    // the size follows openT (so the spring overshoots a touch), the content fades in a little later
                     readonly property real contentT: Math.max(0, Math.min(1, (openT - 0.28) / 0.55))
 
                     width: (srcW + (fullW * ps - srcW) * openT) / ps
@@ -7617,7 +7086,6 @@ Scope {
                     scale: ps
                     transformOrigin: Item.TopLeft
 
-                    // morph blur: only exists while the animation runs, so the open popover is drawn directly (crisp text)
                     readonly property real blurAmt: Math.pow(1 - t, 1.3)
                     readonly property bool morphing: openT > 0.002 && Math.abs(openT - 1) > 0.002
                     layer.enabled: morphing
@@ -7631,11 +7099,9 @@ Scope {
 
                     PopGlassCtx { id: wifiPopGlass; pop: wifiPop; fromCC: wifiPop.fromCC; frame: ui; source: ui.glassSrc; fullW: wifiPop.fullW; fullH: wifiPop.fullH }
                     GGlass { anchors.fill: parent; gx: wifiPopGlass.ctx; cornerR: Math.min(26, 8 + 18 * wifiPop.t); thickness: 22; shadowAmt: 0; flatInner: 1 }
-                    MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(26, 8 + 18 * wifiPop.t); dark: wifiPopGlass.ctx.dark; tint: wifiPopGlass.ctx.borderTint; amount: 1 }   // same border as the top-bar menus
-                    MouseArea { anchors.fill: parent }          // swallow clicks on empty glass so the popover doesn't close
+                    MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(26, 8 + 18 * wifiPop.t); dark: wifiPopGlass.ctx.dark; tint: wifiPopGlass.ctx.borderTint; amount: 1 }
+                    MouseArea { anchors.fill: parent }
 
-                    // the content keeps its full size and is revealed by the growing glass (clipped), fading in and settling
-                    // up from a few px below, so nothing reflows while the shape morphs
                     Item {
                         id: wifiClip
                         anchors.fill: parent
@@ -7651,18 +7117,16 @@ Scope {
                     }
                 }
 
-                // --- Bluetooth list (shared by the top-bar popover and the Control Center page) ---
                 Component {
                     id: btContent
                     Column {
                         id: btCol
-                        property var pp: pal                // palette: the panel palette in the popover, ccPal in the Control Center
-                        property bool showBack: false       // Control Center page: show the back arrow
+                        property var pp: pal
+                        property bool showBack: false
                         signal back()
                         width: parent ? parent.width : 296
                         spacing: 6
 
-                        // header: title + on/off switch
                         Item {
                             width: parent.width; height: 32
                             Item {
@@ -7732,7 +7196,6 @@ Scope {
                             }
                         }
 
-                        // the list
                         Flickable {
                             id: btFlick
                             visible: root.btOn && root.btDevices.length > 0
@@ -7878,16 +7341,12 @@ Scope {
                     }
                 }
 
-                // --- bluetooth popover ---
                 Item {
                     id: btPop
                     z: 10
-                    // same morph as the Wi-Fi popover: one glass shape grows out of the bluetooth icon, blurred, and sharpens
-                    // as it opens; closing folds it back into the icon.
     readonly property real ps: root.barPopupScale
                     readonly property real fullW: 320
                     readonly property real fullH: (btLoad.item ? btLoad.item.height : 120) + 24
-                    // the rectangle it grows from (the bar icon, in screen px) and the one it grows into
                     readonly property real srcW: 26
                     readonly property real srcH: 22
                     readonly property real srcX: ui.menuX + 1
@@ -7899,7 +7358,6 @@ Scope {
                     property real openT: opening ? 1 : 0
                     Behavior on openT {
                         id: btPopOpenB
-                        // the speed follows where the animation is heading (set before it starts), never the order bindings update in
                         NumberAnimation {
                             duration: btPopOpenB.targetValue > 0.5 ? 520 : 220
                             easing.type: btPopOpenB.targetValue > 0.5 ? Easing.OutBack : Easing.InOutCubic
@@ -7918,7 +7376,6 @@ Scope {
                     scale: ps
                     transformOrigin: Item.TopLeft
 
-                    // morph blur: only exists while the animation runs, so the open panel is drawn directly (crisp text)
                     readonly property real blurAmt: Math.pow(1 - t, 1.3)
                     readonly property bool morphing: openT > 0.002 && Math.abs(openT - 1) > 0.002
                     layer.enabled: morphing
@@ -7932,10 +7389,9 @@ Scope {
 
                     PopGlassCtx { id: btPopGlass; pop: btPop; frame: ui; source: ui.glassSrc; fullW: btPop.fullW; fullH: btPop.fullH }
                     GGlass { anchors.fill: parent; gx: btPopGlass.ctx; cornerR: Math.min(26, 8 + 18 * btPop.t); thickness: 22; shadowAmt: 0; flatInner: 1 }
-                    MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(26, 8 + 18 * btPop.t); dark: btPopGlass.ctx.dark; tint: btPopGlass.ctx.borderTint; amount: 1 }   // same border as the top-bar menus
+                    MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(26, 8 + 18 * btPop.t); dark: btPopGlass.ctx.dark; tint: btPopGlass.ctx.borderTint; amount: 1 }
                     MouseArea { anchors.fill: parent }
 
-                    // the content keeps its full size and is revealed by the growing glass (clipped)
                     Item {
                         anchors.fill: parent
                         anchors.margins: 1
@@ -7950,22 +7406,16 @@ Scope {
                     }
                 }
 
-                // --- calendar ---
-                // The same morph as the Wi-Fi menu: ONE glass shape grows out of the clock into the full calendar, springing a
-                // touch past its size and settling, starting out of focus and sharpening; the dates fade up into place a beat
-                // later. Closing folds it back into the clock and blurs it out.
                 Item {
                     id: cal
                     z: 10
                     readonly property real ps: root.barPopupScale
                     readonly property real fullW: 310
                     readonly property real fullH: calCol.height + 28
-                    // the rectangle it grows from: the clock in the menu bar (screen px)
                     readonly property real srcW: Math.max(26, ui.calSrcW)
                     readonly property real srcH: 22
                     readonly property real srcX: Math.min(ui.menuX, ui.width - srcW)
                     readonly property real srcY: Math.max(0, (root.barH - 22) / 2)
-                    // the rectangle it grows into: under the clock's end of the bar
                     readonly property real dstX: Math.max(6, ui.width - fullW * ps - 8)
                     readonly property real dstY: root.barH + 6
 
@@ -7973,7 +7423,6 @@ Scope {
                     property real openT: opening ? 1 : 0
                     Behavior on openT {
                         id: calOpenB
-                        // the speed follows where the animation is heading (set before it starts)
                         NumberAnimation {
                             duration: calOpenB.targetValue > 0.5 ? 540 : 220
                             easing.type: calOpenB.targetValue > 0.5 ? Easing.OutBack : Easing.InOutCubic
@@ -7992,7 +7441,6 @@ Scope {
                     scale: ps
                     transformOrigin: Item.TopLeft
 
-                    // morph blur: only while the animation runs, so the open calendar is drawn directly (crisp text)
                     readonly property real blurAmt: Math.pow(1 - t, 1.3)
                     readonly property bool morphing: openT > 0.002 && Math.abs(openT - 1) > 0.002
                     layer.enabled: morphing
@@ -8004,13 +7452,11 @@ Scope {
                         autoPaddingEnabled: true
                     }
 
-                    // the same Liquid Glass as the Wi-Fi menu and the Control Center tiles (your blur / strength / translucency)
                     PopGlassCtx { id: calGlass; pop: cal; frame: ui; source: ui.glassSrc; fullW: cal.fullW; fullH: cal.fullH }
                     GGlass { anchors.fill: parent; gx: calGlass.ctx; cornerR: Math.min(24, 8 + 16 * cal.t); thickness: 22; shadowAmt: 0; flatInner: 1 }
                     MenuBorder { z: 2; anchors.fill: parent; cornerR: Math.min(24, 8 + 16 * cal.t); dark: calGlass.ctx.dark; tint: calGlass.ctx.borderTint; amount: 1 }
-                    MouseArea { anchors.fill: parent }          // clicks on empty glass don't close it
+                    MouseArea { anchors.fill: parent }
 
-                    // the dates keep their full size and are revealed by the growing glass (clipped), fading in and settling up
                     Item {
                     anchors.fill: parent
                     anchors.margins: 1
@@ -8098,8 +7544,6 @@ Scope {
                     }
                 }
 
-                // --- Control Center ---
-                // No panel behind it: every tile and every button is its own piece of Liquid Glass.
                 Item {
                     id: cc
                     z: 10
@@ -8108,14 +7552,11 @@ Scope {
                     height: ui.ccPage === "" ? Math.min(ccCol.height, maxH) : (ui.ccPage === "wifi" ? ccWifiPage.height : ccBtPage.height)
                     x: Math.max(8, ui.width - width - 10)
                     y: root.barH + 6
-                    // opening (ColorOS 17): the panel springs out from the Control Center button, overshoots a little and
-                    // settles, while the controls stretch up into place one row after another. Closing is quick and flat.
                     readonly property bool opening: ui.pop === "cc"
                     property int openSeq: 0
                     property real openT: opening ? 1 : 0
                     Behavior on openT {
                         id: ccOpenB
-                        // the speed follows where the animation is heading (set before it starts), never the order bindings update in
                         NumberAnimation {
                             duration: ccOpenB.targetValue > 0.5 ? 520 : 150
                             easing.type: ccOpenB.targetValue > 0.5 ? Easing.OutBack : Easing.OutCubic
@@ -8124,11 +7565,8 @@ Scope {
                     }
                     opacity: Math.max(0, Math.min(1, openT * 2.2))
                     visible: opacity > 0
-                    // morph: the panel grows out of the button a little while it springs open
                     scale: root.barPopupScale * (0.94 + 0.06 * Math.min(1.0, openT))
                     transformOrigin: Item.TopRight
-                    // morph blur: the whole panel starts out of focus and sharpens as it opens; on close it blurs out again.
-                    // The layer only exists while the animation runs, so the open panel is drawn directly (crisp text, no extra pass).
                     readonly property real blurAmt: Math.pow(Math.max(0, 1 - Math.min(1, openT)), 1.4)
                     readonly property bool morphing: openT > 0.002 && Math.abs(openT - 1) > 0.002
                     layer.enabled: morphing
@@ -8139,21 +7577,10 @@ Scope {
                         blur: cc.blurAmt * 0.85
                         autoPaddingEnabled: true
                     }
-                    // the panel itself never moves above the bar (the menu bar is transparent, so anything that did would
-                    // show straight through it). The motion lives in the controls: they slide up into place inside it.
                     onOpeningChanged: if (opening) openSeq++
                     onVisibleChanged: if (visible) { root.refreshWifi(); root.refreshBt(); root.refreshBrightness(); root.refreshPowerProfile(); }
 
-                    // Resize refresh: when the menu bar is made smaller / bigger (or the panel itself changes size or position) the
-                    // Control Center's backdrop capture used to stay stuck on the old rectangle. Every such change now drops and
-                    // re-attaches the capture source for a moment (glassFlip) and forces every stage of the glass to re-render.
                     property bool glassFlip: false
-                    // The panel is drawn scaled by barPopupScale around its top-right corner, but the glass shaders position every
-                    // slab in the panel's own UNSCALED coordinates. So the backdrop is described twice:
-                    //   capLocal  = the region in those unscaled coordinates (what the shaders map their pixels against)
-                    //   capScreen = where that same region really is on screen (what is captured): scaled about the top-right corner
-                    // At the default size both are identical; at any other bar size the old code captured the unscaled rectangle, so the
-                    // backdrop (the tree in the wallpaper) landed in the wrong place and at the wrong size.
                     readonly property rect capLocal: Qt.rect(cc.x - 64, cc.y - 64, cc.width + 128, cc.height + 128)
                     readonly property real capS: root.barPopupScale
                     readonly property rect capScreen: Qt.rect((cc.x + cc.width) + (capLocal.x - (cc.x + cc.width)) * capS,
@@ -8195,8 +7622,6 @@ Scope {
                         autoPaddingEnabled: false
                         visible: false
                     }
-                    // real Gaussian pre-blur of the backdrop (Qt MultiEffect): the glass shader refracts THIS texture,
-                    // so there are no sampled copies of the background any more
                     ShaderEffectSource {
                         id: ccBlur
                         sourceItem: ccBlurFx
@@ -8213,7 +7638,6 @@ Scope {
                         autoPaddingEnabled: false
                         visible: false
                     }
-                    // second Gaussian pass: only active when the slider goes past a single pass's 64 px limit
                     ShaderEffectSource {
                         id: ccBlur2
                         sourceItem: (ccg.blur * ccg.blurMul) * 1.4 / 64.0 > 1.0 ? ccBlur2Fx : null
@@ -8228,22 +7652,20 @@ Scope {
                         liquid: root.liquidActive
                         shaderUrl: root.glassShaderUrl
                         dark: root.ccDark
-                        // macOS style: the panel is the glass, so each control only keeps a faint shape on top of it
                         tint: root.ccStyle === "macos" ? root.glassOpacity * 0.30 : root.glassOpacity
                         strength: root.ccStyle === "macos" ? root.glassLiquid * 0.30 : root.glassLiquid
                         rim: root.ccStyle === "macos" ? root.glassRim * 0.4 : root.glassRim
                         rimTint: 1
-                        ringW: 0                            // the border is the QML CornerBorder now (see component CornerBorder)
+                        ringW: 0
                         borderTint: root.menuBorderColor
-                        borderAmount: 1                     // strength of the CornerBorder on every tile / button / the panel
-                        whiteEdge: false                    // no light inner ring on the non-liquid fallback pane
+                        borderAmount: 1
+                        whiteEdge: false
                         grain: root.glassGrain
                         blur: root.glassBlur
                         debug: root.glassDebug
                         onFailed: root.glassState = "failed"
                     }
 
-                    // --- the controls themselves (instantiated by the grid below) ---
                     function ccComp(id) {
                         switch (id) {
                         case "wifi": return cWifi;
@@ -8284,7 +7706,6 @@ Scope {
                                 on: root.wifiOn
                             }
                             MouseArea {
-                                // only the arrow end opens the Wi-Fi page inside the Control Center; the rest of the tile switches Wi-Fi on / off
                                 enabled: root.hasWifi
                                 x: parent.width - 48; width: 48; height: parent.height
                                 onClicked: { root.wifiError = ""; root.scanWifi(); root.refreshConnections(); ui.ccPage = "wifi"; }
@@ -8312,8 +7733,6 @@ Scope {
                             onClicked: root.toggleBt()
                             id: btTile
                             t: ccPal; gx: ccg
-                            // one grid cell is ~70 px wide, two are ~150 px: wide = shows the label and opens the device list
-                            // (the cell's `slot` is not visible from inside this Component, which left the icon unplaced)
                             readonly property bool wide: width > 110
                             CCBtn {
                                 plain: true
@@ -8325,7 +7744,6 @@ Scope {
                             MouseArea {
                                 visible: btTile.wide
                                 enabled: root.hasBt
-                                // only the arrow end opens the Bluetooth page inside the Control Center; the rest of the tile switches Bluetooth on / off
                                 x: parent.width - 48; width: 48; height: parent.height
                                 onClicked: { root.btError = ""; root.scanBt(); root.refreshBt(); ui.ccPage = "bt"; }
                             }
@@ -8510,7 +7928,6 @@ Scope {
                                 width: 52; height: 52; radius: 10
                                 color: ccPal.btnOff
                                 Glyph { visible: artImg.status !== Image.Ready; anchors.centerIn: parent; width: 22; height: 22; kind: "note"; color: ccPal.fg2 }
-                                // `clip: true` only clips to a plain rectangle, so the cover is masked with a rounded shape instead
                                 Item {
                                     id: artMask
                                     anchors.fill: parent
@@ -8535,7 +7952,6 @@ Scope {
                                         maskSpreadAtMin: 1.0
                                     }
                                 }
-                                // hairline edge like the macOS cover art
                                 Rectangle {
                                     anchors.fill: parent
                                     radius: art.radius
@@ -8544,19 +7960,17 @@ Scope {
                                     border.color: ccPal.dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.10)
                                 }
                             }
-                            // audio visualizer next to the cover (Settings -> Widgets -> Audio visualizer)
                             VisBars {
                                 x: art.x + art.width + 14; y: art.y
                                 width: parent.width - x - 14; height: art.height
                                 src: root.hub ? root.hub.vis : null
                                 active: root.visOn && root.visInCC && np.pl !== null && np.pl !== undefined
                                         && (np.pl.isPlaying || np.pl.playbackState === MprisPlaybackState.Paused)
-                                hold: !np.pl || !np.pl.isPlaying     // paused: frozen where the music stopped
+                                hold: !np.pl || !np.pl.isPlaying
                                 style: root.visStyle
                                 gain: root.visGain
-                                count: Math.max(6, Math.round(root.visCount * 0.75))     // the tile is narrower than the widget
+                                count: Math.max(6, Math.round(root.visCount * 0.75))
                                 barFill: root.visWidth
-                                // the same colours as the Now Playing widget: the cover's (ArtTint, same formula), the accent, or plain
                                 ArtTint { id: npTint; source: artImg.source }
                                 readonly property color base: (root.visColor === "accent" || root.accentUi) ? root.accentInk
                                     : (root.visColor === "art" && npTint.known ? Qt.hsla(npTint.h, Math.min(0.95, npTint.s * 1.15 + 0.2), ccPal.dark ? 0.70 : 0.42, 1)
@@ -8673,8 +8087,6 @@ Scope {
                         }
                     }
 
-                    // macOS Control Center: one frosted slab behind everything (the tiles sit on it, instead of each
-                    // control being its own piece of glass)
                     Loader {
                         active: root.ccStyle === "macos"
                         x: -12; y: -12
@@ -8685,8 +8097,6 @@ Scope {
                         }
                     }
 
-                    // Wi-Fi page: the network list opens inside the Control Center (back arrow in the header) instead of
-                    // switching to the top-bar Wi-Fi popover
                     Item {
                         id: ccWifiPage
                         readonly property bool shown: ui.ccPage === "wifi"
@@ -8708,7 +8118,6 @@ Scope {
                         }
                     }
 
-                    // Bluetooth page: the device list opens inside the Control Center, like the Wi-Fi page
                     Item {
                         id: ccBtPage
                         readonly property bool shown: ui.ccPage === "bt"
@@ -8730,8 +8139,6 @@ Scope {
                         }
                     }
 
-                    // Taller than the screen (many rows, big tiles, Edit Controls with its empty rows)? The panel scrolls instead of
-                    // running off the bottom. The 10 px around it keep the glass edges and the edit badges that overhang the tiles.
                     Flickable {
                         id: ccFlick
                         x: -10; y: -10
@@ -8753,13 +8160,11 @@ Scope {
                         visible: opacity > 0.01
                         Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-                        // --- privacy: a small glass pill (icons + the apps using them), only while something is active ---
                         Item {
                             id: ccPriv
                             visible: root.privacyAny && root.barWidgetEnabled("privacy")
                             width: parent.width
                             height: visible ? 32 : 0
-                            // one icon per kind of use (screen sharing and recording share the purple one)
                             readonly property var icons: {
                                 var a = [], seen = {};
                                 for (var i = 0; i < root.privacyRows.length; i++) {
@@ -8770,7 +8175,6 @@ Scope {
                                 }
                                 return a;
                             }
-                            // every app using the mic / camera / screen, once each
                             readonly property string names: {
                                 var all = root.privacy.mic.concat(root.privacy.cam).concat(root.privacy.share), out = [];
                                 for (var i = 0; i < all.length; i++) if (out.indexOf(all[i]) < 0) out.push(all[i]);
@@ -8808,7 +8212,6 @@ Scope {
                                     color: ccPal.fg
                                     font.family: root.fontForWeight(Font.Medium, ccPal.fam); font.pixelSize: 13; font.weight: Font.Medium
                                 }
-                                // while recording, the pill also carries the Stop button
                                 Rectangle {
                                     visible: root.recording
                                     anchors.right: parent.right; anchors.rightMargin: 7
@@ -8821,16 +8224,14 @@ Scope {
                             }
                         }
 
-                        // --- the control grid ---
                         Item {
                             id: ccGrid
                             width: parent.width
-                            height: Math.max(root.ccCellH, root.ccPlan.total + (ui.ccEdit ? root.ccCellH + root.ccGap : 0))     // edit mode: one empty row below to drop into
+                            height: Math.max(root.ccCellH, root.ccPlan.total + (ui.ccEdit ? root.ccCellH + root.ccGap : 0))
                             Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                             readonly property real cw: (width - 3 * root.ccGap) / 4
                             readonly property real chh: root.ccCellH
 
-                            // edit mode: the cells of the grid, so it is clear where a control can be dropped
                             Repeater {
                                 model: ui.ccEdit ? (root.ccPlan.rows + 1) * 4 : 0
                                 delegate: Rectangle {
@@ -8873,7 +8274,6 @@ Scope {
                                     width: slot ? slot.w * ccGrid.cw + (slot.w - 1) * root.ccGap : 0
                                     height: slot ? slot.hpx : 0
                                     z: dragging ? 100 : 0
-                                    // stretch-and-settle, a touch later for each row / column (ColorOS 17)
                                     property real ap: 1
                                     Connections {
                                         target: cc
@@ -8891,7 +8291,6 @@ Scope {
                                     Behavior on y { enabled: !ct.dragging; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                                     Behavior on scale { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
-                                    // one-cell controls (the circle buttons) are drawn as a smaller circle centred in their grid cell
                                     readonly property bool small: slot !== null && slot.w === 1 && slot.h === 1
                                     Loader {
                                         anchors.centerIn: parent
@@ -8901,13 +8300,12 @@ Scope {
                                         sourceComponent: cc.ccComp(ct.modelData.id)
                                     }
 
-                                    // edit mode: this layer sits above the control, so clicks drag it instead of using it
                                     MouseArea {
                                         id: dragArea
                                         anchors.fill: parent
                                         z: 50
                                         enabled: ui.ccEdit
-                                        visible: ui.ccEdit      // a hidden area can't leave the grab cursor behind
+                                        visible: ui.ccEdit
                                         preventStealing: true
                                         cursorShape: !ui.ccEdit ? Qt.ArrowCursor : (ct.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
                                         property point startP: Qt.point(0, 0)
@@ -8924,7 +8322,7 @@ Scope {
                                         }
                                         onReleased: mouse => {
                                             var q = mapToItem(ccGrid, mouse.x, mouse.y);
-                                            var tx = ct.x, ty = ct.y;           // the tile's top-left right now (includes the drag offset)
+                                            var tx = ct.x, ty = ct.y;
                                             ct.dragging = false;
                                             ct.dx = 0; ct.dy = 0;
                                             root.ccDrop(ct.modelData.id, tx, ty, q.x, q.y, ccGrid.cw);
@@ -8932,7 +8330,6 @@ Scope {
                                         onCanceled: { ct.dragging = false; ct.dx = 0; ct.dy = 0; }
                                     }
 
-                                    // while dragging: the cells it would land on (red when it doesn't fit there)
                                     readonly property var tgt: dragging ? root.ccTarget(modelData.id, x, y, ccGrid.cw) : null
                                     Rectangle {
                                         readonly property bool ok: ct.tgt !== null && (ct.tgt.kind === "free" || ct.tgt.kind === "swap")
@@ -8948,7 +8345,6 @@ Scope {
                                         border.color: ok ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(1, 0.27, 0.23, 0.7)
                                     }
 
-                                    // resize by hand: drag the corner handle, the tile snaps to whole cells (and shows the size it will get)
                                     property int rw: slot ? slot.w : 1
                                     property int rh: slot ? slot.h : 1
                                     property bool resizing: false
@@ -8975,7 +8371,7 @@ Scope {
                                         border.color: ccPal.dark ? Qt.rgba(1, 1, 1, 0.35) : "white"
                                         scale: gripMa.pressed ? 1.18 : 1
                                         Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 2.4 } }
-                                        Text {                          // a diagonal double arrow
+                                        Text {
                                             anchors.centerIn: parent
                                             text: "\u2922"
                                             color: "white"; font.pixelSize: 11
@@ -9005,7 +8401,6 @@ Scope {
                                         }
                                     }
 
-                                    // size badge (edit mode): click to switch between the sizes this control offers
                                     Rectangle {
                                         readonly property var opts: ct.modelData.sizes || []
                                         visible: ui.ccEdit && opts.length > 1
@@ -9028,7 +8423,6 @@ Scope {
                                         }
                                     }
 
-                                    // remove badge
                                     Rectangle {
                                         visible: ui.ccEdit
                                         z: 60
@@ -9047,7 +8441,6 @@ Scope {
                             }
                         }
 
-                        // --- edit mode: controls that are not on the grid yet ---
                         Column {
                             visible: ui.ccEdit && ccAddRep.count > 0
                             width: parent.width
@@ -9097,11 +8490,9 @@ Scope {
                             }
                         }
 
-                        // --- edit controls / done ---
                         Item {
                             id: ccEditRow
                             width: parent.width; height: 28
-                            // same stretch-and-settle as the control tiles, arriving after the last row
                             property real ap: 1
                             Connections {
                                 target: cc
@@ -9152,12 +8543,11 @@ Scope {
             }
         }
 
-        // --- Window switcher (ALT + TAB) lives in its OWN layer (namespace "yukiswitch") ---
         PanelWindow {
             id: swWin
             screen: perScreen.modelData
             visible: (root.swOpen && ui.toastScreen) || swPanel.opacity > 0
-            onVisibleChanged: root.popCount += (visible ? 1 : -1)     // keeps the window-geometry poller running while it is open
+            onVisibleChanged: root.popCount += (visible ? 1 : -1)
             anchors { left: true; right: true; top: true; bottom: true }
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
@@ -9171,7 +8561,6 @@ Scope {
                 anchors.fill: parent
                 focus: true
 
-                // releasing ALT switches to the selected app; TAB / SHIFT+TAB / arrows cycle; ESC cancels
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Tab || event.key === Qt.Key_Right) { root.swNext(1); event.accepted = true; }
                     else if (event.key === Qt.Key_Backtab || event.key === Qt.Key_Left) { root.swNext(-1); event.accepted = true; }
@@ -9184,12 +8573,12 @@ Scope {
 
                 Loader {
                     id: swBackdrop
-                    active: root.liquidBase          // stays loaded (warm) so the window opens on ready-made frames
+                    active: root.liquidBase
                     sourceComponent: backdropComp
                     onLoaded: { item.onDemand = true; item.hostShown = Qt.binding(function () { return swWin.visible; });
                                 item.region = Qt.binding(function () { return Qt.rect(swPanel.x - 96, swPanel.y - 96, swPanel.width + 192, swPanel.height + 192); }); }
                 }
-                MouseArea { anchors.fill: parent; onPressed: root.swCancel() }      // click outside cancels
+                MouseArea { anchors.fill: parent; onPressed: root.swCancel() }
 
                 Item {
                     id: swPanel
@@ -9204,7 +8593,6 @@ Scope {
                     height: padY + cellH + 25
                     x: Math.round((swRoot.width - width) / 2)
                     y: Math.round(swRoot.height * 0.42 - height / 2)
-                    // opens with motion + blur: grows from 92 % while coming into focus; closes quicker
                     readonly property bool shown: root.swOpen && ui.toastScreen
                     opacity: shown ? 1 : 0
                     visible: opacity > 0
@@ -9227,7 +8615,6 @@ Scope {
                         dark: root.effDark
                         bx: swPanel.x; by: swPanel.y
                         cornerR: 26
-                        // frosted: the same glass with no refraction, a heavier blur and more tint
                         tint: swPanel.style === "frosted" ? Math.max(0.5, root.glassOpacity) : root.glassOpacity
                         thickness: swPanel.style === "frosted" ? 6 : 20
                         strength: swPanel.style === "frosted" ? 0.0 : 0.75 * root.glassLiquid
@@ -9257,7 +8644,6 @@ Scope {
                         layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 1.0; shadowOpacity: 0.35; shadowVerticalOffset: 8 }
                     }
 
-                    // selection highlight (slides between apps)
                     Rectangle {
                         visible: swPanel.n > 0
                         x: swPanel.pad + root.swIndex * swPanel.cw
@@ -9290,15 +8676,11 @@ Scope {
                             MouseArea {
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onPositionChanged: root.swIndex = swCell.index      // only on real mouse movement, so TAB keeps control
+                                onPositionChanged: root.swIndex = swCell.index
                                 onClicked: { root.swIndex = swCell.index; root.swCommit(); }
                             }
                         }
                     }
-                    // name of the selected app, under its icon
-                    // the name blur-morphs into the next app's while it glides under the new icon
-                    // (a fixed-width box centred on the new icon: it starts moving the instant the selection changes, so the
-                    //  name glides and morphs at the same time - its position never waits on the morphing text's width)
                     TextMetrics { id: swNameM; font.family: root.fontForWeight(Font.Medium, pal.fam); font.pixelSize: 13; font.weight: Font.Medium; text: swName.text }
                     Item {
                         id: swNameBox
@@ -9306,7 +8688,6 @@ Scope {
                         width: 260; height: swName.implicitHeight
                         readonly property real cx: swPanel.pad + root.swIndex * swPanel.cw + swPanel.cw / 2
                         readonly property real tw: Math.min(swNameM.advanceWidth, swPanel.width - 20)
-                        // keep the whole name inside the panel
                         readonly property real cxc: Math.max(10 + tw / 2, Math.min(swPanel.width - 10 - tw / 2, cx))
                         x: cxc - width / 2
                         y: swPanel.padY + swPanel.cellH + 3
@@ -9326,19 +8707,17 @@ Scope {
             }
         }
 
-        // --- Wallpaper picker (CTRL + ALT + W) lives in its OWN layer (namespace "yukiwall") ---
         PanelWindow {
             id: wpWin
             screen: perScreen.modelData
             visible: (root.wpOpen && ui.toastScreen) || wpPanel.opacity > 0
-            onVisibleChanged: root.popCount += (visible ? 1 : -1)     // keeps the window-geometry poller running while it is open
+            onVisibleChanged: root.popCount += (visible ? 1 : -1)
             anchors { left: true; right: true; top: true; bottom: true }
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.namespace: "yukiwall"
             WlrLayershell.layer: WlrLayer.Overlay
-            // while a folder opened from a chip is up, the keyboard goes to whichever of the two you click (the panel grabs it otherwise)
             WlrLayershell.keyboardFocus: !(root.wpOpen && ui.toastScreen) ? WlrKeyboardFocus.None
                                        : (root.wpTermAddr !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
 
@@ -9359,12 +8738,12 @@ Scope {
 
                 Loader {
                     id: wpBackdrop
-                    active: root.liquidBase          // stays loaded (warm) so the window opens on ready-made frames
+                    active: root.liquidBase
                     sourceComponent: backdropComp
                     onLoaded: { item.onDemand = true; item.hostShown = Qt.binding(function () { return wpWin.visible; });
                                 item.region = Qt.binding(function () { return Qt.rect(wpPanel.x - 96, wpPanel.y - 96, wpPanel.width + 192, wpPanel.height + 192); }); }
                 }
-                MouseArea { anchors.fill: parent; onPressed: root.wpOpen = false }      // click outside closes
+                MouseArea { anchors.fill: parent; onPressed: root.wpOpen = false }
 
                 Item {
                     id: wpPanel
@@ -9407,7 +8786,6 @@ Scope {
                         tint: root.menuBorderColor
                     }
 
-                    // --- header: title, the folders, Add Folder... ---
                     Item {
                         id: wpHead
                         x: 22; y: 14
@@ -9428,7 +8806,6 @@ Scope {
                             Text { anchors.centerIn: parent; text: I18n.tr("Add Folder\u2026"); color: pal.fg; font.family: root.fontForWeight(Font.Medium, pal.fam); font.pixelSize: 12; font.weight: Font.Medium }
                             MouseArea { id: wpChooseMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.wpPickFolder() }
                         }
-                        // the folders the pictures come from: a chip each (click to open it, x to take it out), more can be added with Add Folder
                         ListView {
                             id: wpChips
                             anchors.left: wpTitle.right; anchors.leftMargin: 18
@@ -9457,7 +8834,6 @@ Scope {
                                     color: pal.fg
                                     font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: 12
                                 }
-                                // opens the folder in a floating terminal next to the panel (wpOpenFolder); the panel stays open
                                 MouseArea {
                                     id: chipMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                     onClicked: root.wpOpenFolder(dirChip.modelData, wpPanel, wpWin.screen)
@@ -9473,7 +8849,6 @@ Scope {
                             }
                         }
                     }
-                    // --- search + status ---
                     Rectangle {
                         id: wpSearchBox
                         x: 22; y: 54
@@ -9530,7 +8905,6 @@ Scope {
                         font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: 11
                     }
 
-                    // --- grid ---
                     GridView {
                         id: wpGrid
                         x: 16; y: 94
@@ -9551,7 +8925,6 @@ Scope {
                                 root.wpToggleFav(root.wpShown[currentIndex].path); event.accepted = true;
                             } else if (event.key === Qt.Key_Slash || (event.text.length === 1 && event.text > " " && event.text !== "\u007f"
                                        && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)))) {
-                                // typing anywhere starts a search
                                 wpSearch.forceActiveFocus();
                                 if (event.key !== Qt.Key_Slash) root.wpQuery += event.text;
                                 wpSearch.cursorPosition = wpSearch.length;
@@ -9615,7 +8988,6 @@ Scope {
                                             font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: 11
                                         }
                                     }
-                                    // animated wallpaper: its looping preview plays while hovered or selected
                                     Loader {
                                         anchors.fill: parent
                                         active: wc.modelData.video && wc.modelData.preview !== "" && (wcMa.containsMouse || wc.sel) && root.wpOpen
@@ -9641,7 +9013,6 @@ Scope {
                                         }
                                     }
                                 }
-                                // selection / current-wallpaper ring
                                 Rectangle {
                                     anchors.fill: parent
                                     radius: 12
@@ -9653,10 +9024,9 @@ Scope {
                                     id: wcMa
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    onPositionChanged: wpGrid.currentIndex = wc.index      // real mouse movement only, so the keyboard keeps control
+                                    onPositionChanged: wpGrid.currentIndex = wc.index
                                     onClicked: { root.wpApply(wc.modelData.path); root.wpOpen = false; }
                                 }
-                                // favourite star
                                 Rectangle {
                                     anchors.right: parent.right; anchors.top: parent.top
                                     anchors.margins: 7
@@ -9679,7 +9049,6 @@ Scope {
                             }
                         }
                     }
-                    // --- scrollbar ---
                     Item {
                         id: wpTrack
                         visible: wpGrid.contentHeight > wpGrid.height + 1
@@ -9689,7 +9058,7 @@ Scope {
                         readonly property real thumbH: Math.max(32, ratio * height)
                         readonly property real maxY: Math.max(1, height - thumbH)
                         Rectangle { anchors.horizontalCenter: parent.horizontalCenter; width: 4; height: parent.height; radius: 2; color: pal.track; opacity: 0.6 }
-                        MouseArea {                      // click the track to jump
+                        MouseArea {
                             anchors.fill: parent
                             onPressed: mouse => wpTrack.jumpTo(mouse.y - wpTrack.thumbH / 2)
                         }
@@ -9738,22 +9107,14 @@ Scope {
             }
         }
 
-        // --- Spotlight lives in its OWN layer (namespace "yukispot") ---
-        // Hyprland blurs a whole layer or none of it, so Spotlight has its own layer: put the blur layerrule on
-        // "yukispot" and leave "yukibar" without blur.
         PanelWindow {
             id: spotWin
             screen: perScreen.modelData
-            // The layer stays mapped: creating / destroying it on every open restarted the glass's window captures and
-            // Hyprland's layer animation, which is what made Spotlight flicker or vanish. Closed = invisible + click-through.
             visible: root.spotlightEnabled
             readonly property bool openish: ui.pop === "spot" || spot.vis > 0
-            onOpenishChanged: root.popCount += (openish ? 1 : -1)     // keeps the window-geometry poller running while Spotlight is open
+            onOpenishChanged: root.popCount += (openish ? 1 : -1)
             mask: Region { item: spotWin.openish ? spotRoot : spotNoInput }
             Item { id: spotNoInput; width: 0; height: 0 }
-            // Auto contrast, live: while a panel (menu, Control Center, Spotlight) is open on this screen, the area around it is
-            // re-measured, so opening / closing / switching apps behind it flips it light <-> dark. Windows opening or closing
-            // trigger a measurement at once; otherwise it polls.
             function panelRect() {
                 if (ui.pop === "spot") return Qt.rect(perScreen.modelData.x + spot.x, perScreen.modelData.y + spot.y, spot.width, spot.height);
                 var r = ui.glassRect;
@@ -9773,7 +9134,7 @@ Scope {
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.namespace: "yukispot"
-            WlrLayershell.layer: WlrLayer.Overlay      // Overlay, not Top: Hyprland draws fullscreen windows above the Top layer, so Spotlight never showed over a fullscreen app
+            WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: ui.pop === "spot" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
             Item {
@@ -9782,13 +9143,12 @@ Scope {
 
                 Loader {
                     id: spotBackdrop
-                    active: root.liquidBase          // stays loaded (warm) so the window opens on ready-made frames
+                    active: root.liquidBase
                     sourceComponent: backdropComp
                     onLoaded: { item.onDemand = true; item.hostShown = Qt.binding(function () { return !root.gaming && spotWin.openish; });
                                 item.region = Qt.binding(function () { return Qt.rect(spot.x - 128, spot.y - 128, spot.width + 256, spot.height + 256); }); }
                 }
 
-                // a clipboard entry being dragged out of Spotlight
                 Item {
                     id: clipGhost
                     z: 50
@@ -9854,16 +9214,12 @@ Scope {
                     }
                 }
 
-                // click outside Spotlight closes it
                 MouseArea {
                     anchors.fill: parent
                     acceptedButtons: Qt.AllButtons
                     onPressed: ui.pop = ""
                 }
 
-                // Backdrop capture + blur for Spotlight's glass. Deliberately NOT inside `spot`: as children they inherited
-                // spot's opacity while it faded, so the glass refracted a half-transparent backdrop and turned into a milky
-                // blob mid-fade (the fade looked broken). Out here they always produce the real backdrop.
                 readonly property rect spCapLocal: Qt.rect(spot.x - 128, spot.y - 128, spot.width + 256, 684)
                 readonly property real spCapS: root.barPopupScale
                 readonly property rect spCapScreen: {
@@ -9872,12 +9228,10 @@ Scope {
                 }
                 ShaderEffectSource {
                     id: spSrc
-                    sourceItem: spotBackdrop.item     // wallpaper + live windows, captured inside this layer
+                    sourceItem: spotBackdrop.item
                     hideSource: true
                     live: spotWin.openish
                     visible: false
-                    // The Spotlight is drawn scaled by the UI scale around its centre, but the glass shaders map pixels in its UNSCALED
-                    // coordinates (spg.srcRect = spCapLocal). So the capture (spCapScreen) is where that same region really is on screen.
                     sourceRect: spotRoot.spCapScreen
                 }
                 MultiEffect {
@@ -9885,7 +9239,7 @@ Scope {
                     source: spSrc
                     width: spSrc.sourceRect.width; height: spSrc.sourceRect.height
                     blurEnabled: true
-                    blurMax: 64                              // same single-pass blur the Control Center / popovers use
+                    blurMax: 64
                     blur: Math.min(1.0, (spg.blur * spg.blurMul) * 1.4 / 64.0)
                     autoPaddingEnabled: false
                     visible: false
@@ -9894,7 +9248,7 @@ Scope {
                     id: spBlur
                     sourceItem: spBlurFx
                     live: spotWin.openish
-                    mipmap: true                    // liquidglass.frag samples this with textureLod(): it needs mip levels (see its header)
+                    mipmap: true
                     visible: false
                 }
                 GlassCtx {
@@ -9906,19 +9260,18 @@ Scope {
                     shaderUrl: root.glassShaderUrl
                     dark: spotPal.dark
                     tint: root.glassOpacity
-                    strength: root.glassLiquid               // full refraction, like the Dock / Control Center
-                    rim: root.glassRim                       // same wallpaper-coloured rim + border line as the top-bar menus
+                    strength: root.glassLiquid
+                    rim: root.glassRim
                     rimTint: 1
                     ringW: 0.9
                     whiteEdge: false
                     grain: root.glassGrain
-                    blur: root.glassBlur                    // the Blur slider, like the other glass
-                    blurMul: 2.0                    // a little more than the small panels: Spotlight is big and sits over busy windows
+                    blur: root.glassBlur
+                    blurMul: 2.0
                     debug: root.glassDebug
                     onFailed: root.glassState = "failed"
                 }
 
-                // --- Spotlight (Liquid Glass) ---
                 Item {
                     id: spot
                     z: 10
@@ -9926,14 +9279,12 @@ Scope {
                     readonly property var curPanel: ui.spMode === "apps" ? appsPanel : (ui.spMode === "clip" ? clipPanel : emojiPanel)
                     height: ui.spFull ? curPanel.height : (resPanel.visible ? resPanel.y + resPanel.height : spRow.height)
                     x: Math.round((spotRoot.width - width) / 2)
-                    // the search pill sits a little above the vertical centre of the screen (0.4 of the height; 0.5 = dead centre); the Applications panel centres itself instead
                     y: Math.round(spotRoot.height * 0.4 - (ui.spFull ? curPanel.height / 2 : 24))
                     Behavior on y { enabled: spot.vis > 0.99; NumberAnimation { duration: 240; easing.type: Easing.OutQuint } }
-                    // opens with a springy pop; dismiss: quick fade + shrink
                     property real vis: 0
                     opacity: vis
                     visible: vis > 0.001
-                    readonly property real uiS: root.barPopupScale      // Settings -> Menu Bar -> UI scale
+                    readonly property real uiS: root.barPopupScale
                     scale: uiS * (ui.spCalm ? 0.98 : 0.93)
                     transformOrigin: Item.Center
                     states: State {
@@ -9945,7 +9296,6 @@ Scope {
                         Transition {
                             from: ""; to: "open"
                             ParallelAnimation {
-                                // opening: 220 ms OutCubic, opacity 0 -> 1 and scale 0.97 -> 1 (no bounce: the surface is revealed, it doesn't fly in)
                                 NumberAnimation { property: "vis"; duration: root.reduceMotion ? 0 : 260; easing.type: Easing.OutQuint }
                                 NumberAnimation { property: "scale"; duration: root.reduceMotion ? 0 : 420; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
                             }
@@ -9953,7 +9303,6 @@ Scope {
                         Transition {
                             from: "open"; to: ""
                             ParallelAnimation {
-                                // closing: faster than opening (160 ms InCubic), opacity 1 -> 0 and scale 1 -> 0.98
                                 NumberAnimation { property: "vis"; duration: root.reduceMotion ? 0 : 180; easing.type: Easing.OutCubic }
                                 NumberAnimation { property: "scale"; to: spot.uiS * 0.96; duration: root.reduceMotion ? 0 : 180; easing.type: Easing.OutCubic }
                             }
@@ -9967,7 +9316,6 @@ Scope {
                         onTriggered: (ui.spMode === "apps" ? appsInput : (ui.spMode === "clip" ? clipInput : (ui.spMode === "emoji" ? emojiInput : spInput))).forceActiveFocus()
                     }
 
-                    // --- search pill + the five round buttons ---
                     Row {
                         id: spRow
                         spacing: 12
@@ -9988,7 +9336,6 @@ Scope {
                                 width: 18; height: 18
                                 kind: "search"; color: spotPal.fg2
                             }
-                            // placeholder: blur-morphs between "Search" and the hovered button's name
                             MorphText {
                                 x: spInput.x + 3
                                 width: spInput.width
@@ -10005,7 +9352,7 @@ Scope {
                             TextInput {
                                 id: spInput
                                 x: 46
-                                width: parent.width - 46 - 44          // constant width: the field never changes size while typing
+                                width: parent.width - 46 - 44
                                 anchors.verticalCenter: parent.verticalCenter
                                 clip: true
                                 color: spotPal.fg
@@ -10016,7 +9363,6 @@ Scope {
                                 onTextChanged: { if (!ui.spFull) { ui.spQuery = text; ui.spSel = 0; ui.armed = ""; if (/^(file|find)\s+/i.test(text)) root.updateFileSearch(text.replace(/^(file|find)\s+/i, "").trim()); } }
                                 Keys.onPressed: event => ui.spKey(event)
                             }
-                            // clear button: appears once there is a query; keeps focus in the field
                             Item {
                                 id: spClear
                                 anchors.right: parent.right; anchors.rightMargin: 14
@@ -10052,7 +9398,6 @@ Scope {
                                 t: pal; gx: spg
                                 d: 48
                                 matchMenuBorder: true
-                                // entrance when Spotlight opens: fade + scale 0.88 -> 1 + rise 4 px, 24 ms stagger (never blocks clicks / keys)
                                 property real inT: 1
                                 opacity: inT
                                 transform: [
@@ -10075,8 +9420,6 @@ Scope {
                                 on: ui.spMode === modelData.id
                                 HoverHandler {
                                     id: btnHover
-                                    // crossing the gap to the next button must not flash "Search": only go back
-                                    // to it once the pointer has been off every button for 0.35 s
                                     onHoveredChanged: {
                                         if (hovered) { spHoverClear.stop(); ui.spHoverLabel = modelData.label; }
                                         else if (ui.spHoverLabel === modelData.label) spHoverClear.restart();
@@ -10087,7 +9430,6 @@ Scope {
                                     if (modelData.id === "apps") ui.spSetMode(ui.spMode === "apps" ? "home" : "apps");
                                     else if (modelData.id === "actions") ui.spSetMode(ui.spMode === "actions" ? "home" : "actions");
                                     else if (modelData.id === "files") {
-                                        // Files = file search: prefill the "file " prefix in the Spotlight field (click again to clear)
                                         if (ui.spMode !== "home") ui.spSetMode("home");
                                         if (/^(file|find)\s/i.test(spInput.text)) { spInput.text = ""; }
                                         else { spInput.text = "file "; spInput.cursorPosition = spInput.text.length; }
@@ -10100,16 +9442,14 @@ Scope {
                         }
                     }
 
-                    // --- results under the pill ---
                     Item {
                         id: resPanel
                         y: spRow.height + 10
                         width: spot.width
-                        readonly property var items: ui.spFull ? [] : ui.spResults      // clipboard / emoji / apps have their own panels
-                        property int keep: 1                         // last non-empty row count, so the panel shrinks while it fades out
+                        readonly property var items: ui.spFull ? [] : ui.spResults
+                        property int keep: 1
                         onItemsChanged: if (items.length > 0) keep = items.length
                         onSelIdxChanged: {
-                            // keep the selected row inside the 5-row window (pointer hover must not scroll)
                             if (ui.spHover) { ui.spHover = false; return; }
                             var top = selIdx * 46, vh = resFlick.height;
                             if (top < resFlick.contentY) resFlick.contentY = top;
@@ -10119,10 +9459,8 @@ Scope {
                         opacity: (!ui.spFull && items.length > 0) ? 1 : 0
                         visible: opacity > 0
                         Behavior on opacity { NumberAnimation { duration: root.reduceMotion ? 0 : 160; easing.type: Easing.OutCubic } }
-                        // file search shows 5 rows at a time; more results scroll
                         readonly property int maxRows: /^(file|find)\s+/i.test(ui.spQuery) ? 5 : 99
                         height: Math.min(items.length > 0 ? items.length : keep, maxRows) * 46 + 16
-                        // expands / contracts downward only: the pill above never moves
                         Behavior on height { NumberAnimation { duration: root.reduceMotion ? 0 : 220; easing.type: Easing.OutCubic } }
                         GGlass { anchors.fill: parent; gx: spg; cornerR: 26; thickness: 26; strengthMul: 1.0; shadowAmt: 0.10 }
                         MenuBorder { amount: 0.5; anchors.fill: parent; cornerR: 26; dark: spotPal.dark; tint: root.menuBorderColor }
@@ -10162,8 +9500,6 @@ Scope {
                                     readonly property bool armedNow: modelData.confirm === true && ui.armed === modelData.title
                                     width: parent.width
                                     height: 46
-                                    // Entrance: fade + rise 4 px, 16 ms stagger. Delegates are rebuilt on every keystroke, so this only
-                                    // plays while the results panel itself is still (almost) invisible, i.e. when results first appear.
                                     property real enterY: 0
                                     transform: Translate { y: rr.enterY }
                                     Component.onCompleted: {
@@ -10211,7 +9547,6 @@ Scope {
                                     }
                                     Text {
                                         id: rowSub
-                                        // file results: the path sits on its own line under the name, so long names/paths never overlap
                                         x: rr.twoLine ? 54 : parent.width - 16 - width
                                         anchors.verticalCenter: parent.verticalCenter
                                         anchors.verticalCenterOffset: rr.twoLine ? 9 : 0
@@ -10235,7 +9570,6 @@ Scope {
                         }
                     }
 
-                    // --- Clipboard history panel (macOS Tahoe style) ---
                     Item {
                         id: clipPanel
                         opacity: ui.spMode === "clip" ? 1 : 0
@@ -10429,7 +9763,6 @@ Scope {
                                     onReleased: mouse => {
                                         if (!dragged) return;
                                         var p = mapToItem(spotRoot, mouse.x, mouse.y);
-                                        // outside Spotlight = on the desktop -> open it; inside -> it flies back
                                         var out = p.x < spot.x || p.x > spot.x + spot.width || p.y < spot.y || p.y > spot.y + spot.height;
                                         clipGhost.drop(out);
                                     }
@@ -10462,7 +9795,6 @@ Scope {
                             }
                         }
 
-                        // the round "..." menu
                         MouseArea { anchors.fill: parent; z: 4; visible: ui.clipMenu; onClicked: ui.clipMenu = false }
                         Item {
                             id: clipMenuPop
@@ -10527,7 +9859,6 @@ Scope {
                         }
                     }
 
-                    // --- Emoji panel ---
                     Item {
                         id: emojiPanel
                         opacity: ui.spMode === "emoji" ? 1 : 0
@@ -10579,7 +9910,6 @@ Scope {
                             }
                         }
 
-                        // category tabs
                         Row {
                             x: 20; y: 64
                             opacity: ui.spQuery.trim() === "" ? 1 : 0.35
@@ -10672,7 +10002,6 @@ Scope {
                             font.family: root.fontForWeight(Font.Normal, spotPal.fam); font.pixelSize: 14
                         }
 
-                        // footer: name of the highlighted emoji
                         Item {
                             x: 20; y: parent.height - 46
                             width: parent.width - 40; height: 46
@@ -10697,7 +10026,6 @@ Scope {
                         }
                     }
 
-                    // --- Applications panel ---
                     Item {
                         id: appsPanel
                         opacity: ui.spMode === "apps" ? 1 : 0

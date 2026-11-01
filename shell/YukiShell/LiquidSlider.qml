@@ -1,10 +1,8 @@
-// LiquidSlider - the slider used everywhere in the shell: a slim track, an accent fill and a knob that becomes a
-// glass lens while you drag it (see LiquidKnob). Put glyphs or labels around it from outside.
 import QtQuick
 
 Item {
     id: s
-    property real value: 0                  // 0 ... 1
+    property real value: 0
     property real minimum: 0
     property color accent: "#0A84FF"
     property color trackColor: Qt.rgba(0.47, 0.47, 0.5, 0.3)
@@ -12,8 +10,8 @@ Item {
     property bool dark: true
     property real trackH: 4
     property real knobSize: 20
-    property bool knobAtRest: true          // false: no knob until you touch it (the Control Center look)
-    property real stepSize: 0               // in 0 ... 1 units
+    property bool knobAtRest: true
+    property real stepSize: 0
     readonly property bool pressed: ma.pressed
     signal moved(real v)
     height: Math.max(knobSize + 6, 24)
@@ -21,8 +19,6 @@ Item {
 
     readonly property real pos: Math.max(0, Math.min(1, value))
     readonly property real span: Math.max(1, width - knobSize)
-    // the same motion as the Control Center slider (upstream CCSlider): holding springs the knob bigger, and it stretches
-    // and leans along the movement, then rings out
     property real glass: 0
     Behavior on glass { NumberAnimation { duration: ma.pressed ? 420 : 300; easing.type: Easing.OutBack; easing.overshoot: 3.0 } }
     property real vel: 0

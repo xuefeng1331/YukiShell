@@ -1,5 +1,4 @@
 #!/bin/sh
-# Each WlSessionLock instance is used once. Start a fresh IPC-capable instance per lock.
 set -u
 
 get_state() {
@@ -16,11 +15,9 @@ case "$state" in
         lock_now
         ;;
     busy)
-        # Already locked or currently entering the lock; don't start a competing locker.
         exit 0
         ;;
     stopping)
-        # Unlock animation completed, but the prior WlSessionLock process is still exiting.
         tries=0
         while [ "$state" = "stopping" ] && [ "$tries" -lt 60 ]; do
             sleep 0.1
@@ -34,7 +31,6 @@ case "$state" in
         ;;
 esac
 
-# No live IPC endpoint: create a new instance, wait for it, then request the lock.
 YUKILOCK_DAEMON=1 qs -c YukiLock >/dev/null 2>&1 &
 daemon_pid=$!
 tries=0

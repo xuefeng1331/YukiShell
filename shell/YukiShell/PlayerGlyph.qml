@@ -17,13 +17,12 @@ Canvas {
         c.strokeStyle = col;
         c.lineJoin = "round";
         c.lineCap = "round";
-        // rounded triangle pointing right (base at x0, tip at x1)
         function tri(x0, x1, y0, y1, lw) {
             c.lineWidth = lw;
             c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, (y0 + y1) / 2); c.lineTo(x0, y1); c.closePath();
             c.fill(); c.stroke();
         }
-        function arrowHead(x, y, dir, sz) {     // small filled head pointing left / right
+        function arrowHead(x, y, dir, sz) {
             c.beginPath(); c.moveTo(x, y); c.lineTo(x - dir * sz, y - sz * 0.8); c.lineTo(x - dir * sz, y + sz * 0.8); c.closePath();
             c.fill(); c.stroke();
         }
@@ -33,10 +32,10 @@ Canvas {
             c.lineWidth = 0.08 * W;
             c.beginPath(); c.rect(0.20 * W, 0.12 * H, 0.22 * W, 0.76 * H); c.fill(); c.stroke();
             c.beginPath(); c.rect(0.58 * W, 0.12 * H, 0.22 * W, 0.76 * H); c.fill(); c.stroke();
-        } else if (kind === "next") {                    // two triangles pointing right
+        } else if (kind === "next") {
             tri(0.04 * W, 0.50 * W, 0.08 * H, 0.92 * H, 0.07 * H);
             tri(0.50 * W, 0.96 * W, 0.08 * H, 0.92 * H, 0.07 * H);
-        } else if (kind === "prev") {                    // two triangles pointing left
+        } else if (kind === "prev") {
             c.save(); c.translate(W, 0); c.scale(-1, 1);
             tri(0.04 * W, 0.50 * W, 0.08 * H, 0.92 * H, 0.07 * H);
             tri(0.50 * W, 0.96 * W, 0.08 * H, 0.92 * H, 0.07 * H);
@@ -56,18 +55,18 @@ Canvas {
             arrowHead(0.99 * W, 0.74 * H, 1, 0.22 * W);
         } else if (kind === "repeat") {
             c.lineWidth = 0.11 * H;
-            c.beginPath();                                   // top run, heading right
+            c.beginPath();
             c.moveTo(0.14 * W, 0.58 * H); c.lineTo(0.14 * W, 0.44 * H);
             c.quadraticCurveTo(0.14 * W, 0.20 * H, 0.36 * W, 0.20 * H); c.lineTo(0.70 * W, 0.20 * H);
             c.stroke();
-            c.beginPath();                                   // bottom run, heading left
+            c.beginPath();
             c.moveTo(0.86 * W, 0.42 * H); c.lineTo(0.86 * W, 0.56 * H);
             c.quadraticCurveTo(0.86 * W, 0.80 * H, 0.64 * W, 0.80 * H); c.lineTo(0.30 * W, 0.80 * H);
             c.stroke();
             c.lineWidth = 0.05 * H;
             arrowHead(0.90 * W, 0.20 * H, 1, 0.20 * W);
             arrowHead(0.10 * W, 0.80 * H, -1, 0.20 * W);
-        } else if (kind === "lyrics") {                      // speech bubble with two lines of text
+        } else if (kind === "lyrics") {
             c.lineWidth = 0.085 * H;
             var bx = 0.06 * W, by = 0.10 * H, bw = 0.88 * W, bh = 0.66 * H, br = 0.18 * H;
             c.beginPath();
@@ -82,7 +81,7 @@ Canvas {
             c.stroke();
             c.beginPath(); c.moveTo(0.24 * W, 0.34 * H); c.lineTo(0.76 * W, 0.34 * H); c.stroke();
             c.beginPath(); c.moveTo(0.24 * W, 0.54 * H); c.lineTo(0.56 * W, 0.54 * H); c.stroke();
-        } else if (kind === "waves") {                       // the sound-wave mark at the top right
+        } else if (kind === "waves") {
             c.lineWidth = 0.13 * H;
             for (var n = 0; n < 3; n++) {
                 c.beginPath();

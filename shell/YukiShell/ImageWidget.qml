@@ -1,6 +1,3 @@
-// Desktop "Image" widget: shows a picture the user chose, cropped to fill the card with the same rounded corners as the
-// Weather / Calendar / Clock / Player widgets.
-// sizes: Small 168x168 · Medium 358x168 · Large 358x354 (times scaleF, the widget size slider)
 import QtQuick
 import QtQuick.Effects
 import "I18n.js" as I18n
@@ -17,7 +14,7 @@ Item {
     property url source: ""
     property bool editing: false
     property bool darkGlass: true
-    property color borderTint: "#8A9AB5"      // Control Center border colour
+    property color borderTint: "#8A9AB5"
 
     readonly property bool isSmall: size === "small"
     readonly property bool isMedium: size === "medium"
@@ -28,7 +25,6 @@ Item {
     width: (isSmall ? 158 : (isLarge ? 358 : 338)) * s
     height: (isLarge ? 354 : 168) * scaleF
 
-    // rounded-corner mask for the picture
     Item {
         id: maskItem
         anchors.fill: parent
@@ -37,7 +33,6 @@ Item {
         Rectangle { anchors.fill: parent; radius: w.radiusPx; color: "black" }
     }
 
-    // placeholder while nothing is chosen / the file cannot be read
     Rectangle {
         anchors.fill: parent
         radius: w.radiusPx
@@ -78,7 +73,6 @@ Item {
         }
     }
 
-    // Control Center border, like the other cards
     CornerBorder {
         z: 2
         anchors.fill: parent

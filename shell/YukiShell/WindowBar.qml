@@ -1,10 +1,3 @@
-// WindowBar - the macOS window controls, on every window.
-//
-// Hyprland draws no titlebars, so YukiShell draws them: the three lights (and, if you like, the app's icon and name)
-// float at the top-left of whatever window is focused. Only the controls take clicks; the rest of the window is
-// untouched. YukiShell's own windows draw their own, so they are skipped.
-//
-// Settings -> Windows: show it at all, always show the symbols, keep the colours until you hover, show the title.
 import QtQuick
 import QtQuick.Effects
 import Quickshell
@@ -27,9 +20,7 @@ Scope {
     readonly property bool alwaysSymbols: bar ? bar.tlAlwaysSymbols : false
     readonly property bool colorOnHover: bar ? bar.tlColorOnHover : false
 
-    // the focused window, straight from the geometry feed the glass already uses
     readonly property var clients: hub ? (hub.glassClients || []) : []
-    // which window has focus, from the same toplevel manager the menu bar uses
     readonly property var activeTl: ToplevelManager.activeToplevel
     readonly property string activeAddr: {
         if (!activeTl) return "";
@@ -43,15 +34,12 @@ Scope {
             var c = clients[i];
             if (("0x" + String(c.address).replace(/^0x/, "")) !== activeAddr && String(c.address) !== activeAddr) continue;
             if (!c.mapped || c.hidden || c.fullscreen) return null;
-            // our own windows have their lights already
             if (c.class === "org.quickshell" || c.class === "quickshell") return null;
             if (c.size && (c.size[0] < 220 || c.size[1] < 120)) return null;
             return c;
         }
         return null;
     }
-    // Window positions come from the shell's geometry feed, which only runs when something asks for it (the glass
-    // did; in Opaque nothing did, so the controls had nowhere to go)
     Binding { target: root.hub; property: "winBarWantsGeo"; value: root.enabled; when: root.hub !== null }
     function dispatch(d) { Hyprland.dispatch(d + "({ window = \"address:" + activeAddr + "\" })"); }
     function close() { Hyprland.dispatch('hl.dsp.window.close({ window = "address:' + activeAddr + '" })'); }
@@ -70,7 +58,6 @@ Scope {
             WlrLayershell.namespace: "yukiwinbar"
             WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-            // only the little control cluster takes clicks; everything else goes to the window underneath
             mask: Region { item: cluster }
 
             readonly property var c: root.active
@@ -90,7 +77,6 @@ Scope {
                 Behavior on x { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
                 Behavior on y { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
-                // a soft plate so the lights stay readable on any window
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: -5

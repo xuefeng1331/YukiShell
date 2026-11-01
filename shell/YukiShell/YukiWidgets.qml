@@ -1,18 +1,3 @@
-// Desktop widgets (macOS Tahoe style) for yukishell.
-//
-//   * one full-screen layer window on the first monitor, BELOW normal windows (WlrLayer.Bottom, namespace "yukiwidgets")
-//   * click-through while you are not editing; edit mode shows free grid slots and snaps widget moves / sizes without overlap
-//   * Weather data from Open-Meteo, a local-date Calendar, a live local-time Clock, and a Music player (MPRIS) widget
-//   * settings + placed widgets are saved to ~/.config/yukiwidgets/settings.json
-//
-//   qs -c YukiShell ipc call widgets refresh        re-fetch the weather now
-//   qs -c YukiShell ipc call widgets edit true      start / stop editing
-//   qs -c YukiShell ipc call widgets span 0 4 2   make widget 0 cover 4 x 2 grid cells (drag its corner while editing)
-//   qs -c YukiShell ipc call widgets move 0 40 60  move widget 0 to the free slot nearest to x 40, y 60
-//   qs -c YukiShell ipc call widgets add clock liquid small   /   ... remove 2    add a widget / remove widget 2
-//
-// Hyprland: nothing is required. (No blur layerrule is needed, the Liquid Glass style blurs the wallpaper itself.)
-
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -26,42 +11,35 @@ Scope {
     property var hub: null
     readonly property var dock: hub ? hub.dock : null
 
-    // --- state ---
     property bool editing: false
     property bool ready: false
 
-    // saved settings
-    property string tempUnit: "C"          // "C" | "F"
-    property string locMode: "auto"        // "auto" (IP) | "city"
+    property string tempUnit: "C"
+    property string locMode: "auto"
     property string cityName: ""
-    property real widgetScale: 0.9         // the "Widget size" slider: scales every widget and the grid (0.6 - 1.5)
+    property real widgetScale: 0.9
 
     readonly property string fontFamily: dock ? dock.fontFamily : "Open Runde"
     readonly property string boldFontFamily: hub && hub.boldFontFamily ? hub.boldFontFamily : "Open Runde Semibold"
     readonly property string configDir: Quickshell.env("HOME") + "/.config/yukiwidgets"
 
-    // Liquid Glass look = the Appearance sliders (Translucency / Blur / Liquid strength) of the Dock + Menu Bar
     readonly property real glassOpacity: dock ? dock.glassOpacity : 0.42
-    readonly property real glassBlur: dock ? dock.glassBlur + dock.dockBlurBoost : 5   // the Dock's blur (Blur slider + dockBlurBoost): every glass widget uses the Dock's glass
+    readonly property real glassBlur: dock ? dock.glassBlur + dock.dockBlurBoost : 5
     readonly property real glassLiquid: dock ? dock.glassLiquid : 1.0
     readonly property real glassRim: dock ? dock.glassRim : 0.45
     readonly property real glassGrain: dock ? dock.glassGrain : 0.03
     readonly property bool darkGlass: dock ? dock.darkMode : true
-    // Control Center border colour (follows the wallpaper's dominant colour)
     readonly property color borderTint: (hub && hub.bar) ? hub.bar.menuBorderColor : "#8A9AB5"
 
-    // placed widgets: roles wid, wtype (weather | calendar | clock | player), wstyle, wsize, wmode (calendar: auto | light | dark), wx, wy
     property alias model: wmodel
     ListModel { id: wmodel }
     readonly property int widgetCount: wmodel.count
     property bool anyLiquid: false
-    property int rev: 0                    // bumped on every change to the list, so Settings bindings can re-evaluate count()
+    property int rev: 0
 
     readonly property var styleNames: ({ liquid: "Liquid Glass", normal: "Normal", light: "Light", dark: "Dark" })
     readonly property var typeNames: ({ weather: "Weather", calendar: "Calendar", clock: "Clock", player: "Player", image: "Image" })
     readonly property var sizeNames: ({ small: "Small", medium: "Medium", large: "Large" })
-    // Every widget covers a block of grid cells, its span: columns x rows, 1x1 up to 4x4 ("1x1", "2x1", "2x2", "4x1", "4x2", ...),
-    // changed by dragging its corner while editing. A span also accepts the old size names: small 1x1, medium 2x1, large 2x2.
     readonly property int maxCols: 4
     readonly property int maxRows: 4
     function spanArr(x) {
@@ -72,17 +50,12 @@ Scope {
         return m ? [Math.max(1, Math.min(maxCols, +m[1])), Math.max(1, Math.min(maxRows, +m[2]))] : [1, 1];
     }
     function spanStr(c, r) { return c + "x" + r; }
-    // which of the three designs a span uses: one column = small (square, or a tall card), at least twice as wide as tall = the
-    // wide (medium) one, anything else = large; the design then grows to fill the card (see the widgets' `fit`). The weather
-    // takes its large design (hours + days) whenever it is two rows or taller: it spreads out instead of growing.
     function sizeClass(x, type) {
         var sp = spanArr(x);
         if (sp[0] === 1) return "small";
         if (type === "weather" && sp[1] >= 2) return "large";
         return sp[0] >= 2 * sp[1] ? "medium" : "large";
     }
-    // the design a widget shows for its span: besides the three classic ones, every widget has its own design for a tall card
-    // (one column, two or more rows), a strip (4 x 1) and a hero card (4 columns, two or more rows)
     function layoutOf(x, type) {
         var sp = spanArr(x), c = sp[0], r = sp[1];
         if (c === 1) return r === 1 ? "small" : "tall";
@@ -95,10 +68,7 @@ Scope {
         var b = [c === 1 ? 185 : c * 179 + (c - 1) * 28 + 9, r === 1 ? 185 : r * 179 + (r - 1) * 23 + 4];
         return [Math.round(b[0] * widgetScale), Math.round(b[1] * widgetScale)];
     }
-    // Size of the Player's contents (art, text, buttons) relative to the original design. The card itself fills the
-    // normal widget footprint, like every other widget. 1.0 = original size.
     property real playerScale: 0.8
-    // audio visualizer of the Player card (the settings live in the Menu Bar's settings, the spectrum comes from the shell's AudioVis)
     readonly property var visSrc: hub ? hub.vis : null
     readonly property bool visOn: (hub && hub.bar) ? hub.bar.visOn : false
     readonly property string visStyle: (hub && hub.bar) ? hub.bar.visStyle : "bars"
@@ -227,7 +197,6 @@ Scope {
             if (wmodel.get(i).wid === id) { wmodel.remove(i); break; }
         recount(); scheduleSave();
     }
-    // minus button in the Settings gallery: removes the most recently added widget of that kind
     function removeLast(type, style, size) {
         for (var i = wmodel.count - 1; i >= 0; i--) {
             var m = wmodel.get(i);
@@ -251,7 +220,6 @@ Scope {
             if (wmodel.get(i).wid === id) { wmodel.setProperty(i, "wmode", m); break; }
         scheduleSave();
     }
-    // resize only onto a valid grid footprint; never let widgets overlap or sit between slots
     function setSize(id, size) {
         for (var i = 0; i < wmodel.count; i++) {
             if (wmodel.get(i).wid !== id) continue;
@@ -276,7 +244,6 @@ Scope {
             }
         recount(); scheduleSave();
     }
-    // resize by the corner handle to c x r cells: keeps the widget where it is (or the nearest free spot); false if it does not fit
     function canSpan(id, c, r) {
         for (var i = 0; i < wmodel.count; i++)
             if (wmodel.get(i).wid === id) return nearestFreeSlot(id, wmodel.get(i).wx, wmodel.get(i).wy, [c, r]) !== null;
@@ -297,9 +264,6 @@ Scope {
         return true;
     }
 
-    // --- image widgets ---
-    // pickImage("", size) adds a new Image widget with the chosen picture; pickImage(id) changes the picture of widget id.
-    // The chosen file is copied into ~/.config/yukiwidgets/images so the widget keeps working if the original moves.
     property string pickTargetId: ""
     property string pickTargetSize: "small"
     property string pickError: ""
@@ -338,13 +302,11 @@ Scope {
         }
     }
 
-    // --- persistence ---
     function scheduleSave() { if (ready) saveTimer.restart(); }
     onTempUnitChanged: { scheduleSave(); refreshSoon(); }
     onLocModeChanged: { scheduleSave(); refreshSoon(); }
     onCityNameChanged: { scheduleSave(); refreshSoon(); }
     onWidgetScaleChanged: { scheduleSave(); if (ready) rescaleTimer.restart(); }
-    // after the slider settles, snap every widget onto the new grid
     Timer { id: rescaleTimer; interval: 300; onTriggered: { root.normalizePositions(); root.recount(); root.scheduleSave(); } }
 
     function saveSettings() {
@@ -392,7 +354,6 @@ Scope {
             root.scheduleSave();
             root.refresh();
         }
-        // first start (no settings yet): a wide Now Playing widget top-left and the weather top-right, both Liquid Glass
         onLoadFailed: {
             var ss = root.screenSize();
             root.applySettings({ widgets: [
@@ -406,18 +367,14 @@ Scope {
     }
     Timer { id: saveTimer; interval: 400; onTriggered: root.saveSettings() }
 
-    // --- music player (MPRIS) ---
-    // which player to show: see PlayerPicker.qml (same rule as the Menu Bar's media widget)
     PlayerPicker { id: playerPick }
     readonly property var player: playerPick.player
-    // MPRIS does not announce the playback position; ask for it once a second while something plays and a Player widget exists
     Timer {
         interval: 1000
         repeat: true
         running: root.player !== null && root.player.isPlaying && root.count("player") > 0
         onTriggered: { try { root.player.positionChanged(); } catch (err) { } }
     }
-    // screen rectangles of the Player widgets: they stay clickable while the rest of the layer is click-through
     readonly property var playerRects: {
         var r = rev, out = [];
         for (var i = 0; i < wmodel.count; i++) {
@@ -430,7 +387,6 @@ Scope {
     }
     function pr(i, k) { var r = playerRects[i]; return r ? r[k] : 0; }
 
-    // --- weather data (Open-Meteo) ---
     property bool wxReady: false
     property string wxCity: "—"
     property bool wxLocated: true
@@ -445,11 +401,8 @@ Scope {
     property string wxPlace: ""
     property var wxHourly: []
     property var wxDaily: []
-    property string wxCoordsFor: ""          // wxKey the coordinates above belong to
+    property string wxCoordsFor: ""
 
-    // The last good forecast (and the city's coordinates) are kept in ~/.cache/yukishell/weather.json: after a restart the widget
-    // shows them at once and refreshes in the background, instead of "Loading..." and, when the first request of the session
-    // failed (no network yet, a DNS hiccup), "Unavailable" for the next 15 minutes.
     readonly property string wxKey: (locMode === "city" ? "city:" + cityName.trim().toLowerCase() : "auto") + ":" + tempUnit
     FileView {
         id: wxCacheFile
@@ -472,8 +425,6 @@ Scope {
         wxCacheFile.setText(JSON.stringify({ key: wxKey, at: Date.now(), lat: wxLat, lon: wxLon, place: wxPlace, located: wxLocated,
             temp: wxTemp, code: wxCode, day: wxDay, hi: wxHi, lo: wxLo, hourly: wxHourly, daily: wxDaily }));
     }
-    // a failed lookup is tried again soon (5 s, 15 s, 30 s, 1 min, then every 2 min) rather than at the next 15-minute refresh;
-    // meanwhile a forecast we already have stays on screen
     property int wxFails: 0
     function wxFailed(why) {
         if (!wxReady) wxError = why;
@@ -523,7 +474,6 @@ Scope {
         if (!ready || count("weather") === 0) return;
         if (locProc.running || geoProc.running || wxProc.running) return;
         if (locMode === "city" && cityName.trim() !== "") {
-            // the city's position doesn't change: once known (cache or an earlier lookup), go straight to the forecast
             if (wxPlace !== "" && !wxLocated && wxCoordsFor === wxKey) wxProc.running = true;
             else geoProc.running = true;
         }
@@ -539,7 +489,6 @@ Scope {
     }
     onWidgetCountChanged: if (count("weather") > 0 && !wxReady) refreshSoon()
 
-    // automatic location (IP): ipwho.is, falling back to ipapi.co
     Process {
         id: locProc
         stderr: StdioCollector { onStreamFinished: if (text.trim() !== "") console.log("[yukiwidgets] location curl:", text.trim().substring(0, 200)) }
@@ -559,7 +508,6 @@ Scope {
             }
         }
     }
-    // a city typed in Settings
     Process {
         id: geoProc
         stderr: StdioCollector { onStreamFinished: if (text.trim() !== "") console.log("[yukiwidgets] geocoding curl:", text.trim().substring(0, 200)) }
@@ -575,7 +523,6 @@ Scope {
                     root.wxCoordsFor = root.wxKey;
                     wxProc.running = true;
                 } catch (err) {
-                    // an empty answer is a network problem (try again soon); an answer without results is a city that doesn't exist
                     if (text.trim() !== "" && text.indexOf("results") < 0) { root.wxError = "city not found"; root.wxReady = false; }
                     else root.wxFailed("location lookup failed");
                     console.log("[yukiwidgets] geocoding:", err);
@@ -602,7 +549,6 @@ Scope {
                     root.wxDay = o.current.is_day === 1;
                     root.wxHi = Math.round(o.daily.temperature_2m_max[0]);
                     root.wxLo = Math.round(o.daily.temperature_2m_min[0]);
-                    // next hours (starting with the current one) and the coming days
                     var hrs = [], ht = o.hourly.time, cur = String(o.current.time).substring(0, 13), start = 0, i;
                     for (i = 0; i < ht.length; i++) if (ht[i].substring(0, 13) === cur) { start = i; break; }
                     for (i = start; i < ht.length && hrs.length < 6; i++)
@@ -623,9 +569,7 @@ Scope {
         }
     }
 
-    // --- Liquid Glass backend ---
-    // Same shader as the Dock / Menu Bar (liquidglass.frag), compiled with qsb into ~/.config/yukiwidgets/.
-    property string glassState: "idle"                     // idle -> building -> ready | failed
+    property string glassState: "idle"
     readonly property string glassShaderSrc: decodeURIComponent(Qt.resolvedUrl("liquidglass.frag").toString().replace("file://", ""))
     readonly property string glassShaderOut: configDir + "/liquidglass.frag.qsb"
     onAnyLiquidChanged: if (anyLiquid) startGlass()
@@ -640,7 +584,6 @@ Scope {
         id: qsbProc
         command: ["sh", "-c",
             "mkdir -p \"$(dirname \"$2\")\"; "
-            // already compiled from this very source (it is newer than the .frag): nothing to do, the glass is ready at once
             + "[ -s \"$2\" ] && [ \"$2\" -nt \"$1\" ] && exit 0; "
             + "for q in qsb qsb6 qsb-qt6 /usr/lib/qt6/bin/qsb /usr/lib64/qt6/bin/qsb /usr/lib/qt/bin/qsb; do "
             + "  if command -v \"$q\" >/dev/null 2>&1; then \"$q\" --qt6 -o \"$2\" \"$1\" && exit 0; fi; "
@@ -653,14 +596,11 @@ Scope {
     }
     Binding { target: root.hub; property: "widgetsWantWallpaper"; value: root.anyLiquid }
 
-    // animated wallpaper the widget glass plays behind itself: only while the Dock's "Real-time glass" AND "Animated wallpaper in glass" are on
     readonly property string liveWallVideo: (dock && dock.glassLive && hub && hub.bar) ? hub.bar.glassVideo : ""
-    // the widgets sit on the first screen's desktop: their video pauses with the wallpaper (Game Mode, the menu bar button, "Pause behind windows")
     readonly property bool liveWallPaused: {
         if (!hub || !hub.bar) return false;
         return Quickshell.screens.length > 0 ? hub.bar.wallIdle(Quickshell.screens[0].name) : hub.bar.gaming;
     }
-    // wallpaper behind the widgets (same lookup as the Dock's Liquid Glass)
     readonly property var wallpaperMap: hub ? hub.wallpaperMap : ({})
     function wallpaperFor(screenName) {
         var p = (dock && dock.wallpaperPath !== "") ? dock.wallpaperPath
@@ -675,7 +615,6 @@ Scope {
         return "file://" + encodeURI(p).replace(/#/g, "%23").replace(/\?/g, "%3F");
     }
 
-    // --- the desktop layer ---
     Variants {
         model: (root.ready && Quickshell.screens.length > 0 && (root.widgetCount > 0 || root.editing)) ? [Quickshell.screens[0]] : []
 
@@ -691,7 +630,6 @@ Scope {
             WlrLayershell.layer: WlrLayer.Bottom
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-            // click-through unless editing; only the Player widgets (up to 4) take clicks, for their buttons
             mask: Region {
                 item: root.editing ? ui : null
                 regions: [ Region { item: hit0 }, Region { item: hit1 }, Region { item: hit2 }, Region { item: hit3 } ]
@@ -706,11 +644,9 @@ Scope {
                 Item { id: hit2; x: root.pr(2, 0); y: root.pr(2, 1); width: root.pr(2, 2); height: root.pr(2, 3) }
                 Item { id: hit3; x: root.pr(3, 0); y: root.pr(3, 1); width: root.pr(3, 2); height: root.pr(3, 3) }
 
-                // ONE video player for every widget's glass: each widget shows its part of it through a WallSlice (it used to be one
-                // player per widget). It is never drawn itself, only through the slices.
                 LiveWall {
                     id: sharedWall
-                    opacity: 0          // never drawn itself (a ShaderEffectSource ignores its source's own opacity)
+                    opacity: 0
                     x: 0; y: 0
                     width: win.modelData.width; height: win.modelData.height
                     video: root.liveWallVideo
@@ -719,14 +655,14 @@ Scope {
                     clock: root.hub && root.hub.bar ? root.hub.bar.wallClock : null
                 }
 
-                Rectangle {   // slight dim while editing
+                Rectangle {
                     anchors.fill: parent
                     color: "black"
                     opacity: root.editing ? 0.16 : 0
                     Behavior on opacity { NumberAnimation { duration: 200 } }
                 }
 
-                Repeater {   // free Small-sized grid cells; Medium and Large snap across 2-cell footprints
+                Repeater {
                     model: {
                         var revision = root.rev;
                         return root.editing ? root.gridSlots(win.modelData.width, win.modelData.height) : [];
@@ -758,7 +694,6 @@ Scope {
                         required property real wy
                         required property string wspan
 
-                        // while the corner is dragged the widget snaps live to the grid block under the pointer ("" = not resizing)
                         property string liveSpan: ""
                         property bool liveFits: true
                         readonly property string effSpan: liveSpan !== "" ? liveSpan : wspan
@@ -787,7 +722,6 @@ Scope {
                         Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
                         z: dragArea.pressed || gripMa.pressed ? 10 : 1
 
-                        // edit mode: outline + drag + remove
                         Rectangle {
                             anchors.fill: parent
                             visible: root.editing
@@ -817,7 +751,7 @@ Scope {
                                 ww.dragDX = 0; ww.dragDY = 0;
                             }
                         }
-                        Rectangle {   // image widget: choose another picture
+                        Rectangle {
                             visible: root.editing && ww.wtype === "image"
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.bottom: parent.bottom; anchors.bottomMargin: 10
@@ -828,7 +762,6 @@ Scope {
                             Text { id: chooseText; anchors.centerIn: parent; text: I18n.tr("Choose Image\u2026"); color: "#3A3A3C"; font.family: root.fontFamily; font.pixelSize: 12 }
                             MouseArea { id: chooseMa; anchors.fill: parent; onClicked: root.pickImage(ww.wid, "small") }
                         }
-                        // resize handle (bottom-right corner): drag it to make the widget cover more or fewer grid cells (2x1, 2x2, 4x1, 4x2...)
                         Rectangle {
                             id: sizeGrip
                             visible: root.editing
@@ -838,7 +771,7 @@ Scope {
                             border.width: 1
                             border.color: Qt.rgba(0, 0, 0, 0.18)
                             z: 20
-                            Canvas {   // two diagonal arrow heads
+                            Canvas {
                                 anchors.fill: parent
                                 onPaint: {
                                     var c = getContext("2d"); c.reset();
@@ -858,7 +791,6 @@ Scope {
                                     if (!pressed) return;
                                     var p = mapToItem(ui, mouse.x, mouse.y);
                                     var g = root.gridInfo(ui.width, ui.height);
-                                    // the cell under the pointer becomes the bottom-right cell of the widget
                                     var c = Math.max(1, Math.min(root.maxCols, Math.ceil((p.x - ww.wx + root.gridGapX / 2) / g.pitchX)));
                                     var r = Math.max(1, Math.min(root.maxRows, Math.ceil((p.y - ww.wy + root.gridGapY / 2) / g.pitchY)));
                                     var sp = root.spanStr(c, r);
@@ -871,12 +803,12 @@ Scope {
                                         var sp = root.spanArr(ww.liveSpan);
                                         root.setSpan(ww.wid, sp[0], sp[1]);
                                     }
-                                    ww.liveSpan = ""; ww.liveFits = true;   // no room for that block: it springs back
+                                    ww.liveSpan = ""; ww.liveFits = true;
                                 }
                                 onCanceled: { ww.liveSpan = ""; ww.liveFits = true; }
                             }
                         }
-                        Rectangle {   // the block being picked, while resizing
+                        Rectangle {
                             visible: gripMa.pressed && ww.liveSpan !== ""
                             anchors.centerIn: parent
                             width: spanText.width + 24; height: 30; radius: 15
@@ -884,7 +816,7 @@ Scope {
                             z: 20
                             Text { id: spanText; anchors.centerIn: parent; text: ww.liveSpan.replace("x", " \u00D7 "); color: "white"; font.family: root.fontFamily; font.pixelSize: 14; font.weight: Font.DemiBold }
                         }
-                        Rectangle {   // "−" remove badge
+                        Rectangle {
                             visible: root.editing
                             x: -8; y: -8
                             width: 24; height: 24; radius: 12
@@ -904,15 +836,11 @@ Scope {
         target: "widgets"
         function refresh(): void { root.refresh(); }
         function edit(on: bool): void { root.editing = on; }
-        // add a widget (type: weather | calendar | clock | player; style: liquid | normal | light | dark; size: small | medium | large)
-        // in the first free slot, or remove the widget at `index`
         function add(type: string, style: string, size: string): bool { return root.addWidget(type, style, size, ""); }
         function remove(index: int): void { if (index >= 0 && index < wmodel.count) root.removeWidget(wmodel.get(index).wid); }
-        // move the widget at `index` to the free grid slot nearest to x, y (screen pixels)
         function move(index: int, x: int, y: int): void {
             if (index >= 0 && index < wmodel.count) root.moveWidget(wmodel.get(index).wid, x, y);
         }
-        // grid block of the widget at `index` (0 = the first one placed): cols x rows, 1..4 each; false if it does not fit
         function span(index: int, cols: int, rows: int): bool {
             if (index < 0 || index >= wmodel.count) return false;
             return root.setSpan(wmodel.get(index).wid, Math.max(1, Math.min(root.maxCols, cols)), Math.max(1, Math.min(root.maxRows, rows)));

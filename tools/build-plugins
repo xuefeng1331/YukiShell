@@ -1,8 +1,4 @@
 #!/bin/sh
-# Builds YukiShell's QML plugins and installs them to ~/.local/share/yukishell/qml (yuki-start puts that on QML_IMPORT_PATH):
-#   YukiVideo  one video decoder for the animated wallpaper in every window's Liquid Glass (shell/plugins/yukivideo)
-# Needs cmake, a C++ compiler and the Qt 6 development files (qt6-base, qt6-declarative, qt6-multimedia). Run it again after a
-# Qt update. Without the plugin the shell runs one decoder per window, as before.
 set -e
 here=$(cd "$(dirname "$0")/.." && pwd)
 dest="${XDG_DATA_HOME:-$HOME/.local/share}/yukishell/qml"
@@ -12,7 +8,6 @@ cmake -S "$here/shell/plugins/yukivideo" -B "$build" -DCMAKE_BUILD_TYPE=Release 
 cmake --build "$build" -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
 mkdir -p "$dest/YukiVideo"
 cp -f "$build/YukiVideo/qmldir" "$build/YukiVideo/yukivideo.qmltypes" "$dest/YukiVideo/"
-# replace the library by a new file (never overwrite it in place: a running shell has it mapped)
 cp -f "$build/YukiVideo/libyukivideo.so" "$dest/YukiVideo/.libyukivideo.so.new"
 mv -f "$dest/YukiVideo/.libyukivideo.so.new" "$dest/YukiVideo/libyukivideo.so"
 echo "build-plugins: YukiVideo installed in $dest (restart the shell: yuki-restart)"

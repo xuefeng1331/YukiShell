@@ -7,7 +7,6 @@
 WallFeed::WallFeed(QObject *parent)
     : QObject(parent), m_sink(new QVideoSink(this))
 {
-    // the decoder delivers frames on its own thread: copy them there, hand them out on this (the GUI) thread
     connect(m_sink, &QVideoSink::videoFrameChanged, m_sink, [this](const QVideoFrame &f) { onFrame(f); }, Qt::DirectConnection);
 }
 
@@ -55,9 +54,8 @@ void WallFeed::onFrame(const QVideoFrame &in)
     if (!in.isValid()) return;
     QVideoFrame out;
     if (in.handleType() == QVideoFrame::NoHandle) {
-        out = in;                                    // already in plain memory: every window can upload it as it is
+        out = in;
     } else {
-        // a hardware frame: download it once, every window uploads the copy to its own GPU context
         QVideoFrame src(in);
         if (!src.map(QVideoFrame::ReadOnly)) return;
         QVideoFrameFormat fmt(src.size(), src.pixelFormat());
@@ -129,7 +127,7 @@ void WallFeedOutput::rewire()
     m_conn = {};
     if (!m_feed || !m_target || !m_enabled) return;
     m_conn = connect(m_feed, &WallFeed::frameReady, this, &WallFeedOutput::push);
-    if (m_feed->hasFrame()) push(m_feed->lastFrame());          // show the current frame at once, not only from the next one
+    if (m_feed->hasFrame()) push(m_feed->lastFrame());
 }
 
 void WallFeedOutput::push(const QVideoFrame &frame)

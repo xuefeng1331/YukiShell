@@ -2,49 +2,33 @@ import QtQuick
 import "I18n.js" as I18n
 import "Fonts.js" as Fonts
 
-// Segmented control (macOS Tahoe look): a capsule track, thin dividers between the options that are not selected, and a
-// capsule that marks the chosen option.
-//
-//  * choosing another option makes the marker turn into Liquid Glass (the same shader, the same Control Center border and
-//    the same grow-and-settle motion as the knob of GlassSwitch) while it slides to the new option; it then settles back
-//    into a plain capsule
-//  * the slide is fluid: the leading edge runs ahead with a little overshoot while the trailing edge lags behind, so the
-//    marker stretches while it moves
-//  * click an option, or press the marker and drag it across the options (it follows the pointer and snaps to the
-//    nearest option on release)
-//  * the glass lens refracts the option labels, so the chosen word is seen through it
-//
-// `current` is only ever set by the owner (the usual  current: x   +   onPicked: i => x = i  pattern).
 Item {
     id: g
 
     property var model: []
     property int current: 0
-    property real segWidth: 0                 // 0: every option is as wide as its label; > 0: fixed width per option;
-                                              // < 0: all as wide as the widest label (rounded up to an even number of px)
+    property real segWidth: 0
     property real labelPad: 14
     property string fontFamily: "Open Runde"
     property real fontSize: 12
     signal picked(int index)
     signal glassFailed()
 
-    // look
     property bool dark: true
     property color textColor: dark ? "#F5F5F7" : "#1D1D1F"
     property color trackColor: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.06)
     property color trackBorder: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.07)
     property color dividerColor: dark ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.14)
     property color pillColor: dark ? "#636366" : "#FFFFFF"
-    property color baseColor: dark ? "#2B2B2D" : "#FFFFFF"       // what lies under the control (the lens refracts it)
-    // glass
-    property bool glass: false                // false: the marker stays a plain capsule
+    property color baseColor: dark ? "#2B2B2D" : "#FFFFFF"
+    property bool glass: false
     property url shaderUrl: ""
     property real glassLiquid: 1.0
     property real glassRim: 0.45
     property real glassGrain: 0.03
     property real glassTint: 0.42
     property color borderTint: "#8A9AB5"
-    property real lensStrength: 0.2           // how strongly the glass bends what is behind it (the switch knob uses 0.85)
+    property real lensStrength: 0.2
 
     height: 28
     width: segRow.width + 2 * inset
@@ -60,12 +44,10 @@ Item {
     readonly property real kh0: height - 2 * inset
     readonly property int count: model ? model.length : 0
 
-    // --- layout of the options (positions are read back from the row, so every width, fixed or from the text, works) ---
     property int geoTick: 0
     function segX(i) { var it = rep.itemAt(i); return it ? segRow.x + it.x : inset; }
     function segW(i) { var it = rep.itemAt(i); return it ? it.width : 0; }
 
-    // --- the marker: its two edges run on their own (pixels inside this item) ---
     property real pL: inset
     property real pR: inset
     property int tgtIdx: -1
@@ -73,7 +55,6 @@ Item {
     property bool dragging: false
     property int want: -1
 
-    // glass state: pressed, or just released / just changed (keeps the glass through the slide)
     property bool hold: false
     readonly property bool glassOn: ma.pressed || hold
     property real pressT: glassOn ? 1 : 0
@@ -81,7 +62,7 @@ Item {
     onGlassOnChanged: if (glassOn) ses.scheduleUpdate()
     Timer { id: holdT; interval: 480; onTriggered: g.hold = false }
 
-    readonly property real gw: height * 0.14          // the marker grows a little while it is glass
+    readonly property real gw: height * 0.14
     readonly property real gh: height * 0.07
 
     NumberAnimation { id: animL; target: g; property: "pL" }
@@ -106,11 +87,10 @@ Item {
         animL.start(); animR.start();
     }
     function commit(i) {
-        hold = true; holdT.restart();                                  // glass through the slide
+        hold = true; holdT.restart();
         settleTo(i);
         if (i !== current) { want = i; picked(i); refuse.restart(); }
     }
-    // the owner may refuse (or be slow to apply) the change: follow `current` again if it did not come
     Timer { id: refuse; interval: 1200; onTriggered: if (g.current !== g.want) g.settleTo(g.current) }
     onCurrentChanged: {
         if (!ready || dragging || ma.pressed) return;
@@ -121,7 +101,6 @@ Item {
     onCountChanged: if (ready) snap()
     Component.onCompleted: Qt.callLater(function () { geoTick++; snap(); ready = true; })
 
-    // --- track ---
     Rectangle {
         anchors.fill: parent
         radius: height / 2
@@ -129,7 +108,6 @@ Item {
         border.width: 1; border.color: g.trackBorder
     }
 
-    // --- thin dividers between the options (hidden next to the marker) ---
     Repeater {
         model: Math.max(0, g.count - 1)
         delegate: Rectangle {
@@ -144,7 +122,6 @@ Item {
         }
     }
 
-    // --- the marker, plain (the glass one fades in over it while it moves) ---
     Item {
         id: pill
         visible: g.tgtIdx >= 0
@@ -154,15 +131,13 @@ Item {
         height: g.kh0 + g.gh * g.pressT
         readonly property real rad: height / 2
         readonly property real plainOp: g.glass ? Math.max(0, Math.min(1, 1 - g.pressT * 1.4)) : 1
-        Rectangle {                                  // no glass available: a plain capsule
+        Rectangle {
             anchors.fill: parent
             visible: !g.glass
             radius: pill.rad
             color: g.pillColor
             border.width: 1; border.color: g.dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.10)
         }
-        // resting marker: a frosted Liquid Glass capsule (bright body, specular band, the Control Center rim). The refracting lens
-        // below fades in over it while the marker is pressed or sliding, so the chosen option always looks like glass.
         Item {
             anchors.fill: parent
             visible: g.glass
@@ -176,7 +151,7 @@ Item {
                 }
                 border.width: 1; border.color: g.dark ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.10)
             }
-            Rectangle {                              // specular band along the top half
+            Rectangle {
                 x: 1; y: 1
                 width: parent.width - 2; height: parent.height * 0.5
                 radius: Math.max(0, pill.rad - 1)
@@ -189,7 +164,6 @@ Item {
         }
     }
 
-    // --- the labels ---
     Row {
         id: segRow
         x: g.inset; y: g.inset
@@ -218,7 +192,6 @@ Item {
         }
     }
 
-    // --- what the lens sees (hidden copy of the track and the labels, on a backdrop) ---
     readonly property real m: 22
     Item {
         id: lyr
@@ -247,11 +220,10 @@ Item {
         sourceItem: g.glass ? lyr : null
         hideSource: true
         live: g.glass && (g.glassOn || g.pressT > 0.02)
-        mipmap: false                         // no mip blur: the lens only refracts, it never blurs
+        mipmap: false
         visible: false
     }
 
-    // --- the marker, glass ---
     Item {
         id: lens
         visible: g.tgtIdx >= 0
@@ -273,17 +245,15 @@ Item {
                     thickness: Math.round(g.kh0 * 0.7)
                     strengthMul: g.lensStrength
                     liquid: g.glassLiquid
-                    rim: g.glassRim                 // the same edge light as the Dock (liquidglass.frag)
+                    rim: g.glassRim
                     grain: g.glassGrain
                     tint: g.glassTint
                     shadowAmt: 0.5
                     flatInner: 1
-                    blurPx: 0                 // pure liquid glass: refraction only, no blur
+                    blurPx: 0
                     onFailed: g.glassFailed()
                 }
-                // same border as the Control Center buttons, sliders and switches
                 CornerBorder { z: 2; anchors.fill: parent; cornerR: lens.height / 2; dark: g.dark; tint: g.borderTint; amount: 1; lineW: 0.9 }
-                // soft specular sheen along the top
                 Rectangle {
                     anchors.fill: parent
                     radius: lens.height / 2
@@ -297,7 +267,6 @@ Item {
         }
     }
 
-    // --- mouse: click an option, or press the marker and drag it across the options ---
     MouseArea {
         id: ma
         anchors.fill: parent
@@ -335,7 +304,7 @@ Item {
         onReleased: mouse => {
             var i;
             if (g.dragging) {
-                var c = (g.pL + g.pR) / 2 + (Math.abs(vx) > 4 ? vx * 3 : 0);       // a flick carries it a little further
+                var c = (g.pL + g.pR) / 2 + (Math.abs(vx) > 4 ? vx * 3 : 0);
                 i = idxAt(c);
             } else {
                 i = idxAt(lx(mouse));

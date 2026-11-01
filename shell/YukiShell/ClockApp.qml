@@ -1,10 +1,3 @@
-// Clock - the macOS Clock app for YukiShell: World Clock, Alarms, Stopwatch, Timers.
-//
-//   qs -c YukiShell ipc call clock open            (also: clock tab alarms|world|stopwatch|timers, clock stop, clock snooze)
-//
-// Lives inside YukiShell (not its own process) so alarms and timers ring even when the window is closed. Everything is
-// saved to ~/.config/yukishell/clock.json the moment it changes (survives crashes and restarts); the Clock widget and
-// the lock screen read the same file, so a running timer / stopwatch shows there too.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
@@ -29,15 +22,14 @@ Scope {
     readonly property string soundDir: home + "/.local/share/sounds/yukishell"
     readonly property color orange: "#FF9F0A"
 
-    // --- STATE (saved) ---
-    property var alarms: []        // { id, h, m, label, on, days: [0..6] (0 = Sunday; empty = once) }
+    property var alarms: []
     property var cities: [ { name: "Cupertino", tz: "America/Los_Angeles" }, { name: "New York", tz: "America/New_York" },
                            { name: "London", tz: "Europe/London" }, { name: "Tokyo", tz: "Asia/Tokyo" } ]
-    property var timer: ({ state: "idle", total: 300000, endAt: 0, left: 300000, label: "" })   // idle | running | paused
+    property var timer: ({ state: "idle", total: 300000, endAt: 0, left: 300000, label: "" })
     property var sw: ({ running: false, startAt: 0, acc: 0, laps: [] })
-    property var recents: []       // recent timer durations (ms), newest first
-    property var snoozes: []       // { at, label }
-    property var ringing: null     // { kind: "alarm" | "timer", label, time } while it rings
+    property var recents: []
+    property var snoozes: []
+    property var ringing: null
     property bool loaded: false
 
     property real nowMs: Date.now()
@@ -77,7 +69,6 @@ Scope {
         return d.map(function (i) { return I18n.tr(n[i]); }).join(", ");
     }
 
-    // --- persistence ---
     FileView {
         id: store
         path: root.home + "/.config/yukishell/clock.json"
@@ -109,7 +100,6 @@ Scope {
             "sh", JSON.stringify({ alarms: alarms, cities: cities, timer: timer, sw: sw, recents: recents, snoozes: snoozes, ringing: ringing }, null, 1)]);
     }
 
-    // --- alarms ---
     function addAlarm(h, m, label, days) {
         var a = alarms.slice(); a.push({ id: uid(), h: h, m: m, label: label || "", on: true, days: days || [] });
         a.sort(function (x, y) { return x.h * 60 + x.m - (y.h * 60 + y.m); });
@@ -123,7 +113,6 @@ Scope {
     function setAlarmOn(id, on) { alarms = alarms.map(function (x) { if (x.id !== id) return x; var c = Object.assign({}, x); c.on = on; return c; }); save(); }
     function deleteAlarm(id) { alarms = alarms.filter(function (x) { return x.id !== id; }); save(); }
     function nextAlarmText(a) {
-        // "in 7 hr 12 min" style hint for the widget
         var d = new Date(nowMs), best = -1;
         for (var k = 0; k < 8; k++) {
             var t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + k, a.h, a.m, 0);
@@ -133,7 +122,6 @@ Scope {
         return best;
     }
 
-    // --- timer ---
     function startTimer(ms, label) {
         if (ms <= 0) return;
         timer = { state: "running", total: ms, endAt: Date.now() + ms, left: ms, label: label || "" };
@@ -144,13 +132,11 @@ Scope {
     function resumeTimer() { if (timer.state !== "paused") return; var t = Object.assign({}, timer); t.endAt = Date.now() + t.left; t.state = "running"; timer = t; save(); }
     function cancelTimer() { var t = Object.assign({}, timer); t.state = "idle"; t.left = t.total; timer = t; save(); }
 
-    // --- stopwatch ---
     function swStart() { sw = { running: true, startAt: Date.now(), acc: sw.acc, laps: sw.laps }; save(); }
     function swStop() { sw = { running: false, startAt: 0, acc: sw.acc + Date.now() - sw.startAt, laps: sw.laps }; save(); }
     function swLap() { var l = sw.laps.slice(); l.unshift(swElapsed()); sw = { running: sw.running, startAt: sw.startAt, acc: sw.acc, laps: l }; save(); }
     function swReset() { sw = { running: false, startAt: 0, acc: 0, laps: [] }; save(); }
 
-    // --- world clock: UTC offsets come from the system tz database (DST-correct), refreshed hourly ---
     property var tzOff: ({})
     readonly property int localOff: -new Date(nowMs).getTimezoneOffset()
     function refreshTz() {
@@ -206,8 +192,6 @@ Scope {
     function addCity(name, tz) { var c = cities.slice(); c.push({ name: name, tz: tz }); cities = c; save(); refreshTz(); }
     function removeCity(i) { var c = cities.slice(); c.splice(i, 1); cities = c; save(); }
 
-    // --- Tick + ringing ---
-    // 1 s normally; 30 fps only while the stopwatch is on screen and running
     Timer {
         interval: (win.visible && win.tab === 2 && root.sw.running) ? 33 : 1000
         repeat: true; running: true
@@ -270,11 +254,10 @@ Scope {
             var i = ["world", "alarms", "stopwatch", "timers"].indexOf(tabName);
             if (i >= 0) win.tab = i;
         }
-        if (dock && dock.glassState === "idle") dock.startGlass();       // builds the Liquid Glass shader the tab marker uses
+        if (dock && dock.glassState === "idle") dock.startGlass();
         win.visible = true; win.raise(); win.requestActivate();
     }
 
-    // --- RINGING BANNER (top-right, every screen's focused one) ---
     PanelWindow {
         id: banner
         screen: {
@@ -337,7 +320,6 @@ Scope {
         }
     }
 
-    // --- The window ---
     Window {
         id: win
         title: "Clock"
@@ -347,8 +329,8 @@ Scope {
         color: "transparent"
         flags: Qt.Window | Qt.FramelessWindowHint
         property int tab: 1
-        property string sheet: ""          // "" | "alarm" | "city"
-        property var editing: null         // alarm being edited
+        property string sheet: ""
+        property var editing: null
 
         QtObject {
             id: pal
@@ -375,24 +357,21 @@ Scope {
             border.width: 1; border.color: pal.border
             clip: true
 
-            // resize edges
             MouseArea { x: parent.width - 8; y: parent.height - 8; width: 8; height: 8; z: 100; cursorShape: Qt.SizeFDiagCursor; onPressed: win.startSystemResize(Qt.BottomEdge | Qt.RightEdge) }
             MouseArea { x: parent.width - 5; y: 10; width: 5; height: parent.height - 20; z: 100; cursorShape: Qt.SizeHorCursor; onPressed: win.startSystemResize(Qt.RightEdge) }
             MouseArea { x: 10; y: parent.height - 5; width: parent.width - 20; height: 5; z: 100; cursorShape: Qt.SizeVerCursor; onPressed: win.startSystemResize(Qt.BottomEdge) }
 
-            // --- toolbar ---
             Rectangle {
                 id: toolbar
                 width: parent.width; height: 52
                 color: pal.bar
                 Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: pal.sep }
                 DragHandler { target: null; onActiveChanged: if (active) win.startSystemMove() }
-                // traffic lights
                 Item {
                     x: 17; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -2
                     width: 58; height: 14
                     Row {
-                        scale: 0.93; transformOrigin: Item.TopLeft      // a touch smaller
+                        scale: 0.93; transformOrigin: Item.TopLeft
                         spacing: 8
                         Repeater {
                             model: [{ c: "#FF5F57", g: "×", on: true }, { c: "#FEBC2E", g: "−", on: false }, { c: "#28C840", g: "↗", on: true }]
@@ -443,12 +422,11 @@ Scope {
                         id: tlMa; anchors.fill: parent; hoverEnabled: true
                         onClicked: mouse => {
                             if (mouse.x < 22) win.visible = false;
-                            else if (mouse.x < 44) { }      // minimize is greyed out and does nothing
+                            else if (mouse.x < 44) { }
                             else win.visibility === Window.FullScreen ? win.showNormal() : win.showFullScreen();
                         }
                     }
                 }
-                // tabs (segmented control; the marker turns into Liquid Glass while it slides, see GlassSegmented.qml)
                 GlassSegmented {
                     id: seg
                     anchors.centerIn: parent
@@ -472,7 +450,6 @@ Scope {
                     glassTint: root.dock ? root.dock.glassOpacity : 0.42
                     borderTint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
                 }
-                // + (add)
                 Rectangle {
                     anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter
                     width: 30; height: 26; radius: 7
@@ -486,7 +463,6 @@ Scope {
                 }
             }
 
-            // --- pages ---
             Item {
                 id: pages
                 anchors.top: toolbar.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
@@ -507,7 +483,6 @@ Scope {
                 }
             }
 
-            // --- sheets ---
             Rectangle {
                 anchors.fill: parent
                 color: Qt.rgba(0, 0, 0, 0.35)
@@ -528,7 +503,6 @@ Scope {
             }
         }
 
-        // --- World Clock ---
         Component {
             id: pWorld
             Flickable {
@@ -560,7 +534,6 @@ Scope {
                                 Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.cityDayText(cc.modelData.tz); color: pal.text2; font.family: root.fam; font.pixelSize: 11 }
                                 Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.fmtHM(cc.d.getHours(), cc.d.getMinutes()) + (root.use24h ? "" : " " + root.ampm(cc.d.getHours())); color: pal.text2; font.family: root.fam; font.pixelSize: 13 }
                             }
-                            // remove (hover)
                             Rectangle {
                                 x: 6; y: 2; width: 22; height: 22; radius: 11
                                 color: "#FF453A"
@@ -581,7 +554,6 @@ Scope {
             }
         }
 
-        // --- Alarms ---
         Component {
             id: pAlarms
             Item {
@@ -626,7 +598,6 @@ Scope {
                                 color: ar.modelData.on ? pal.text2 : pal.text3
                                 font.family: root.fam; font.pixelSize: 13
                             }
-                            // delete (hover)
                             Rectangle {
                                 anchors.right: sw1.left; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter
                                 width: 26; height: 26; radius: 13
@@ -652,7 +623,6 @@ Scope {
             }
         }
 
-        // --- Stopwatch ---
         Component {
             id: pStopwatch
             Item {
@@ -691,7 +661,6 @@ Scope {
                     clip: true
                     model: root.sw.laps.length + (root.swActive ? 1 : 0)
                     readonly property var lapTimes: {
-                        // per-lap durations, newest first; index 0 = the lap in progress
                         var L = root.sw.laps, out = [];
                         var cur = parent.el - (L.length ? L[0] : 0);
                         if (root.swActive) out.push(cur);
@@ -713,18 +682,15 @@ Scope {
             }
         }
 
-        // --- Timers ---
         Component {
             id: pTimers
             Item {
                 id: tp
-                // idle: wheels + Start; running / paused: the ring
                 Item {
                     anchors.fill: parent
                     opacity: root.timerActive ? 0 : 1
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: 260 } }
-                    // the selection band behind the middle row, then the three wheels
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: wheels.y + wheels.height / 2 - 18
@@ -776,7 +742,6 @@ Scope {
                         fill: Qt.rgba(0.19, 0.82, 0.35, 0.28); ink: "#30D158"
                         onClicked: root.startTimer(((tp.parts[0] || 0) * 3600 + (tp.parts[1] || 0) * 60 + (tp.parts[2] || 0)) * 1000, tLabel.text)
                     }
-                    // recents
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.bottom: parent.bottom; anchors.bottomMargin: 18
@@ -843,7 +808,6 @@ Scope {
             }
         }
 
-        // --- sheets ---
         Component {
             id: sAlarm
             Rectangle {
@@ -877,7 +841,6 @@ Scope {
                     Wheel { ink: pal.text; fam: root.fam; id: mT; labels: root.range(60, true); fontPx: 26; start: sa.ed ? sa.ed.m : new Date().getMinutes() }
                     Wheel { ink: pal.text; fam: root.fam; id: pT; visible: !root.use24h; width: 56; labels: ["AM", "PM"]; fontPx: 20; start: sa.pm ? 1 : 0 }
                 }
-                // repeat days
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: tw.y + tw.height + 14
@@ -980,7 +943,6 @@ Scope {
         }
     }
 
-    // --- small parts ---
     function range(n, padded) { var a = []; for (var i = 0; i < n; i++) a.push(padded ? pad(i) : String(i)); return a; }
 
     component CSwitch: GlassSwitch {
@@ -1041,7 +1003,6 @@ Scope {
             c.stroke();
         }
     }
-    // analog face: white by day, black by night (macOS World Clock)
     component ClockFace: Item {
         id: cf
         property var date: new Date()
@@ -1069,7 +1030,6 @@ Scope {
                 text: index + 1; color: cf.ink; font.family: root.fam; font.pixelSize: cf.width * 0.105; font.weight: Font.Medium
             }
         }
-        // hour, minute, second hands
         Item {
             anchors.fill: parent
             rotation: (cf.date.getHours() % 12) * 30 + cf.date.getMinutes() * 0.5

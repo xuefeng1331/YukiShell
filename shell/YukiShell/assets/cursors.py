@@ -18,11 +18,9 @@ ICON_DIRS = [os.path.join(HOME, ".icons"), os.path.join(DATA, "icons")] + \
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "yukishell", "cursors")
 CONF = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config")), "yukishell", "cursor")
 
-
 def is_theme(d):
     return os.path.isdir(os.path.join(d, "cursors")) or os.path.isfile(os.path.join(d, "manifest.hl")) \
         or os.path.isdir(os.path.join(d, "hyprcursors"))
-
 
 def theme_name(d, fallback):
     for f in ("index.theme", "cursor.theme"):
@@ -36,7 +34,6 @@ def theme_name(d, fallback):
         except OSError:
             pass
     return fallback
-
 
 def xcursor_png(path, out, want=48):
     """The image of an Xcursor file closest to `want` px, written as a PNG. False if it is not an Xcursor file."""
@@ -59,7 +56,7 @@ def xcursor_png(path, out, want=48):
         rows.append(0)
         for x in range(w):
             b, g, r, a = px[(y * w + x) * 4: (y * w + x) * 4 + 4]
-            if a and a < 255:      # Xcursor pixels are premultiplied
+            if a and a < 255:
                 r, g, b = (min(255, c * 255 // a) for c in (r, g, b))
             rows += bytes((r, g, b, a))
 
@@ -72,7 +69,6 @@ def xcursor_png(path, out, want=48):
         f.write(png)
     os.replace(tmp, out)
     return True
-
 
 def preview(tid, d):
     os.makedirs(CACHE, exist_ok=True)
@@ -90,7 +86,6 @@ def preview(tid, d):
             pass
     return ""
 
-
 def list_themes():
     seen, out = set(), []
     for base in ICON_DIRS:
@@ -107,11 +102,9 @@ def list_themes():
     out.sort(key=lambda t: t["name"].lower())
     print(json.dumps(out))
 
-
 def install(src):
     src = os.path.abspath(os.path.expanduser(src))
     if not is_theme(src) and not any(is_theme(os.path.join(src, x)) for x in os.listdir(src)):
-        # a Windows cursor pack (.cur / .ani, maybe GIF animations): made into a Linux theme by wincursor.py
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import wincursor
         if wincursor.is_pack(src):
@@ -126,7 +119,7 @@ def install(src):
             os.rename(tmp, dest)
             print(tid)
             return
-    if not is_theme(src):      # a folder that holds the theme one level down (what most downloads unpack to)
+    if not is_theme(src):
         subs = [os.path.join(src, s) for s in sorted(os.listdir(src)) if is_theme(os.path.join(src, s))]
         if not subs:
             sys.exit("no cursor theme in " + src)
@@ -141,13 +134,11 @@ def install(src):
         shutil.copytree(src, dest, symlinks=True)
     print(tid)
 
-
 def run(*cmd):
     try:
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         pass
-
 
 def apply(theme, size):
     size = str(max(12, min(128, int(float(size)))))
@@ -158,7 +149,6 @@ def apply(theme, size):
     run("gsettings", "set", "org.gnome.desktop.interface", "cursor-size", size)
     run("kwriteconfig6", "--file", "kcminputrc", "--group", "Mouse", "--key", "cursorTheme", theme)
     run("kwriteconfig6", "--file", "kcminputrc", "--group", "Mouse", "--key", "cursorSize", size)
-    # X apps without a toolkit setting fall back to the "default" theme
     d = os.path.join(DATA, "icons", "default")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "index.theme"), "w") as f:
@@ -166,7 +156,6 @@ def apply(theme, size):
     os.makedirs(os.path.dirname(CONF), exist_ok=True)
     with open(CONF, "w") as f:
         f.write(f"{theme}\n{size}\n")
-
 
 if __name__ == "__main__":
     a = sys.argv[1:]

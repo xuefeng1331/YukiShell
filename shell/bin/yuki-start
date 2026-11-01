@@ -1,8 +1,4 @@
 #!/bin/sh
-# yuki-start: starts YukiShell (this repo's fork of MacShell) for the Hyprland session.
-#   yuki-start [ConfigName]      default: YukiShell
-# Your own environment variables go in ~/.config/hypr-yukishell/env
-# Log: ~/.local/state/hypr-yukishell/<ConfigName>.log
 NAME="${1:-YukiShell}"
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/hypr-yukishell"
@@ -11,46 +7,35 @@ AUTO="$STATE/auto-env"
 PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; export PATH
 
 mkdir -p "$STATE" 2>/dev/null
-# keep the log small
 if [ -f "$LOG" ] && [ "$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')" -gt 1048576 ] 2>/dev/null; then mv -f "$LOG" "$LOG.old" 2>/dev/null; fi
 log() { printf '%s yuki-start: %s\n' "$(date '+%F %T')" "$*" >> "$LOG" 2>/dev/null; }
 
 command -v qs >/dev/null 2>&1 || { echo "yuki-start: qs (quickshell) not found in PATH" >&2; log "qs (quickshell) not found in PATH"; exit 1; }
 
-# wait (up to 20 s) until the Wayland socket exists
 i=0
 while [ "$i" -lt 100 ]; do
     if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$WAYLAND_DISPLAY" ]; then break; fi
     i=$((i + 1)); sleep 0.2
 done
 
-# one supervisor per shell: the lock is held for as long as this script lives. Everything this script starts in the background
-# gets `9>&-` so that a long-lived child (awww-daemon, ...) cannot keep the lock alive after the script is gone.
 LOCK="$STATE/$NAME.lock"
 if command -v flock >/dev/null 2>&1; then
     exec 9>"$LOCK" || true
     flock -n 9 || exit 0
 fi
 
-# already running for this user? then there is nothing to do
 if pgrep -u "$(id -u)" -f "(^|/)(qs|quickshell)( .*)? (-c|--config) $NAME( |\$)" >/dev/null 2>&1; then exit 0; fi
 
-# --- environment: the variables Qt and Quickshell need, whatever started this script ---
 export XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}"
 export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-Hyprland}"
-# terminals the shell opens (About -> Open, "Run in a terminal", ...) start $SHELL: always the account's login shell, never the
-# shell of whatever script or terminal happened to (re)start YukiShell
 login_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
 [ -n "$login_shell" ] && [ -x "$login_shell" ] && export SHELL="$login_shell"
 export XDG_SESSION_DESKTOP="${XDG_SESSION_DESKTOP:-Hyprland}"
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland}"
-# YukiShell's own QML plugins (tools/build-plugins: one video decoder for all the glass); without them the shell still works
 export QML_IMPORT_PATH="${XDG_DATA_HOME:-$HOME/.local/share}/yukishell/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
-# graphics settings this script picked by itself after crashes (lowest priority), then your own settings, which win
 if [ -f "$AUTO" ]; then set -a; . "$AUTO"; set +a; fi
 if [ -f "$CONF/hypr-yukishell/env" ]; then set -a; . "$CONF/hypr-yukishell/env"; set +a
-elif [ -f "$CONF/hypr-rice/env" ]; then set -a; . "$CONF/hypr-rice/env"; set +a; fi     # installs from before the rename
-# icon theme: yours (QS_ICON_THEME or qt6ct), else the GTK one, else the first well-known theme that is installed
+elif [ -f "$CONF/hypr-rice/env" ]; then set -a; . "$CONF/hypr-rice/env"; set +a; fi
 if [ -z "${QS_ICON_THEME:-}" ] && [ -z "${QT_QPA_PLATFORMTHEME:-}" ]; then
     has_theme() { [ -f "/usr/share/icons/$1/index.theme" ] || [ -f "$HOME/.local/share/icons/$1/index.theme" ] || [ -f "$HOME/.icons/$1/index.theme" ]; }
     t=""
@@ -66,13 +51,10 @@ if [ -z "${QS_ICON_THEME:-}" ] && [ -z "${QT_QPA_PLATFORMTHEME:-}" ]; then
     fi
     [ -n "$t" ] && export QS_ICON_THEME="$t"
 fi
-# portals and services started later by D-Bus / systemd need to know the session too
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP >/dev/null 2>&1
 fi
 
-# --- wallpaper: awww forgets it at every reboot. If awww was used before (and no other wallpaper tool runs), bring it back
-# now; the shell also re-applies the wallpaper you picked, a few seconds later.
 if command -v awww-daemon >/dev/null 2>&1 && [ -n "$(ls -A "${XDG_CACHE_HOME:-$HOME/.cache}/awww" 2>/dev/null)" ] \
    && ! pgrep -x hyprpaper >/dev/null 2>&1 && ! pgrep -x swaybg >/dev/null 2>&1 && ! pgrep -x mpvpaper >/dev/null 2>&1; then
     (
@@ -81,19 +63,13 @@ if command -v awww-daemon >/dev/null 2>&1 && [ -n "$(ls -A "${XDG_CACHE_HOME:-$H
         awww restore >/dev/null 2>&1
     ) 9>&- &
 fi
-# animated wallpaper: start the player now, side by side with the shell, instead of waiting for the shell to be up and ask for it
-# (that took ~8 s after login: the shell loading, then its restore timer, then mpvpaper). The shell sees it already playing and
-# leaves it alone.
 setwall="$CONF/hypr-yukishell/scripts/yukishell-setwall.sh"
 if [ -s "$CONF/yukishell/wallpaper-video" ] && [ -x "$setwall" ] && command -v mpvpaper >/dev/null 2>&1; then
     "$setwall" --restore >/dev/null 2>&1 </dev/null 9>&- &
 fi
 
-# --- run the shell; restart it when it crashes. After repeated quick crashes, try simpler graphics settings (only the
-# ones you have not set yourself): OpenGL, then the basic render loop, then software drawing (no Liquid Glass).
-# A setting that gets the shell running is remembered in $AUTO (delete that file to go back to the defaults).
 applied=""; soft=0
-rung() { # rung <number of quick crashes so far>
+rung() {
     [ "$1" -ge 2 ] || return 0
     if [ -z "${QSG_RHI_BACKEND:-}" ]; then export QSG_RHI_BACKEND=opengl; applied="$applied QSG_RHI_BACKEND=opengl"; fi
     [ "$1" -ge 3 ] || return 0
@@ -104,7 +80,6 @@ rung() { # rung <number of quick crashes so far>
 fast=0
 while :; do
     rung "$fast"
-    # a crash while Settings was recording a new shortcut would leave Hyprland in the empty "yuki-capture" submap, where no key bind works
     command -v hyprctl >/dev/null 2>&1 && hyprctl dispatch "hl.dsp.submap('reset')" >/dev/null 2>&1
     log "starting qs -c $NAME (attempt $((fast + 1)))${applied:+, fallback settings:$applied}$([ "$soft" = 1 ] && printf ' QT_QUICK_BACKEND=software')"
     start=$(date +%s)
@@ -116,7 +91,7 @@ while :; do
     fi
     wait "$pid"
     rc=$?
-    case "$rc" in 0|130|143) exit 0 ;; esac          # quit on purpose (qs kill / Ctrl+C / SIGTERM)
+    case "$rc" in 0|130|143) exit 0 ;; esac
     now=$(date +%s)
     log "qs exited with code $rc after $((now - start)) s"
     if [ $((now - start)) -lt 5 ]; then fast=$((fast + 1)); else fast=0; fi

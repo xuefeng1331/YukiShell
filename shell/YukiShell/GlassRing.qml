@@ -1,8 +1,5 @@
 import QtQuick
 
-// The "this one is chosen" ring: a Liquid Glass frame (bright translucent rim, a dark inner hairline for thickness, a lit edge and a faint
-// halo) that springs in when `on` and fades out when it is not. Put it around a preview: `GlassRing { anchors.fill: parent; anchors.margins: -2; radius: 12; on: sel }`.
-// Its contents only exist while it is shown, so a grid of hundreds of cards doesn't carry hundreds of rings.
 Item {
     id: r
     property bool on: false
@@ -19,19 +16,19 @@ Item {
         anchors.fill: parent
         active: r.on || r.visible
         sourceComponent: Item {
-            Rectangle {                                  // halo
+            Rectangle {
                 anchors.fill: parent; anchors.margins: -2
                 radius: r.radius + 2; color: "transparent"
                 border.width: 2
                 border.color: r.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0.2, 0.3, 0.5, 0.14)
             }
-            Rectangle {                                  // the frosted rim
+            Rectangle {
                 anchors.fill: parent
                 radius: r.radius; color: "transparent"
                 border.width: r.ringW
                 border.color: r.dark ? Qt.rgba(1, 1, 1, 0.78) : Qt.rgba(0.30, 0.36, 0.48, 0.62)
             }
-            Rectangle {                                  // inner hairline: the glass has a thickness
+            Rectangle {
                 anchors.fill: parent; anchors.margins: r.ringW
                 radius: Math.max(0, r.radius - r.ringW); color: "transparent"
                 border.width: 1

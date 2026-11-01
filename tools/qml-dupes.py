@@ -9,13 +9,12 @@ import re, sys
 HANDLER = re.compile(r"(on[A-Z]\w*)\s*:")
 PROPERTY = re.compile(r"(?:readonly\s+|required\s+|default\s+)*property\s+[\w<>.]+\s+(\w+)")
 
-
 def scan(path):
     src = open(path, encoding="utf-8").read()
     found = []
-    stack = [{}]                 # one dict per open brace: key -> line it was first seen on
+    stack = [{}]
     i, n, line = 0, len(src), 1
-    at_start = True              # only the first token on a line can be a handler / property
+    at_start = True
     while i < n:
         c = src[i]
         if c == "\n":
@@ -35,7 +34,7 @@ def scan(path):
                 j += 1
             i = j + 1; at_start = False; continue
         if c == "{":
-            stack.append({}); i += 1; at_start = True; continue   # "Item { onFoo: ..." on one line still counts
+            stack.append({}); i += 1; at_start = True; continue
         if c == "}":
             if len(stack) > 1: stack.pop()
             i += 1; at_start = False; continue
@@ -47,10 +46,9 @@ def scan(path):
                 seen = stack[-1]
                 if key in seen: found.append(f"{path}:{line}: {key} already set on line {seen[key]} (same object)")
                 else: seen[key] = line
-        at_start = c == ";"      # "a: 1; onFoo: ..." on one line
+        at_start = c == ";"
         i += 1
     return found
-
 
 out = []
 for p in sys.argv[1:]:

@@ -1,15 +1,5 @@
 import QtQuick
 
-// A small Liquid Glass slab that refracts a LOCAL picture instead of the shared backdrop texture of a popover.
-// It is what the Settings window uses for its back / forward pill and for the knobs of its switches and sliders
-// (Settings has no big backdrop capture of its own), and it runs the very same liquidglass shader as the Control Center.
-//
-//  * leave `src` empty  -> the slab refracts a flat `baseColor` backdrop of its own (the back / forward pill)
-//  * hand in `src`      -> a ShaderEffectSource (mipmap: true) that holds the picture to refract, plus its size in px and
-//                          where this slab's top-left corner lies inside that picture (`origin`)
-//                          (the knobs: the picture is the track they sit on)
-//
-// `glass: false` (shader not built yet / failed) draws a plain frosted pane instead.
 Item {
     id: gs
 
@@ -22,12 +12,12 @@ Item {
     property url shaderUrl: ""
     property bool dark: true
     property real cornerR: height / 2
-    property real thickness: 16         // same meaning as GGlass.thickness in YukiBar.qml
+    property real thickness: 16
     property real strengthMul: 1.0
-    property real liquid: 1.0           // the global "Liquid strength" setting
-    property real rim: 0.45             // the default Rim: the same edge light as the Dock
+    property real liquid: 1.0
+    property real rim: 0.45
     property real grain: 0.03
-    property real tint: 0.42            // the global translucency setting (glassOpacity)
+    property real tint: 0.42
     property real tintMul: 1.0
     property real shadowAmt: 0
     property real flatInner: 1
@@ -36,9 +26,8 @@ Item {
 
     readonly property real pad: 10
     readonly property bool own: src === null
-    readonly property real ownM: 40     // margin of the slab's own backdrop (room for the refraction to reach into)
+    readonly property real ownM: 40
 
-    // --- own flat backdrop (only built when no texture is handed in) ---
     Item {
         id: ownLayer
         visible: gs.own && gs.glass
@@ -56,7 +45,6 @@ Item {
         visible: false
     }
 
-    // --- fallback: plain frosted pane ---
     Rectangle {
         visible: !gs.glass
         anchors.fill: parent
@@ -66,12 +54,9 @@ Item {
         border.color: gs.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.06)
     }
 
-    // --- the glass itself ---
     Loader {
         anchors.fill: parent
         active: gs.glass && gs.shaderUrl.toString() !== ""
-        // the shader sits inside a plain Item: a Loader resizes its root item to its own size, which would squash the
-        // padded ShaderEffect to the glass size and crop the rounded shape into a flat rectangle
         sourceComponent: Item {
             ShaderEffect {
             x: -gs.pad; y: -gs.pad

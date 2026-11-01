@@ -1,25 +1,18 @@
 import QtQuick
 
-// A small Liquid Glass tile that springs in under the pointer: a frosted white body that is brighter at the top, a soft
-// specular band along the upper half, a hairline edge, and a crisp rim light that follows the cursor (contourglow.frag).
-// It is used for the menu-bar buttons (BarHover) and for the hovered dock icon. Size, position and radius come from the user;
-// give `area` the MouseArea the pointer is over so the rim light can follow it.
-// With `glass` (a Component, e.g. the menu bar's GGlass on its own backdrop) the tile is real Liquid Glass: that slab is drawn
-// under a lighter frosted fill, and the glass's own edge light replaces the hairline and the specular band.
 Rectangle {
     id: g
 
-    property bool hot: false        // the pointer is over it
+    property bool hot: false
     property bool pressed: false
-    property bool open: false       // it is the active one (its popover is open, or it is the current workspace)
-    property bool filled: false     // resting glass for something that is in use (a workspace that has windows)
+    property bool open: false
+    property bool filled: false
     property bool dark: true
     property MouseArea area: null
     property Component glass: null
     readonly property bool glassy: glass !== null
-    readonly property real fillK: glassy ? 0.45 : 1     // the frosted fill only lifts the glass a little when there is real glass under it
+    readonly property real fillK: glassy ? 0.45 : 1
 
-    // the icon on top uses `scale: g.lift` for a small overshoot pop
     property real lift: pressed ? 0.92 : (hot ? 1.16 : 1)
     Behavior on lift { NumberAnimation { duration: 240; easing.type: Easing.OutBack; easing.overshoot: 2.6 } }
 
@@ -37,7 +30,6 @@ Rectangle {
     border.width: glassy ? 0 : 1
     border.color: g.dark ? Qt.rgba(1, 1, 1, 0.20 * g.amt) : Qt.rgba(0, 0, 0, 0.12 * g.amt)
 
-    // the Liquid Glass slab, under the fill (a negative z draws below the parent's own fill)
     Loader {
         z: -1
         anchors.fill: parent
@@ -46,7 +38,6 @@ Rectangle {
         opacity: Math.min(1, g.amt / 0.42)
     }
 
-    // specular band
     Rectangle {
         visible: !g.glassy
         x: 1; y: 1
@@ -59,7 +50,6 @@ Rectangle {
         }
     }
 
-    // rim light along the outline, brightest next to the cursor
     ShaderEffect {
         readonly property real pad: 14
         anchors.fill: parent

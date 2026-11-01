@@ -1,7 +1,3 @@
- // macOS Clock widget for the desktop widget layer.
- // styles: "light" | "dark" | "liquid"
- // sizes: Small 168x168 · Medium 358x168 · Large 358x354
-
 import QtQuick
 import QtQuick.Effects
 import "Fonts.js" as Fonts
@@ -9,7 +5,7 @@ import "Fonts.js" as Fonts
 Item {
     id: w
 
-    property string style: "light"       // "light" | "dark" | "liquid"
+    property string style: "light"
     property string size: "small"
     property real scaleF: 1.0
     property string fam: "Open Runde"
@@ -20,25 +16,22 @@ Item {
     property string previewTime: "9:41"
     property bool editing: false
 
-    // City label supplied by the widget host.
-    // Riyadh = RIY, Dubai = DXB, London = LON, New York = NYC.
     property string cityCode: "RIY"
 
-    // Liquid Glass inputs shared with Weather / Calendar.
     property bool glassReady: false
     property url shaderUrl: ""
     property url wallUrl: ""
-    property string wallVideo: ""        // animated wallpaper to play behind the glass ("" = none / real-time glass off)
-    property bool wallPaused: false      // desktop covered / Game Mode: keep the decoder idle
-    property Item wallItem: null         // a LiveWall shared by the whole window: show a slice of it instead of a decoder of our own
+    property string wallVideo: ""
+    property bool wallPaused: false
+    property Item wallItem: null
     property real screenW: 1920
     property real screenH: 1080
     property real glassOpacity: 0.42
     property real glassBlur: 5
     property real glassLiquid: 1.0
     property real glassRim: 0.45
-    property color borderTint: "#8A9AB5"      // Control Center border colour
-    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)   // "Tint the interface" (rgb = accent, a = on) for the glass shader
+    property color borderTint: "#8A9AB5"
+    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)
     property real glassGrain: 0.03
     property bool darkGlass: true
 
@@ -47,14 +40,11 @@ Item {
     readonly property bool isSmall: size === "small"
     readonly property bool isMedium: size === "medium"
     readonly property bool isLarge: size === "large"
-    // the design for its grid shape: the three classic ones, or one of the designs in ClockAlt.qml (tall | strip | hero)
     property string lay: size
     readonly property bool alt: lay === "tall" || lay === "strip" || lay === "hero"
 
-    // content scale: follows the real size of the widget, so it still fits if the host stretches it
     readonly property real u: Math.min(width, height) / 158
     readonly property real s: u
-    // same corner radius as the Weather / Calendar widgets
     readonly property real radiusPx: 28 * scaleF * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1))
 
     readonly property bool dark:
@@ -62,10 +52,8 @@ Item {
 
     readonly property bool glassOn:
         style === "liquid" && glassReady && !preview && wallUrl != ""
-    // the glass is made at once but only shown once its backdrop holds the wallpaper (an empty backdrop refracts as black):
-    // until then it sits at 1% opacity (so it still renders and fills its textures) over the plain card, then fades in
     property bool glassShown: false
-    property bool glassFull: false          // the fade-in is over: the plain card underneath can go
+    property bool glassFull: false
     onGlassOnChanged: if (!glassOn) { glassShown = false; glassFull = false; }
     onGlassShownChanged: if (glassShown) fullT.restart()
     Timer { id: fullT; interval: 250; onTriggered: w.glassFull = w.glassShown }
@@ -82,7 +70,6 @@ Item {
 
     property var now: new Date()
 
-    // Update often enough that the second ticks glide smoothly.
     Timer {
         interval: 33
         repeat: true
@@ -101,11 +88,9 @@ Item {
     readonly property string displayTime:
         preview ? previewTime : liveTime
 
-    // seconds into the minute (fractional); the Settings preview freezes the dial half way round, like the macOS picture
     readonly property real secs:
         preview ? 30.4 : w.now.getSeconds() + w.now.getMilliseconds() / 1000
 
-    // Light face.
     Rectangle {
         anchors.fill: parent
         visible: w.style === "light"
@@ -118,7 +103,6 @@ Item {
         }
     }
 
-    // Dark face.
     Rectangle {
         anchors.fill: parent
         visible: w.style === "dark"
@@ -131,7 +115,6 @@ Item {
         }
     }
 
-    // Liquid style fallback and Settings preview.
     Rectangle {
         anchors.fill: parent
         visible: w.style === "liquid" && !(w.glassOn && w.glassFull)
@@ -169,7 +152,6 @@ Item {
         }
     }
 
-    // Live wallpaper backdrop and refraction shader.
     Loader {
         anchors.fill: parent
         active: w.glassOn
@@ -178,7 +160,6 @@ Item {
 
         sourceComponent: Item {
             id: gl
-            // the backdrop has the wallpaper (or the live video slice); one more moment for the blur to render it, then show
             readonly property bool filled: wallImg.status === Image.Ready || wallImg.status === Image.Error || wslice.ready
             onFilledChanged: if (filled) showT.restart()
             Component.onCompleted: if (filled) showT.restart()
@@ -196,7 +177,6 @@ Item {
                 width: w.width + 2 * (gl.padPx + gl.margin)
                 height: w.height + 2 * (gl.padPx + gl.margin)
 
-                // the placeholder only shows when the wallpaper can't be loaded (while it loads, the glass stays clear)
                 Rectangle {
                     anchors.fill: parent
                     visible: wallImg.status === Image.Error
@@ -241,8 +221,6 @@ Item {
                 }
             }
 
-            // the window's shared video (WallSlice), straight into the blur while it plays: the backdrop (gradient + still picture) is
-            // not captured at all then, since the full-screen video covers it anyway
             WallSlice {
                 id: wslice
                 wall: w.wallItem
@@ -314,22 +292,21 @@ Item {
                 property real magnify:
                     0.08 * w.glassLiquid * Math.min(1, 90 / w.height)
                 property real rim: w.glassRim
-                property real grain: w.glassGrain * 0.3     // the Dock's glass
-                property real blurPx: 1.5            // tiny residual smoothing; the real blur is the MultiEffect pre-pass
-                property real tintMix: w.glassOpacity * 0.55     // the Dock's light, adaptive tint (no heavy widget tint)
+                property real grain: w.glassGrain * 0.3
+                property real blurPx: 1.5
+                property real tintMix: w.glassOpacity * 0.55
                 property vector4d accentTint: w.accentTint
                 property real saturation: 1.25
                 property real dark: w.dark ? 1 : 0
                 property real debug: 0
-                property real shadowAmt: 0           // no drop shadow
-                property real flatInner: 1           // no darker inner edge (needs the rebuilt liquidglass shader)
+                property real shadowAmt: 0
+                property real flatInner: 1
                 property real rimTint: 1
                 property real ringW: 0
             }
         }
     }
 
-    // Control Center border (the solid styles; Liquid Glass has the Dock's edge light from the shader instead)
     CornerBorder {
         z: 2
         visible: w.style !== "liquid"
@@ -340,9 +317,6 @@ Item {
         lineW: 0.8
     }
 
-    // --- dial ticks ---
-    // 60 ticks, one every 6 degrees starting at 12 o'clock. Each sits where its ray from the centre meets a rounded rectangle
-    // inset from the widget's edge, and points at the centre (that is how the macOS face looks, also in the corners).
     readonly property real tickLen: 5.6 * u
     readonly property var tickGeo: {
         var W = w.width, H = w.height, inset = 9 * w.u, L = w.tickLen;
@@ -354,12 +328,12 @@ Item {
             var ax = Math.abs(dx), ay = Math.abs(dy);
             var t = Math.min(ax > 1e-9 ? hw / ax : 1e9, ay > 1e-9 ? hh / ay : 1e9);
             var px = ax * t, py = ay * t;
-            if (px > cx && py > cy) {            // inside a rounded corner: meet the corner circle instead
+            if (px > cx && py > cy) {
                 var b = ax * cx + ay * cy, c = cx * cx + cy * cy - cr * cr;
                 t = b + Math.sqrt(Math.max(0, b * b - c));
                 px = ax * t; py = ay * t;
             }
-            var ex = dx < 0 ? -px : px, ey = dy < 0 ? -py : py;      // outer end of the tick, relative to the centre
+            var ex = dx < 0 ? -px : px, ey = dy < 0 ? -py : py;
             out.push({ x: W / 2 + ex - dx * L / 2, y: H / 2 + ey - dy * L / 2, a: Math.atan2(dx, -dy) * 180 / Math.PI });
         }
         return out;
@@ -373,8 +347,6 @@ Item {
 
             readonly property var tick: w.tickGeo[index]
 
-            // The seconds that already passed this minute form a dark trail that gets stronger towards the current second;
-            // the ticks still to come are faint. frac = how much of this tick's second has elapsed (smooth sweep).
             readonly property real frac: Math.max(0, Math.min(1, w.secs - index))
             readonly property real past: 0.40 + 0.58 * Math.min(1, index / Math.max(1, w.secs))
             readonly property real ahead: 0.12 + 0.28 * Math.max(0, Math.min(1, (index - w.secs) / Math.max(1, 60 - w.secs)))
@@ -390,7 +362,6 @@ Item {
         }
     }
 
-    // City label (Cupertino is "CUP" on the Mac): small, bold, grey, a fifth of the way down.
     Text {
         visible: !w.alt
         id: cityLabel
@@ -414,20 +385,18 @@ Item {
         verticalAlignment: Text.AlignVCenter
     }
 
-    // The time: Open Runde Semibold, drawn smooth (no synthetic outline, no hinting) and stretched slightly taller than wide,
-    // like the Mac Clock widget. 12-hour, no leading zero; longer times like 12:45 shrink to stay inside the ticks.
     Text {
         visible: !w.alt
         id: clockText
 
-        readonly property real xs: 0.94       // horizontal squeeze
-        readonly property real ys: 1.14       // vertical stretch
+        readonly property real xs: 0.94
+        readonly property real ys: 1.14
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
         anchors.verticalCenterOffset: -1 * w.u
 
-        width: (w.width - 56 * w.u) / xs      // layout width before the squeeze
+        width: (w.width - 56 * w.u) / xs
         height: 64 * w.u * 1.25
 
         text: w.displayTime
@@ -438,7 +407,7 @@ Item {
         font.family: w.boldFam
         font.pixelSize: 64 * w.u
         font.letterSpacing: -2.2 * w.u
-        font.features: { "tnum": 1, "ss01": 0 }   // tabular figures: the digits don't jitter as the minutes change
+        font.features: { "tnum": 1, "ss01": 0 }
 
         renderType: Text.QtRendering
         antialiasing: true
@@ -457,7 +426,6 @@ Item {
         minimumPixelSize: 10
     }
 
-    // --- the designs of the other grid shapes ---
     Loader {
         anchors.fill: parent
         z: 3

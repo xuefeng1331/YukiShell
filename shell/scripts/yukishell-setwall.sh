@@ -1,43 +1,20 @@
 #!/bin/sh
-# Set the YukiShell wallpaper: a picture (awww) or an animated one (video -> mpvpaper on every monitor).
-#   yukishell-setwall.sh <file>        apply it
-#   yukishell-setwall.sh --restore     re-apply the saved animated wallpaper at login (no-op if none)
-#   yukishell-setwall.sh --prepare <video>   only build the cached files (thumbnail frame + optimized copy)
-#   yukishell-setwall.sh --prepare-all <video>...   the same for every video in the pickers, one after another, plus the glass copy:
-#                                            picking one of them later starts at once (only one such run at a time)
-# Prints the still image the Liquid Glass should refract (the picture itself, or a frame grabbed from the video).
-# The current animated wallpaper is remembered in ~/.config/yukishell/wallpaper-video (YukiLock reads it too).
-#
-# Performance: videos are never played as-is. A 4K clip decoded once per monitor cost ~45% CPU. Each video gets a cached
-# copy sized to the largest monitor, at the clip's own frame rate up to 60 fps (H.264, hardware-decoded through VA-API: the
-# Intel iGPU when there is one, NVDEC through nvidia-vaapi-driver otherwise). It used to be cut to 30 fps, which made a
-# 60 fps wallpaper visibly choppy. The copy is built once in the background; the still frame shows meanwhile.
 state="$HOME/.config/yukishell/wallpaper-video"
 cache="$HOME/.cache/yukishell"
 mkdir -p "$HOME/.config/yukishell" "$cache/frames" "$cache/anim"
 
-# Intel render node (never the NVIDIA one, so the dGPU can stay asleep)
 igpu=""
 for n in /dev/dri/renderD*; do
     [ "$(basename "$(readlink -f "/sys/class/drm/$(basename "$n")/device/driver")")" = i915 ] && { igpu="$n"; break; }
     [ "$(basename "$(readlink -f "/sys/class/drm/$(basename "$n")/device/driver")")" = xe ] && { igpu="$n"; break; }
 done
-# video-sync=display-resample + interpolation: a 60 fps clip on a 100 / 144 Hz monitor is blended to the monitor's own rate instead of
-# holding each frame for 1 or 2 refreshes (a visible judder). Measured: +2 % of a core, no extra GPU load. The monitor's rate is
-# handed to each player as display-fps-override (below), since mpvpaper's render loop does not report it to mpv by itself.
-# load-scripts=no: mpv plugins (mpv-mpris above all) are for the mpv you watch and listen with; the wallpaper must not show up as
-# a media player in the Now Playing widget, the media keys or playerctl
 MPV_OPTS="no-audio load-scripts=no loop-file=inf profile=fast panscan=1.0 hwdec=vaapi${igpu:+ vaapi-device=$igpu} vd-lavc-threads=2 framedrop=vo video-sync=display-resample interpolation=yes tscale=oversample"
 
 is_video() { case "$(printf %s "$1" | tr 'A-Z' 'a-z')" in *.mp4|*.webm|*.mkv|*.mov|*.m4v) return 0 ;; esac; return 1; }
 key_of() { printf '%s:%s' "$1" "$(stat -c %Y "$1" 2>/dev/null)" | md5sum | cut -c1-16; }
 
-# A cached copy is only trusted when ffprobe can read a video stream from it. "Non-empty" is not enough: two overlapping runs
-# (a login restore plus the shell re-applying the wallpaper) used to share one temp file and left a big, unplayable mp4
-# that was then trusted for ever, so mpvpaper sat idle on a blank wallpaper.
 valid_video() { [ -s "$1" ] && [ "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_type -of csv=p=0 "$1" 2>/dev/null | head -n1)" = video ]; }
-# run a command while holding a per-file lock, so a second caller waits for the first conversion instead of racing it
-with_lock() {  # with_lock <lockfile> <command...>
+with_lock() {
     l="$1"; shift
     if command -v flock >/dev/null 2>&1; then ( flock 8; "$@" ) 8>"$l"; else "$@"; fi
 }
@@ -45,14 +22,13 @@ with_lock() {  # with_lock <lockfile> <command...>
 frame_for() {
     out="$cache/frames/$(key_of "$1").png"
     if [ ! -s "$out" ]; then
-        tmp="$out.$$.part.png"     # written aside and renamed, so a half-written frame is never picked up
+        tmp="$out.$$.part.png"
         { ffmpeg -loglevel error -y -ss 1 -i "$1" -frames:v 1 "$tmp" </dev/null \
             || ffmpeg -loglevel error -y -i "$1" -frames:v 1 "$tmp" </dev/null; } && mv -f "$tmp" "$out" || rm -f "$tmp"
     fi
     printf '%s' "$out"
 }
 
-# small looping preview for the pickers (animated WebP: no video player needed inside the shell)
 preview_for() {
     k=$(key_of "$1"); mkdir -p "$cache/thumbs"
     t="$cache/thumbs/$k.jpg"; w="$cache/thumbs/$k.webp"
@@ -65,9 +41,7 @@ preview_for() {
     fi
 }
 
-# low-res looping animated WebP of the whole clip: what the Liquid Glass (widgets) refracts - it's blurred anyway,
-# so 480 px at 15 fps is plenty, and an image needs no video player inside the shell
-build_glass() {  # build_glass <video> <out.webp>
+build_glass() {
     [ -s "$2" ] && return 0
     tmp="$2.$$.part.webp"
     nice -n 15 ionice -c3 ffmpeg -loglevel error -y -i "$1" -an -vf "fps=15,scale=480:-2:flags=bilinear" \
@@ -79,8 +53,6 @@ glass_for() {
     printf '%s' "$g"
 }
 
-# the 720 px copy the shell's Liquid Glass plays (YukiBar.qml, glassProxyEnsure): same file name and settings, so the shell finds it
-# ready instead of making it after the switch (6-8 s for a 4K clip, while the desktop already moved on)
 proxy_for() {
     d="$cache/glass"; mkdir -p "$d"
     k=$(printf '%s:%s:%s:%s' "$1" "$(stat -c %Y "$1" 2>/dev/null)" 720 60 | md5sum | cut -c1-16)
@@ -90,7 +62,6 @@ proxy_for() {
         -crf 30 -pix_fmt yuv420p -g 60 -movflags +faststart -f mp4 "$t" </dev/null && mv -f "$t" "$o" || rm -f "$t"
 }
 
-# width of the widest monitor (logical px), at least 1280
 target_width() {
     w=$(hyprctl -j monitors 2>/dev/null | jq '[.[] | (.width / .scale)] | max | floor' 2>/dev/null)
     case "$w" in ''|null|*[!0-9]*) w=1920 ;; esac
@@ -98,23 +69,20 @@ target_width() {
     printf '%s' "$w"
 }
 
-# optimized copy: largest-monitor width, the source's frame rate capped at 60 (-fpsmax keeps 24/25/30/50/60 fps clips as they
-# are), H.264, a keyframe every second at 60 fps
-build_anim() {  # build_anim <video> <out.mp4> <width>: re-checks under the lock, so a waiting second caller finds the finished copy
+build_anim() {
     valid_video "$2" && return 0
     rm -f "$2"
-    tmp="$2.$$.part.mp4"       # one temp file per run: concurrent runs can no longer write into each other's output
+    tmp="$2.$$.part.mp4"
     nice -n 15 ionice -c3 ffmpeg -loglevel error -y -i "$1" -an \
         -vf "scale='min($3,iw)':-2:flags=lanczos" -fpsmax 60 \
         -c:v libx264 -preset faster -crf 21 -pix_fmt yuv420p -g 60 -movflags +faststart "$tmp" </dev/null \
         && valid_video "$tmp" && mv -f "$tmp" "$2" || rm -f "$tmp"
 }
-anim_path() { printf '%s' "$cache/anim/$(key_of "$1")-$(target_width)-f60.mp4"; }    # "-f60": built at up to 60 fps (the old 30 fps copies have no suffix)
+anim_path() { printf '%s' "$cache/anim/$(key_of "$1")-$(target_width)-f60.mp4"; }
 anim_for() {
     tw=$(target_width)
     out=$(anim_path "$1")
     valid_video "$out" || with_lock "$out.lock" build_anim "$1" "$out" "$tw"
-    # could not build a usable copy: play the original (heavier, but never a blank wallpaper)
     valid_video "$out" || { printf '%s' "$1"; return; }
     printf '%s' "$out"
 }
@@ -128,23 +96,18 @@ awww_ready() {
 
 supfile="$cache/wallsup.pid"
 stop_video() {
-    # the supervisor runs in its own process group (setsid): stop the whole group, nothing else
     if [ -f "$supfile" ]; then
-        # every supervisor appends its pid; the pid is only trusted if it is still one of ours (pids get reused)
         while read -r g; do
             [ -n "$g" ] && tr '\0' ' ' < "/proc/$g/cmdline" 2>/dev/null | grep -q ' wallsup ' && kill -TERM -- "-$g" 2>/dev/null
         done < "$supfile"
         rm -f "$supfile"
     fi
-    # mpvpaper can ignore SIGTERM (and a Game Mode SIGSTOP blocks it): wake it, ask, then force it
     pkill -CONT -x mpvpaper 2>/dev/null
     pkill -TERM -x mpvpaper 2>/dev/null
     for i in 1 2 3 4 5; do pgrep -x mpvpaper >/dev/null || break; sleep 0.1; done
     pkill -KILL -x mpvpaper 2>/dev/null
 }
 
-# this video is already the wallpaper and its supervisor is alive (yuki-start restored it at login before the shell was up):
-# nothing to do. Restarting it would make the desktop blink and start the clip over.
 video_running() {
     [ "$(cat "$state" 2>/dev/null)" = "$1" ] && [ -f "$supfile" ] || return 1
     while read -r g; do
@@ -153,14 +116,11 @@ video_running() {
     return 1
 }
 
-# keeps mpvpaper running for as long as this video is the chosen wallpaper (restarts it if it crashes)
 start_video() {
     src="$1"; play="$2"
-    valid_video "$play" || play="$src"      # never hand mpvpaper a file it cannot play: it would stay running and show nothing
+    valid_video "$play" || play="$src"
     stop_video
-    printf '%s\n' "$play" > "$HOME/.config/yukishell/wallpaper-video-play"     # the optimized copy (YukiLock plays this one)
-    # one supervised mpvpaper per monitor, each with an IPC socket: YukiShell pauses a monitor's video while windows
-    # cover it (or the screen is locked) and resumes it when the desktop shows again - no decoding nobody can see
+    printf '%s\n' "$play" > "$HOME/.config/yukishell/wallpaper-video-play"
     outs=$(hyprctl -j monitors 2>/dev/null | jq -r '.[].name' 2>/dev/null); [ -n "$outs" ] || outs=ALL
     run="${XDG_RUNTIME_DIR:-/tmp}"
     setsid sh -c '
@@ -193,11 +153,9 @@ start_video() {
         wait
     ' wallsup "$src" "$play" "$state" "$MPV_OPTS" "$supfile" "$run" "$(dirname "$(readlink -f "$0")")/yukishell-wallpause.sh" $outs >/dev/null 2>&1 </dev/null 8>&- &
 }
-# the running players move over to another file of the same clip (the optimized copy, once it is built) at the frame they are
-# showing, through their IPC sockets: no restart, so the desktop does not blink or start the clip over
-swap_video() {  # swap_video <file>
+swap_video() {
     printf '%s\n' "$1" > "$HOME/.config/yukishell/wallpaper-video-play"
-    command -v python3 >/dev/null 2>&1 || return 0     # without it the copy is used from the next start on
+    command -v python3 >/dev/null 2>&1 || return 0
     for sock in "${XDG_RUNTIME_DIR:-/tmp}"/yukishell-mpv-*.sock; do
         [ -S "$sock" ] || continue
         python3 -I - "$sock" "$1" <<'PY' >/dev/null 2>&1
@@ -229,16 +187,14 @@ PY
     done
 }
 
-# stopping the old player and starting the new one is one step: two callers at once (the login restore and the shell re-applying the
-# wallpaper) each stopped "the" player, then each started their own, and the desktop ended up decoding the video twice
 change_video() { with_lock "$cache/wallpaper-start.lock" "$@"; }
 
 case "$1" in
     --prepare-all)
         shift
         exec 7>"$cache/prepare.lock"
-        command -v flock >/dev/null 2>&1 && { flock -n 7 || exit 0; }      # one run builds them all; a second one has nothing to add
-        for v do [ -f "$v" ] && is_video "$v" && preview_for "$v"; done       # the pickers' previews first: they are quick and on screen
+        command -v flock >/dev/null 2>&1 && { flock -n 7 || exit 0; }
+        for v do [ -f "$v" ] && is_video "$v" && preview_for "$v"; done
         for v do
             [ -f "$v" ] && is_video "$v" || continue
             frame_for "$v" >/dev/null; anim_for "$v" >/dev/null; proxy_for "$v"
@@ -257,9 +213,6 @@ if is_video "$f"; then
     still=$(frame_for "$f")
     if video_running "$f"; then printf '%s\n' "$still"; exit 0; fi
     printf '%s\n' "$f" > "$state"
-    # the frame goes up first, so there is never a black flash and the glass has something to refract right away
-    # (at login awww has usually restored that very frame already: then it is not faded in a second time;
-    # at login the player must not wait for the awww daemon to come up, so there this runs on the side)
     put_still() {
         if awww_ready && [ -s "$still" ] && ! { [ "$1" = --restore ] && awww query 2>/dev/null | grep -qF -- "$still"; }; then
             awww img "$still" --transition-type grow --transition-duration 0.8 >/dev/null 2>&1
@@ -267,13 +220,10 @@ if is_video "$f"; then
     }
     if [ "$1" = --restore ]; then put_still --restore >/dev/null 2>&1 </dev/null & else put_still; fi
     printf '%s\n' "$still"
-    # Play at once: the optimized copy if it was built before, otherwise the original right away. Building the copy of a 4K clip takes
-    # 10-15 s, and waiting for it left the OLD video playing on the desktop (on top of the new still) while the glass, whose own small
-    # copy is quicker to make, already showed the new one. The copy is built meanwhile and the players move over to it when it is done.
     (
         copy=$(anim_path "$f")
         if valid_video "$copy"; then play="$copy"; else play="$f"; fi
-        [ "$(cat "$state" 2>/dev/null)" = "$f" ] || exit 0      # another wallpaper was picked meanwhile
+        [ "$(cat "$state" 2>/dev/null)" = "$f" ] || exit 0
         change_video start_video "$f" "$play"
         if [ "$play" = "$f" ]; then
             play=$(anim_for "$f")

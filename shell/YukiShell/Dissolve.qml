@@ -1,4 +1,3 @@
-// Disintegrate a card (cleared notifications): put the card inside, call dissolve(delayMs); `done` fires when it is gone.
 import QtQuick
 
 Item {
@@ -7,7 +6,7 @@ Item {
     property real progress: 0
     property int duration: 900
     property real pad: 70
-    property real cardH: height          // the card's real height (the slot itself may shrink while it dissolves)
+    property real cardH: height
     signal done()
     function dissolve(delay) { dzDelay.interval = Math.max(1, delay || 1); dzDelay.restart(); }
     Timer { id: dzDelay; onTriggered: { snap.scheduleUpdate(); dzAnim.restart(); } }

@@ -23,7 +23,7 @@ def write(g, k, v):
 
 for g, kv in groups.items():
     if g == "General":
-        continue                        # the scheme's own name/ColorScheme keys; kdeglobals keeps its own [General]
+        continue
     for k, v in kv:
         write(g, k, v)
 write("General", "ColorScheme", name)

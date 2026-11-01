@@ -1,16 +1,11 @@
 import QtQuick
 import "Fonts.js" as Fonts
 
-// The Weather widget's designs for the other grid shapes (WeatherWidget.qml draws the card, this only the contents):
-//   tall   one column, 2+ rows   now on top, then the coming hours as a list
-//   strip  4 x 1                 now on the left, the week across as columns with a temperature range bar each
-//   hero   4 columns, 2+ rows    a big "now" panel on the left; the hours across and the week as a list on the right
 Item {
     id: a
     property Item wd
     property string lay: "tall"
 
-    // px per design pixel: the designs are drawn for 185 x 385 (tall), 809 x 185 (strip) and 809 x 385 (hero) at Widget size 100%
     readonly property real u: lay === "tall" ? Math.min(width / 185, height / 385)
                             : (lay === "strip" ? Math.min(width / 809, height / 185) : Math.min(width / 809, height / 385))
     readonly property real pad: 16 * u
@@ -28,12 +23,10 @@ Item {
         font.weight: weight
         elide: Text.ElideRight
     }
-    // the week's lowest / highest temperature, for the range bars
     readonly property real wkMin: { var m = 1e9; for (var i = 0; i < days.length; i++) m = Math.min(m, days[i].lo); return m; }
     readonly property real wkMax: { var m = -1e9; for (var i = 0; i < days.length; i++) m = Math.max(m, days[i].hi); return m; }
     readonly property real wkSpan: Math.max(1, wkMax - wkMin)
 
-    // ---------- tall ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "tall"
@@ -67,7 +60,6 @@ Item {
         }
     }
 
-    // ---------- strip ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "strip"
@@ -97,7 +89,6 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter; y: 44 * a.u
                         kind: modelData.k; size: 20 * a.u
                     }
-                    // this day's range on the week's scale: a short vertical bar, high on top
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: 76 * a.u; width: 5 * a.u; height: 54 * a.u; radius: width / 2
@@ -116,12 +107,10 @@ Item {
         }
     }
 
-    // ---------- hero ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "hero"
         readonly property real panelW: 290 * a.u
-        // now: a big panel of its own
         Label { x: 26 * a.u; y: 24 * a.u; width: 250 * a.u; text: a.wd.city; px: 18 }
         Label { id: hTemp; x: 20 * a.u; y: 50 * a.u; text: a.deg(a.wd.temp); px: 104; weight: Font.Light }
         WeatherIcon { light: !a.wd.dark;
@@ -132,7 +121,6 @@ Item {
         Label { x: 26 * a.u; y: hTemp.y + hTemp.height + 6 * a.u; width: 250 * a.u; text: a.wd.cond; px: 20 }
         Label { x: 26 * a.u; y: hTemp.y + hTemp.height + 34 * a.u; text: a.wd.hasData ? "H:" + a.deg(a.wd.hi) + "   L:" + a.deg(a.wd.lo) : ""; px: 16; color: a.wd.fgSub }
         Rectangle { x: parent.panelW; y: 24 * a.u; width: 1; height: parent.height - 48 * a.u; color: a.wd.line }
-        // the coming hours across the top
         Row {
             id: hHours
             x: parent.panelW + 20 * a.u; y: 22 * a.u
@@ -154,7 +142,6 @@ Item {
             }
         }
         Rectangle { id: hLine; x: parent.panelW + 20 * a.u; y: 116 * a.u; width: a.width - x - 22 * a.u; height: 1; color: a.wd.line }
-        // the week as a list with range bars
         Column {
             x: parent.panelW + 20 * a.u; y: hLine.y + 6 * a.u
             width: a.width - x - 22 * a.u

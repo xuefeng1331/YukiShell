@@ -1,11 +1,9 @@
-// One Liquid Glass slab (pill, card, button) that refracts the shared, pre-blurred lock screen backdrop.
-// Same uniforms / tuning as YukiShell's GGlass (YukiBar.qml), so it looks like the bar's popovers.
 import QtQuick
 
 Item {
     id: gg
-    property var src: null              // ShaderEffectSource with mipmaps: the blurred scene
-    property Item frame: null           // coordinate space the backdrop texture covers (the whole screen)
+    property var src: null
+    property Item frame: null
     property url shaderUrl: Qt.resolvedUrl("liquidglass.frag.qsb")
     property real cornerR: 22
     property real thickness: 24
@@ -17,7 +15,6 @@ Item {
     readonly property real pad: 10
     readonly property bool failed: fx.status === ShaderEffect.Error
 
-    // position inside `frame`; reads every ancestor's x/y so it follows animated parents
     function framePos() {
         var px = 0, py = 0, it = gg;
         while (it && it !== frame) { px += it.x; py += it.y; it = it.parent; }
@@ -25,7 +22,6 @@ Item {
     }
     readonly property point fp: framePos()
 
-    // flat fallback if the shader can't load
     Rectangle {
         visible: gg.failed || !gg.src
         anchors.fill: parent

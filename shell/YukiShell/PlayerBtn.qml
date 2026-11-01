@@ -7,14 +7,13 @@ Item {
     required property var wd
     property string kind: "play"
     property color col: "white"
-    property real gw: 30                 // glyph size in px
+    property real gw: 30
     property real gh: 30
-    property bool on: false              // shuffle / repeat engaged: round highlight behind the glyph
+    property bool on: false
     property bool enabledBtn: true
-    property string badge: ""            // "1" for repeat-one
-    property bool idleFill: false        // faint round background even when switched off
+    property string badge: ""
+    property bool idleFill: false
     signal clicked()
-    // morph state
     property bool useA: true
     property string kindA: kind
     property string kindB: kind
@@ -47,7 +46,6 @@ Item {
         visible: b.on || b.idleFill
         Behavior on color { ColorAnimation { duration: 200 } }
     }
-    // hover: a soft round highlight grows in behind the glyph
     Rectangle {
         anchors.centerIn: parent
         width: Math.min(b.width, b.height) * 1.08
@@ -60,8 +58,6 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutBack } }
     }
-    // icon: morphs into the next one (old glyph blurs + shrinks away, new one comes into focus);
-    // back / forward also give a motion-blur nudge when clicked
     Item {
         id: icon
         anchors.centerIn: parent

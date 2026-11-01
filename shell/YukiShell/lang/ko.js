@@ -1,6 +1,5 @@
 .pragma library
 
-// Korean interface strings. Keys are the English texts exactly as written in the QML files.
 var strings = {
     " Connected": " 개 연결됨",
     " Hz · Scale ": " Hz · 배율 ",

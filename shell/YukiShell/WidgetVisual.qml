@@ -1,5 +1,3 @@
-// One desktop widget's content (Weather / Calendar / Clock / Player). Used by YukiWidgets.qml for the desktop layer and by
-// YukiBar.qml to mirror the widgets into the Liquid Glass backdrop, so a menu refracts them together with the live windows.
 import QtQuick
 import Quickshell
 import Quickshell.Services.Mpris
@@ -7,9 +5,8 @@ import "I18n.js" as I18n
 
 Item {
     id: v
-    required property var host           // the YukiWidgets instance (data, glass state, wallpaper lookup)
+    required property var host
 
-    // the player's icon: its desktop entry, else its name ("chromium-browser" -> "chromium"); "" when the theme has none
     function playerIcon(p) {
         var d = p.desktopEntry || "", n = p.identity || "";
         var c = [d, d.replace(/-browser$/, ""), n, n.toLowerCase(), n.toLowerCase().replace(/\s+/g, "-")];
@@ -24,20 +21,19 @@ Item {
     property string wstyle: "liquid"
     property string wsize: "small"
     property string wmode: "auto"
-    property string wsrc: ""             // image widget: path of the picture
-    property string wlay: wsize          // the design for its grid shape: small | medium | large | tall | strip | hero
-    property real sx: 0                  // position on the screen (the glass uses it to find the wallpaper behind the widget)
+    property string wsrc: ""
+    property string wlay: wsize
+    property real sx: 0
     property real sy: 0
-    property string sname: ""            // screen name
+    property string sname: ""
     property real sw: 1920
     property real sh: 1080
-    // how much bigger this widget's grid block is than its design's own block (a 4x2 Calendar draws its 2x2 design larger)
     readonly property real fit: {
         if (width <= 0 || height <= 0 || !host || !host.dims) return 1;
         var d = host.dims(wsize);
         return Math.max(0.5, Math.min(width / d[0], height / d[1]));
     }
-    property Item wallItem: null         // the window's shared LiveWall (LiveWall.qml / WallSlice.qml), if it has one
+    property Item wallItem: null
         Component {
             id: weatherVisual
             WeatherWidget {
@@ -206,7 +202,6 @@ Item {
                 onToggleShuffle: { if (host.player && host.player.shuffleSupported) host.player.shuffle = !host.player.shuffle; }
                 onCycleLoop: {
                     if (!host.player || !host.player.loopSupported) return;
-                    // off -> repeat all -> repeat song -> off
                     var ls = host.player.loopState;
                     host.player.loopState = ls === MprisLoopState.None ? MprisLoopState.Playlist
                                           : (ls === MprisLoopState.Playlist ? MprisLoopState.Track : MprisLoopState.None);

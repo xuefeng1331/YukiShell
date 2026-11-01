@@ -1,6 +1,5 @@
 .pragma library
 
-// Vietnamese interface strings. Keys are the English texts exactly as written in the QML files.
 var strings = {
     " Connected": " đã kết nối",
     " Hz · Scale ": " Hz · Tỷ lệ ",

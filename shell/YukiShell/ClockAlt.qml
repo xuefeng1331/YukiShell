@@ -2,10 +2,6 @@ import QtQuick
 import "Fonts.js" as Fonts
 import "I18n.js" as I18n
 
-// The Clock widget's designs for the other grid shapes (ClockWidget.qml draws the card, this only the contents):
-//   tall   one column, 2+ rows   hours over minutes on two tiles (like a flip clock), the date underneath
-//   strip  4 x 1                 the time, a bar that sweeps with the seconds, and the date
-//   hero   4 columns, 2+ rows    an analog face with a sweeping second hand next to the digital time and the date
 Item {
     id: a
     property Item wd
@@ -17,7 +13,7 @@ Item {
     readonly property color ink: wd && wd.dark ? "#FFFFFF" : "#0C0D0F"
     readonly property color ink2: wd && wd.dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.5)
     readonly property color tile: wd && wd.dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.05)
-    readonly property color hand: "#FF9F0A"         // the second hand / seconds bar
+    readonly property color hand: "#FF9F0A"
     readonly property int h12: { var h = now.getHours() % 12; return h === 0 ? 12 : h; }
     readonly property string mm: ("0" + now.getMinutes()).slice(-2)
     readonly property string ampm: now.getHours() < 12 ? "AM" : "PM"
@@ -33,7 +29,6 @@ Item {
         font.weight: weight
         font.features: { "tnum": 1 }
     }
-    // a digit tile: the number on a soft rounded square, with a hairline across the middle like a flip card
     component Tile: Rectangle {
         property string txt
         radius: 18 * a.u
@@ -49,7 +44,6 @@ Item {
         Rectangle { width: parent.width; height: Math.max(1, 1.2 * a.u); y: parent.height / 2; color: a.wd.dark ? Qt.rgba(0, 0, 0, 0.35) : Qt.rgba(1, 1, 1, 0.7) }
     }
 
-    // ---------- tall ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "tall"
@@ -61,7 +55,6 @@ Item {
             Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.h12 }
             Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.mm }
         }
-        // the seconds: a row of dots that fills as the minute goes by
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             y: parent.height - 66 * a.u
@@ -78,7 +71,6 @@ Item {
         Label { anchors.horizontalCenter: parent.horizontalCenter; y: parent.height - 46 * a.u; width: parent.width - 20 * a.u; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight; text: a.dateText; px: 12; color: a.ink2 }
     }
 
-    // ---------- strip ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "strip"
@@ -95,7 +87,6 @@ Item {
             }
             Label { anchors.baseline: parent.children[0].baseline; text: a.ampm; px: 20; color: a.ink2 }
         }
-        // the minute as a bar: it fills with the seconds and starts over
         Item {
             id: sBar
             x: 330 * a.u; width: a.width - x - 260 * a.u; height: 8 * a.u
@@ -112,11 +103,9 @@ Item {
         }
     }
 
-    // ---------- hero ----------
     Item {
         anchors.fill: parent
         visible: a.lay === "hero"
-        // the analog face
         Item {
             id: face
             readonly property real d: a.height - 48 * a.u
@@ -138,7 +127,7 @@ Item {
                     }
                 }
             }
-            Repeater {   // the hour numbers
+            Repeater {
                 model: 12
                 delegate: Label {
                     required property int index
@@ -165,7 +154,6 @@ Item {
             Hand { angle: a.secs * 6; len: face.width * 0.42; back: 18 * a.u; width: 2 * a.u; color: a.hand }
             Rectangle { anchors.centerIn: parent; width: 10 * a.u; height: width; radius: width / 2; color: a.hand; border.width: 2 * a.u; border.color: a.ink }
         }
-        // the digital time and the date
         Column {
             x: face.x + face.width + 44 * a.u; anchors.verticalCenter: parent.verticalCenter
             spacing: 2 * a.u

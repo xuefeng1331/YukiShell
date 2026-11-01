@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Super+Alt+D: toggle the dashboard - fff on the left, tty-clock top-right, cava bottom-right (kitty windows, tiled).
-# Press again to close them. Windows are tagged by class (dash-*) so nothing else is touched.
 count() { hyprctl -j clients | python3 -c 'import json,sys; print(sum(c["class"].startswith("dash-") for c in json.load(sys.stdin)))'; }
 
 if [ "$(count)" -gt 0 ]; then
@@ -9,21 +7,16 @@ if [ "$(count)" -gt 0 ]; then
     exit 0
 fi
 
-open() {  # open <class> <command...>; wait for the window before the next one so the tiling splits in order
+open() {
     local n; n=$(count); local cls=$1; shift
-    # started by Hyprland with { tile = true } (like Super+E's Dolphin): "Open windows floating" (Settings -> Windows, on by
-    # default) floats every other new window, which piled the three on top of each other in the middle of the screen
     hyprctl dispatch "hl.dsp.exec_cmd([[kitty --class $cls $*]], { tile = true })" >/dev/null
     for _ in $(seq 40); do [ "$(count)" -gt "$n" ] && break; sleep 0.05; done
 }
 pre() { hyprctl dispatch "hl.dsp.layout(\"preselect $1\")" >/dev/null; }
-# cava first (fills the workspace), then fff splits off above it, then the clock splits off to fff's right.
 open dash-cava  cava -p "$HOME/.config/cava/dashboard.conf"
 pre u; open dash-fff   fish -C fff
 pre r; open dash-clock tty-clock -scb -C 5
-# fff exactly 1000 px wide (the clock window takes up the slack)
 read -r fff w < <(hyprctl -j clients | python3 -c 'import json,sys; c=next(c for c in json.load(sys.stdin) if c["class"]=="dash-fff"); print(c["address"], c["size"][0])')
 hyprctl dispatch "hl.dsp.window.resize({ x = $((1000 - w)), y = 0, relative = true, window = \"address:$fff\" })" >/dev/null
-# cava 100 px taller (the top row, fff + clock, gives up the same 100 px)
 cava=$(hyprctl -j clients | python3 -c 'import json,sys; print(next(c["address"] for c in json.load(sys.stdin) if c["class"]=="dash-cava"))')
 hyprctl dispatch "hl.dsp.window.resize({ x = 0, y = -100, relative = true, window = \"address:$cava\" })" >/dev/null

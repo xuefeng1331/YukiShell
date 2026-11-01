@@ -1,16 +1,3 @@
-// macOS Tahoe "Now Playing" widget (MPRIS: Spotify, Firefox, mpv, VLC, ...).
-//   size:  "small"  - art, play / pause, title + scrolling artist line
-//          "medium" - the wide Now Playing card: art, title, scrolling subtitle, waves, progress + times, shuffle / back / play / forward / repeat
-//          "large"  - the same card, taller, with big artwork
-//   Everything is drawn in "reference units" (RU): the wide card scales to the shell's 358 x 168 Medium footprint.
-//   style: "light"  - plain light card (same face as the Clock widget), dark text
-//          "dark"   - plain dark card (same face as the Clock widget), white text
-//          "liquid" - normal Liquid Glass (Appearance sliders), exactly like the Clock / Calendar / Weather widgets
-//
-// The light and dark cards take their colour from the artwork (a pale / deep version of it). The liquid card never does.
-//
-// This file only draws. YukiWidgets.qml owns the MPRIS player and feeds the data properties; the buttons emit
-// togglePlaying() / nextTrack() / previousTrack().
 import QtQuick
 import QtQuick.Effects
 import "I18n.js" as I18n
@@ -19,83 +6,75 @@ import "Fonts.js" as Fonts
 Item {
     id: w
 
-    // --- look ---
-    property string style: "dark"            // "light" | "dark" | "liquid"
+    property string style: "dark"
     property string size: "small"
     property real scaleF: 1.0
-    property real contentScale: 1.0          // scales art / text / buttons; the card itself keeps the widget's full size
+    property real contentScale: 1.0
     property string fam: "Open Runde"
     property real screenX: x
     property real screenY: y
-    property bool preview: false             // inside the Settings gallery: sample data, no wallpaper, not clickable
+    property bool preview: false
     property bool editing: false
 
-    // --- data (from YukiWidgets) ---
     property bool hasPlayer: false
     property string title: ""
     property string artist: ""
     property string album: ""
     property string artUrl: ""
-    property string appName: ""              // the player's own name ("Chromium", "Spotify"): fallback text
-    property string appIcon: ""              // its icon (file path): fallback artwork when the track has no cover
+    property string appName: ""
+    property string appIcon: ""
     property bool playing: false
-    property bool paused: false              // paused (not stopped): the visualizer stays frozen where the song stopped
-    property real position: 0                // seconds
-    property real length: 0                  // seconds (0 = unknown)
+    property bool paused: false
+    property real position: 0
+    property real length: 0
 
     property bool shuffle: false
-    property int loop: 0                     // 0 = off, 1 = repeat song, 2 = repeat all
+    property int loop: 0
     property bool canShuffle: true
     property bool canLoop: true
 
     property bool canSeek: false
 
-    // audio visualizer: bars rising from the bottom of the card, behind the controls (spectrum from the shell's AudioVis)
     property var visSrc: null
     property bool visOn: false
-    property string visStyle: "bars"         // bars | mirror | wave
-    property string visColor: "white"        // art | white | accent
+    property string visStyle: "bars"
+    property string visColor: "white"
     property real visGain: 2.0
-    property int visCount: 128               // columns (Settings -> Widgets -> Audio Visualizer)
-    property real visWidth: 0.7              // bar width as a share of its column
+    property int visCount: 128
+    property real visWidth: 0.7
     property color visAccent: "#0A84FF"
-    // Settings -> Widgets -> Music Widget
-    property real glowAmt: 0.6               // cover glow: the album art lights the card from behind (0 = off)
-    property bool motion: true               // living artwork (off with Reduce Motion)
-    property string barStyle: "slim"         // progress bar: slim | bold
-    property string visMode: "ambient"       // visualizer: ambient (soft glowing wave along the bottom) | strip (bars behind the controls)
+    property real glowAmt: 0.6
+    property bool motion: true
+    property string barStyle: "slim"
+    property string visMode: "ambient"
 
     signal seek(real seconds)
-    signal raiseRequested()                  // click on the artwork: bring the player's window forward
+    signal raiseRequested()
     signal togglePlaying()
     signal nextTrack()
     signal previousTrack()
     signal toggleShuffle()
     signal cycleLoop()
 
-    // --- liquid glass inputs (the Appearance sliders), same as the other widgets ---
     property bool glassReady: false
     property url shaderUrl: ""
     property url wallUrl: ""
-    property string wallVideo: ""        // animated wallpaper to play behind the glass ("" = none / real-time glass off)
-    property bool wallPaused: false      // desktop covered / Game Mode: keep the decoder idle
-    property Item wallItem: null         // a LiveWall shared by the whole window: show a slice of it instead of a decoder of our own
+    property string wallVideo: ""
+    property bool wallPaused: false
+    property Item wallItem: null
     property real screenW: 1920
     property real screenH: 1080
     property real glassOpacity: 0.42
     property real glassBlur: 5
     property real glassLiquid: 1.0
     property real glassRim: 0.45
-    property color borderTint: "#8A9AB5"      // Control Center border colour
-    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)   // "Tint the interface" (rgb = accent, a = on) for the glass shader
+    property color borderTint: "#8A9AB5"
+    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)
     property real glassGrain: 0.03
     property bool darkGlass: true
 
     signal glassFailed()
 
-    // the design for its grid shape: the three classic ones (size), or tall (one column, 2+ rows: a portrait card), strip
-    // (4 x 1: everything on one line) or hero (4 columns, 2+ rows: a big cover and a Now Playing column). The isSmall / isMedium /
-    // isLarge flags only mean the classic designs.
     property string lay: size
     readonly property bool isTall: lay === "tall"
     readonly property bool isStrip: lay === "strip"
@@ -105,15 +84,13 @@ Item {
     readonly property bool isMedium: size === "medium" && !alt
     readonly property bool isLarge: size === "large" && !alt
 
-    // RU -> px. It follows the real size of the widget, so it still fits if the host stretches it.
-    // On a bigger grid block the side that runs out first decides, and the layout stretches along the other one.
     readonly property real k0: isSmall ? Math.min(width, height) / 202
                              : isTall ? width / 202
                              : (isMedium || isStrip) ? Math.min(height / 202, width / 430)
                              : isHero ? height / 376
                              : Math.min(width / 446, height / 441)
-    readonly property real k: contentScale * k0        // RU -> px for the contents
-    readonly property real wr: width / k               // card size in RU: the layout stretches to fill the whole card
+    readonly property real k: contentScale * k0
+    readonly property real wr: width / k
     readonly property real hr: height / k
     readonly property real radiusPx: 28 * scaleF * (size === "small" ? 168 / 158 : (size === "medium" ? 358 / 338 : 1))
 
@@ -122,17 +99,14 @@ Item {
     height: (isLarge ? 354 : 168) * scaleF
 
     readonly property bool glassOn: style === "liquid" && glassReady && !preview && wallUrl != ""
-    // the glass is made at once but only shown once its backdrop holds the wallpaper (an empty backdrop refracts as black):
-    // until then it sits at 1% opacity (so it still renders and fills its textures) over the plain card, then fades in
     property bool glassShown: false
-    property bool glassFull: false          // the fade-in is over: the plain card underneath can go
+    property bool glassFull: false
     onGlassOnChanged: if (!glassOn) { glassShown = false; glassFull = false; }
     onGlassShownChanged: if (glassShown) fullT.restart()
     Timer { id: fullT; interval: 250; onTriggered: w.glassFull = w.glassShown }
     readonly property bool dark: style === "dark" || (style === "liquid" && darkGlass)
     readonly property real tint: Math.min(0.92, dark ? 0.25 + glassOpacity * 0.8 : 0.45 + glassOpacity * 0.9)
 
-    // --- colours ---
     function fileUrl(p) {
         if (!p) return "";
         if (p.indexOf("/") === 0) return "file://" + encodeURI(p).replace(/#/g, "%23").replace(/\?/g, "%3F");
@@ -141,18 +115,16 @@ Item {
     readonly property url artSrc: fileUrl(artUrl)
 
     function fa(a) { return dark ? Qt.rgba(1, 1, 1, a) : Qt.rgba(0, 0, 0, a); }
-    // "Tint the interface": buttons and the progress bar take a shade of the accent (text stays white / black)
     readonly property bool accentUi: accentTint.w > 0
     readonly property color inkC: dark ? Qt.tint(visAccent, Qt.rgba(1, 1, 1, 0.18)) : Qt.tint(visAccent, Qt.rgba(0, 0, 0, 0.25))
     function ia(a) { return accentUi ? Qt.rgba(inkC.r, inkC.g, inkC.b, Math.min(1, a + 0.2)) : fa(a); }
-    readonly property color fg: fa(dark ? 0.90 : 0.86)          // title
-    readonly property color fg2: fa(dark ? 0.52 : 0.50)         // subtitle, times
-    readonly property color fgBtn: ia(dark ? 0.78 : 0.72)       // back / play / forward
-    readonly property color fgDim: ia(dark ? 0.52 : 0.48)       // shuffle / repeat when off
+    readonly property color fg: fa(dark ? 0.90 : 0.86)
+    readonly property color fg2: fa(dark ? 0.52 : 0.50)
+    readonly property color fgBtn: ia(dark ? 0.78 : 0.72)
+    readonly property color fgDim: ia(dark ? 0.52 : 0.48)
     readonly property color trackCol: fa(dark ? 0.12 : 0.10)
     readonly property color fillCol: ia(dark ? 0.58 : 0.50)
 
-    // --- artwork colour --- (ArtTint.qml; the Control Center's visualizer uses the same one)
     readonly property bool tintKnown: artTint.known
     readonly property real tintH: artTint.h
     readonly property real tintS: artTint.s
@@ -160,8 +132,6 @@ Item {
     readonly property bool faceTint: tintKnown && !preview && hasPlayer
     function tintFace(l, satMul) { return Qt.hsla(tintH, Math.min(0.7, tintS * satMul), l, 1); }
 
-    // --- background ---
-    // Light face
     Rectangle {
         anchors.fill: parent
         visible: w.style === "light"
@@ -173,7 +143,6 @@ Item {
         }
     }
 
-    // Dark face
     Rectangle {
         anchors.fill: parent
         visible: w.style === "dark"
@@ -185,7 +154,6 @@ Item {
         }
     }
 
-    // Liquid fallback / gallery preview: frosted card
     Rectangle {
         anchors.fill: parent
         visible: w.style === "liquid" && !(w.glassOn && w.glassFull)
@@ -196,7 +164,6 @@ Item {
         }
     }
 
-    // Liquid Glass: wallpaper crop -> blur -> refraction shader (same maths as the Dock and the other widgets)
     Loader {
         anchors.fill: parent
         active: w.glassOn
@@ -204,14 +171,12 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         sourceComponent: Item {
             id: gl
-            // the backdrop has the wallpaper (or the live video slice); one more moment for the blur to render it, then show
             readonly property bool filled: wallImg.status === Image.Ready || wallImg.status === Image.Error || wslice.ready
             onFilledChanged: if (filled) showT.restart()
             Component.onCompleted: if (filled) showT.restart()
             Timer { id: showT; interval: 100; onTriggered: w.glassShown = true }
             readonly property real margin: 72
             readonly property real padPx: 10
-            // the Dock's glass: the same blur (glassBlur here is the Dock's, see WidgetVisual.qml)
             readonly property real ds: w.glassBlur >= 8 ? 0.5 : 1.0
             readonly property real bn: Math.min(1.0, w.glassBlur * 1.5 * ds / 64.0)
 
@@ -219,8 +184,6 @@ Item {
                 id: backdrop
                 width: w.width + 2 * (gl.padPx + gl.margin)
                 height: w.height + 2 * (gl.padPx + gl.margin)
-                // the placeholder only shows when the wallpaper can't be loaded (while it loads, the glass stays clear instead of
-                // flashing these colours after every restart)
                 Rectangle {
                     anchors.fill: parent
                     visible: wallImg.status === Image.Error
@@ -253,8 +216,6 @@ Item {
                     paused: w.wallPaused
                 }
             }
-            // the window's shared video (WallSlice), straight into the blur while it plays: the backdrop (gradient + still picture) is
-            // not captured at all then, since the full-screen video covers it anyway
             WallSlice {
                 id: wslice
                 wall: w.wallItem
@@ -310,7 +271,6 @@ Item {
                 property real dispersion: 0.06 * w.glassLiquid
                 property real magnify: 0.08 * w.glassLiquid * Math.min(1, 90 / w.height)
                 property real rim: w.glassRim
-                // the Dock's glass: its light, adaptive tint (no heavy widget tint), grain and residual blur
                 property real grain: w.glassGrain * 0.3
                 property real blurPx: 1.5
                 property real tintMix: w.glassOpacity * 0.55
@@ -318,19 +278,16 @@ Item {
                 property real saturation: 1.25
                 property real dark: w.dark ? 1 : 0
                 property real debug: 0
-                property real shadowAmt: 0           // no drop shadow
-                property real flatInner: 1           // no darker inner edge (needs the rebuilt liquidglass shader)
+                property real shadowAmt: 0
+                property real flatInner: 1
                 property real rimTint: 1
                 property real ringW: 0
             }
         }
     }
 
-    // --- ambience: the cover's colours fill the card from behind (a small, heavily blurred copy of the art scaled up, so it costs
-    //     next to nothing), and the ambient visualizer glows along the bottom; both are clipped to the card's rounded shape.
-    //     A new song fades the glow out and back in with the new colours; while playing (Living artwork) it drifts slowly. ---
     property url glowSrc: ""
-    property real glowT: 0                   // the glow's own fade (track changes)
+    property real glowT: 0
     readonly property bool glowWanted: glowAmt > 0.01 && hasPlayer && !preview && artSrc != ""
     onArtSrcChanged: glowSwap.restart()
     Component.onCompleted: { w.glowSrc = w.artSrc; w.dispTitle = w.shownTitle; w.dispSub = w.shownSub; }
@@ -357,7 +314,6 @@ Item {
             visible: false
             onStatusChanged: if (status === Image.Ready) glowIn.restart()
         }
-        // rendered at a quarter size and scaled up: the blur ends up four times wider for the same cost
         MultiEffect {
             id: glowFx
             readonly property real big: Math.max(amb.width, amb.height) * 1.6
@@ -373,11 +329,9 @@ Item {
             blur: 1.0
             saturation: 0.35
             brightness: w.dark ? -0.08 : 0.12
-            // Liquid Glass shows the glass itself, like the Dock: no wash of the cover's colours over it (the other styles keep it)
             opacity: (w.glowWanted && ambArt.status === Image.Ready && w.style !== "liquid") ? w.glowT * w.glowAmt * (w.dark ? 0.85 : 0.7) : 0
             Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
         }
-        // the slow drift while music plays (Living artwork): a lazy turn and a gentle breathe
         QtObject {
             id: glowDrift
             property real turn: 0
@@ -394,9 +348,6 @@ Item {
             NumberAnimation { target: glowDrift; property: "zoom"; to: 1.0; duration: 7000; easing.type: Easing.InOutSine }
         }
 
-        // ambient visualizer: crisp bars along the bottom of the card, in the room under the time labels (around the controls),
-        // so they never run through the title, the progress bar or the times; small: beside the cover. Silent columns vanish
-        // instead of leaving a row of dots, and both ends fade out.
         VisBars {
             id: ambVis
             x: w.ambL * w.k
@@ -406,25 +357,21 @@ Item {
             soft: true
             src: w.visSrc
             active: w.visOn && w.visMode === "ambient" && w.hasPlayer && (w.playing || w.paused || w.preview) && !w.editing
-            hold: !w.playing && !w.preview          // paused: frozen where the music stopped
+            hold: !w.playing && !w.preview
             demo: w.preview
             style: w.visStyle
             gain: w.visGain
             count: w.isSmall ? Math.max(4, Math.round(w.visCount / 2)) : w.visCount
             barFill: w.visWidth
             readonly property color base: visual.base
-            // faint, so the buttons in front of it stay easy to read
             colorTop: Qt.rgba(base.r, base.g, base.b, w.dark ? 0.34 : 0.28)
             colorBottom: Qt.rgba(base.r, base.g, base.b, 0.04)
         }
     }
 
-    // --- audio visualizer: under the content, over the glass / face. Medium / large: a strip behind the control row, below the
-    //    time labels. Small: a little equaliser to the right of the artwork, under the play button.
     VisBars {
         id: visual
-        readonly property real sx0: (w.artX + w.artS + 14)                 // RU, small only
-        // behind the controls row: the classic designs as before, the other shapes centred on their own row of controls
+        readonly property real sx0: (w.artX + w.artS + 14)
         x: (w.isSmall ? sx0 : (w.alt ? w.ctlL + 14 : w.mx)) * w.k
         width: (w.isSmall ? w.wr - w.mx - sx0 : (w.alt ? w.ctlR - w.ctlL - 28 : w.wr - 2 * w.mx)) * w.k
         y: (w.isSmall ? 77 : (w.alt ? w.ctlCY - 23 : w.hr - 58)) * w.k
@@ -444,7 +391,6 @@ Item {
         colorBottom: Qt.rgba(base.r, base.g, base.b, w.isSmall ? 0.12 : 0.03)
     }
 
-    // Control Center border (the solid styles; Liquid Glass has the Dock's edge light from the shader instead)
     CornerBorder {
         z: 2
         visible: w.style !== "liquid"
@@ -455,16 +401,12 @@ Item {
         lineW: 0.8
     }
 
-    // --- content ---
-    // m:ss, or h:mm:ss once the track / video is an hour or longer (decided by its length, so elapsed and remaining match;
-    // with no known length, by the value itself)
     function fmt(sec) {
         var s = Math.max(0, Math.floor(sec)), m = Math.floor(s / 60), ss = ("0" + (s % 60)).slice(-2);
         if (Math.max(length, sec) < 3600) return m + ":" + ss;
         return Math.floor(m / 60) + ":" + ("0" + (m % 60)).slice(-2) + ":" + ss;
     }
     readonly property real progress: length > 0 ? Math.max(0, Math.min(1, position / length)) : 0
-    // while the bar is dragged (and a moment after, until the player reports the new position) show the dragged value
     property bool seeking: false
     property bool seekHold: false
     property real seekFrac: 0
@@ -472,8 +414,6 @@ Item {
     readonly property real shownFrac: seekShown ? seekFrac : progress
     readonly property real shownPos: seekShown ? seekFrac * length : position
     Timer { id: seekHoldTimer; interval: 900; onTriggered: w.seekHold = false }
-    // The player only reports its position about once a second, so the bar is glided between two reports (linear, same speed
-    // as the song) instead of stepping. Seeks, pauses, a new song and dragging move it straight away.
     property real dispFrac: 0
     onShownFracChanged: {
         var d = shownFrac - dispFrac;
@@ -490,15 +430,9 @@ Item {
     }
     onPlayingChanged: if (!playing) { fracAnim.stop(); dispFrac = shownFrac; }
     NumberAnimation { id: fracAnim; target: w; property: "dispFrac"; easing.type: Easing.Linear }
-    // Browsers report the tab title: drop the unread-count prefix "(3) " and the site suffix " - YouTube" / " - Chromium"
     function cleanTitle(t) {
         return t.replace(/^\(\d+\)\s+/, "").replace(/\s+[-\u2013\u2014|]\s+(YouTube( Music)?|Chromium|Google Chrome|Brave|Mozilla Firefox|Firefox|Vivaldi|Opera|Microsoft Edge)$/, "");
     }
-    // What is shown when the player gives little or nothing:
-    //   no player at all        -> "No Music Playing" / "Open a music app", a plain white note (no tile)
-    //   player open, no track   -> "Not Playing" / the player's name, its icon as artwork
-    //   no artist and no album  -> the player's name under the title
-    //   no cover                -> the player's icon on the placeholder tile
     readonly property bool hasTrack: hasPlayer && (title !== "" || artist !== "" || album !== "" || playing)
     readonly property string shownTitle: !hasPlayer ? I18n.tr("No Music Playing")
                                        : (title !== "" ? cleanTitle(title)
@@ -507,15 +441,11 @@ Item {
                                      : (!hasTrack ? appName
                                         : ((title !== "" && artist !== "") ? (album !== "" ? artist + " \u2014 " + album : artist)
                                            : (title !== "" && album !== "" ? album : (title !== "" ? appName : album))))
-    readonly property bool live: hasPlayer && playing && length <= 0         // a stream: no length, so no bar to fill
+    readonly property bool live: hasPlayer && playing && length <= 0
 
-
-
-
-    // --- a new song: the title and artist slip out and the new ones slide in (instead of the text just changing) ---
     property string dispTitle: ""
     property string dispSub: ""
-    property real txtT: 1                    // 0 = between two songs, 1 = shown
+    property real txtT: 1
     function txtSwap() {
         if (dispTitle === shownTitle && dispSub === shownSub) return;
         if (preview || !visible) { dispTitle = shownTitle; dispSub = shownSub; return; }
@@ -530,25 +460,18 @@ Item {
         NumberAnimation { target: w; property: "txtT"; to: 1; duration: 420; easing.type: Easing.OutCubic }
     }
     readonly property real textVis: 1
-    // Living artwork: the cover sinks back a little while paused and springs forward when the music starts
     readonly property real artRest: (motion && hasPlayer && !playing && !preview) ? 0.88 : 1
     property real artB: artRest
     Behavior on artB { NumberAnimation { duration: 700; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
 
-    // --- layout numbers (RU), per size ---
-    readonly property real mx: 23                                     // side margin
+    readonly property real mx: 23
     readonly property real artX: isLarge ? (wr - artS) / 2 : w.mx
     readonly property real artY: 23
     readonly property real artS: isSmall ? 110 : (isMedium ? hr - 142 : (alt ? (isTall ? wr - 2 * mx : hr - 46) : Math.min(hr - 218, wr - 2 * mx)))
-    // strip / hero: the column right of the cover
     readonly property real sideX: artX + artS + (isHero ? 40 : 26)
     readonly property real textX: isSmall || isTall ? w.mx : ((isMedium || alt) ? (isMedium ? w.mx + artS + 18 : sideX) : w.mx)
-    // right edge of the title / subtitle
-    // (scrolling text fades out within the card's margins, the same distance from either edge)
     readonly property real textR: isStrip ? textX + Math.min(330, wr * 0.3) : (isHero ? wr - mx - 50 : wr - (mx - mqPad) - (isMedium ? 50 : 0))
-    // room left of the text where scrolling text fades out: beside the cover (medium) it stays clear of the art
     readonly property real mqPad: (isMedium || isStrip || isHero) ? 4 : 12
-    // tall: the title block sits half way between the cover and the progress bar
     readonly property real tallMid: (artY + artS + barCY) / 2
     readonly property real titleCY: isSmall ? hr - 60 : isMedium ? artY + artS / 2 - 16 : isTall ? tallMid - 15
                                   : isStrip ? hr / 2 - 16 : isHero ? 112 : hr - 165
@@ -557,14 +480,11 @@ Item {
     readonly property real barCY: isTall ? hr - 118 : isStrip ? hr / 2 + 40 : isHero ? hr - 150 : hr - 95.5
     readonly property real timeCY: isTall ? hr - 98 : isStrip ? hr / 2 + 60 : isHero ? hr - 128 : hr - 75.2
     readonly property real ctlCY: isTall ? hr - 50 : isStrip ? hr / 2 - 26 : isHero ? hr - 62 : hr - 44
-    // the progress bar and the controls row: from / to (RU); the controls keep shuffle and repeat at their ends unless narrow
     readonly property real barL: isStrip ? textR + 34 : (isHero ? sideX : mx)
     readonly property real barR: wr - mx
     readonly property real ctlL: isStrip ? textR + 10 : (isHero ? sideX - 25 : 0)
     readonly property real ctlR: isStrip ? wr - 50 : wr
     readonly property bool ctlSides: !isTall
-    // the ambient visualizer's room (RU): under the time labels down to the bottom edge, right of the cover where the cover
-    // reaches that low (strip / hero); small (no times): beside the cover, under the play button
     readonly property real ambT: isSmall ? 77 : timeCY + 12
     readonly property real ambB: isSmall ? artY + artS : hr
     readonly property real ambL: isSmall ? artX + artS + 14 : (isStrip ? barL - 12 : (isHero ? sideX - 25 : 0))
@@ -572,12 +492,10 @@ Item {
     readonly property real titlePx: isSmall ? 21 : isTall ? 20 : isHero ? 36 : 24
     readonly property real subPx: isSmall ? 18 : isTall ? 17 : isHero ? 24 : 21
 
-    // the contents (artwork, title, controls) fill the card edge to edge
     Item {
         id: content
         anchors.fill: parent
 
-        // --- artwork: a soft shadow in the cover's own colour lifts it off the card ---
         RectangularShadow {
             x: artItem.x; y: artItem.y + 7 * w.k * w.artB
             width: artItem.width; height: artItem.height
@@ -599,7 +517,6 @@ Item {
             r: (w.isLarge ? 11 : (w.isSmall ? 11 : 12)) * w.k
         }
 
-        // click the artwork: bring the player (browser tab, Spotify, ...) to the front
         MouseArea {
             x: artItem.x; y: artItem.y; width: artItem.width; height: artItem.height
             enabled: w.hasPlayer && !w.preview && !w.editing
@@ -607,7 +524,6 @@ Item {
             onClicked: w.raiseRequested()
         }
 
-        // --- title: scrolls like the subtitle when it does not fit ---
         MarqueeText {
             id: titleItem
             x: (w.textX - w.mqPad) * w.k
@@ -628,7 +544,6 @@ Item {
             animate: !w.preview && w.playing
         }
 
-        // --- subtitle: artist - album, scrolling when it does not fit ---
         MarqueeText {
             id: subItem
             x: (w.textX - w.mqPad) * w.k
@@ -649,7 +564,6 @@ Item {
             animate: !w.preview && w.playing
         }
 
-        // --- hero: a small "Now Playing" heading over the title, with the player's name ---
         Text {
             visible: w.isHero && w.hasPlayer
             x: w.textX * w.k
@@ -663,7 +577,6 @@ Item {
             font.letterSpacing: 1.2 * w.k
         }
 
-        // --- small: play / pause at the top right ---
         PlayerBtn {
             visible: w.isSmall
             wd: w
@@ -679,7 +592,6 @@ Item {
             onClicked: w.togglePlaying()
         }
 
-        // --- progress bar: click or drag to seek ---
         Rectangle {
             id: bar
             visible: !w.isSmall && opacity > 0
@@ -695,7 +607,6 @@ Item {
             Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
             radius: height / 2
             color: w.trackCol
-            // a soft glow of the played part, so the bar reads as lit rather than painted
             RectangularShadow {
                 anchors.fill: barFill
                 radius: barFill.radius
@@ -713,7 +624,6 @@ Item {
                 color: bar.hot ? w.ia(w.dark ? 0.86 : 0.70) : w.fillCol
                 Behavior on color { ColorAnimation { duration: 160 } }
             }
-            // the knob: grows in at the end of the played part while the bar is hovered or dragged
             Rectangle {
                 readonly property real d: bar.height + 8 * w.k
                 width: d; height: d; radius: d / 2
@@ -729,7 +639,7 @@ Item {
             MouseArea {
                 id: seekMa
                 anchors.fill: parent
-                anchors.topMargin: -14 * w.k          // taller touch area than the thin bar
+                anchors.topMargin: -14 * w.k
                 anchors.bottomMargin: -14 * w.k
                 hoverEnabled: true
                 preventStealing: true
@@ -774,7 +684,6 @@ Item {
             font.weight: Font.Medium
         }
 
-        // --- controls: shuffle · back · play · forward · repeat ---
         PlayerBtn {
             visible: !w.isSmall && w.ctlSides
             wd: w

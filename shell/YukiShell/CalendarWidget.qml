@@ -1,18 +1,3 @@
-// macOS  style Calendar widget (month grid, today in red).
-//   size:  "small" 158x158 · "medium" 338x158 · "large" 338x354   (macOS point sizes, times scaleF) - same as the Weather widget
-//   style: "liquid" - Liquid Glass: the wallpaper behind the widget is blurred + refracted by liquidglass.frag, using the
-//                     Appearance sliders (Translucency / Blur / Liquid strength)
-//          "normal" - solid card
-//   mode:  "auto"  - follows the shell's Dark / Light setting (Settings -> Appearance)
-//          "light" - bright glass, dark text
-//          "dark"  - dark glass, white text
-//
-//   small  : month name + month grid
-//   medium : weekday + big day number + month on the left, month grid on the right
-//   large  : big month / year header + large month grid
-//
-// The item's own x / y are its position on the screen, which is how the glass knows which part of the wallpaper
-// sits behind it (it follows the widget while it is dragged).
 import QtQuick
 import QtQuick.Effects
 import "Fonts.js" as Fonts
@@ -21,86 +6,73 @@ import "I18n.js" as I18n
 Item {
     id: w
 
-    // --- look ---
     property string style: "liquid"
     property string size: "small"
-    property string mode: "auto"        // "auto" | "light" | "dark"
+    property string mode: "auto"
     property real scaleF: 1.0
     property string fam: "Open Runde"
     property real screenX: x
     property real screenY: y
-    property int weekStart: 0           // 0 = Sunday, 1 = Monday
+    property int weekStart: 0
 
-    // --- liquid glass inputs (the Appearance sliders) ---
-    property bool glassReady: false     // liquidglass.frag.qsb compiled
+    property bool glassReady: false
     property url shaderUrl: ""
     property url wallUrl: ""
-    property string wallVideo: ""        // animated wallpaper to play behind the glass ("" = none / real-time glass off)
-    property bool wallPaused: false      // desktop covered / Game Mode: keep the decoder idle
-    property Item wallItem: null         // a LiveWall shared by the whole window: show a slice of it instead of a decoder of our own
+    property string wallVideo: ""
+    property bool wallPaused: false
+    property Item wallItem: null
     property real screenW: 1920
     property real screenH: 1080
-    property real glassOpacity: 0.42    // Translucency
-    property real glassBlur: 5          // Blur
-    property real glassLiquid: 1.0      // Liquid strength
+    property real glassOpacity: 0.42
+    property real glassBlur: 5
+    property real glassLiquid: 1.0
     property real glassRim: 0.45
-    property color borderTint: "#8A9AB5"      // Control Center border colour
-    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)   // "Tint the interface" (rgb = accent, a = on) for the glass shader
+    property color borderTint: "#8A9AB5"
+    property vector4d accentTint: Qt.vector4d(0, 0, 0, 0)
     property real glassGrain: 0.03
-    property bool darkGlass: true       // the shell's Dark / Light setting (used by mode "auto")
-    property bool preview: false        // inside the Settings gallery: no wallpaper, simplified glass
+    property bool darkGlass: true
+    property bool preview: false
 
-    // --- desktop edit mode ---
     property bool editing: false
 
-    signal glassFailed()                // the shader did not compile / load -> YukiWidgets falls back to the frosted card
+    signal glassFailed()
 
     readonly property bool isSmall: size === "small"
     readonly property bool isMedium: size === "medium"
     readonly property bool isLarge: size === "large"
-    // the design for its grid shape: the three classic ones, or one of the designs in CalendarAlt.qml (tall | strip | hero)
     property string lay: size
     readonly property bool alt: lay === "tall" || lay === "strip" || lay === "hero"
-    // a bigger grid block (Settings: drag the corner while editing): `fit` = how much bigger than this design's own block, given
-    // by the desktop. The contents are drawn that much larger (natively, not stretched) in the block bw x bh, placed at ox, oy.
     property real fit: 1
     readonly property real aspect: isSmall ? 1 : (isMedium ? 395 / 185 : 395 / 385)
     readonly property real bw: Math.min(width, height * aspect)
     readonly property real bh: Math.min(height, width / aspect)
     readonly property real ox: Math.round((width - bw) / 2)
     readonly property real oy: Math.round((height - bh) / 2)
-    // Small / Medium are slightly enlarged; Large shares the widened footprint without stretching its vertical content.
     readonly property real s: scaleF * fit * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
     readonly property real radiusPx: 28 * s / fit
     readonly property bool glassOn: style === "liquid" && glassReady && !preview && wallUrl != ""
-    // the glass is made at once but only shown once its backdrop holds the wallpaper (an empty backdrop refracts as black):
-    // until then it sits at 1% opacity (so it still renders and fills its textures) over the plain card, then fades in
     property bool glassShown: false
-    property bool glassFull: false          // the fade-in is over: the plain card underneath can go
+    property bool glassFull: false
     onGlassOnChanged: if (!glassOn) { glassShown = false; glassFull = false; }
     onGlassShownChanged: if (glassShown) fullT.restart()
     Timer { id: fullT; interval: 250; onTriggered: w.glassFull = w.glassShown }
     width: (isSmall ? 158 : (isLarge ? 358 : 338)) * s
     height: (isLarge ? 354 : 168) * scaleF
 
-    // --- light / dark ---
     readonly property bool dark: mode === "dark" || (mode !== "light" && darkGlass)
     readonly property color fg: dark ? Qt.rgba(1, 1, 1, 0.96) : Qt.rgba(0, 0, 0, 0.86)
     readonly property color fgSub: dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.45)
     readonly property color red: dark ? "#FF453A" : "#FF3B30"
     readonly property color line: dark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.12)
-    // glass tint: stronger than the Weather widget's, so black (light mode) / white (dark mode) text stays readable on any wallpaper
     readonly property real tint: Math.min(0.92, dark ? 0.25 + glassOpacity * 0.8 : 0.45 + glassOpacity * 0.9)
 
-    // --- date ---
     property var now: new Date()
-    Timer {   // roll over at midnight (and pick up clock / time-zone changes)
+    Timer {
         interval: 30000
         repeat: true
         running: true
         onTriggered: { var d = new Date(); if (d.toDateString() !== w.now.toDateString()) w.now = d; }
     }
-    // names in the chosen interface language (Settings -> General), Sunday first
     readonly property var monthNames: { var l = I18n.locale(), a = []; for (var i = 0; i < 12; i++) a.push(l.monthName(i, Locale.LongFormat)); return a; }
     readonly property var dayNames: { var l = I18n.locale(), a = []; for (var i = 0; i < 7; i++) a.push(l.dayName(i, Locale.LongFormat)); return a; }
     readonly property var letters: { var l = I18n.locale(), a = []; for (var i = 0; i < 7; i++) a.push(l.dayName(i, Locale.NarrowFormat)); return a; }
@@ -111,8 +83,6 @@ Item {
                  lead: (first - w.weekStart + 7) % 7, days: new Date(y, m + 1, 0).getDate() };
     }
 
-    // --- background ---
-    // Normal: solid card
     Rectangle {
         anchors.fill: parent
         visible: w.style === "normal"
@@ -123,7 +93,6 @@ Item {
         }
     }
 
-    // Liquid fallback / gallery preview: frosted card (while the shader builds, if it fails, and in Settings)
     Rectangle {
         anchors.fill: parent
         visible: w.style === "liquid" && !(w.glassOn && w.glassFull)
@@ -142,7 +111,6 @@ Item {
         }
     }
 
-    // Liquid Glass: wallpaper crop -> blur -> refraction shader (the same maths as the Dock and the Weather widget)
     Loader {
         id: glassLoader
         anchors.fill: parent
@@ -151,23 +119,19 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         sourceComponent: Item {
             id: gl
-            // the backdrop has the wallpaper (or the live video slice); one more moment for the blur to render it, then show
             readonly property bool filled: wallImg.status === Image.Ready || wallImg.status === Image.Error || wslice.ready
             onFilledChanged: if (filled) showT.restart()
             Component.onCompleted: if (filled) showT.restart()
             Timer { id: showT; interval: 100; onTriggered: w.glassShown = true }
-            readonly property real margin: 72           // backdrop captured around the widget (blur + refraction reach)
-            readonly property real padPx: 10            // shader item padding (soft shadow)
+            readonly property real margin: 72
+            readonly property real padPx: 10
             readonly property real ds: w.glassBlur >= 8 ? 0.5 : 1.0
             readonly property real bn: Math.min(1.0, w.glassBlur * 1.5 * ds / 64.0)
 
-            // the part of the wallpaper behind the widget, laid out exactly like the screen
             Item {
                 id: backdrop
                 width: w.width + 2 * (gl.padPx + gl.margin)
                 height: w.height + 2 * (gl.padPx + gl.margin)
-                // the placeholder only shows when the wallpaper can't be loaded (while it loads, the glass stays clear instead of
-                // flashing these colours after every restart)
                 Rectangle {
                     anchors.fill: parent
                     visible: wallImg.status === Image.Error
@@ -200,8 +164,6 @@ Item {
                     paused: w.wallPaused
                 }
             }
-            // the window's shared video (WallSlice), straight into the blur while it plays: the backdrop (gradient + still picture) is
-            // not captured at all then, since the full-screen video covers it anyway
             WallSlice {
                 id: wslice
                 wall: w.wallItem
@@ -257,22 +219,21 @@ Item {
                 property real dispersion: 0.06 * w.glassLiquid
                 property real magnify: 0.08 * w.glassLiquid * Math.min(1, 90 / w.height)
                 property real rim: w.glassRim
-                property real grain: w.glassGrain * 0.3     // the Dock's glass
-                property real blurPx: 1.5            // tiny residual smoothing; the real blur is the MultiEffect pre-pass
-                property real tintMix: w.glassOpacity * 0.55     // the Dock's light, adaptive tint (no heavy widget tint)
+                property real grain: w.glassGrain * 0.3
+                property real blurPx: 1.5
+                property real tintMix: w.glassOpacity * 0.55
                 property vector4d accentTint: w.accentTint
                 property real saturation: 1.25
-                property real dark: w.dark ? 1 : 0   // this widget's own light / dark mode, not the shell's
+                property real dark: w.dark ? 1 : 0
                 property real debug: 0
-                property real shadowAmt: 0           // no drop shadow
-                property real flatInner: 1           // no darker inner edge (needs the rebuilt liquidglass shader)
-                property real rimTint: 1             // rim + border follow the glass's own colour
-                property real ringW: 0               // the border is the Control Center CornerBorder below
+                property real shadowAmt: 0
+                property real flatInner: 1
+                property real rimTint: 1
+                property real ringW: 0
             }
         }
     }
 
-    // Control Center border (the solid styles; Liquid Glass has the Dock's edge light from the shader instead)
     CornerBorder {
         z: 2
         visible: w.style !== "liquid"
@@ -283,15 +244,8 @@ Item {
         lineW: 0.8
     }
 
-    // --- content ---
     readonly property real pad: 15 * s
 
-    // The month grid: weekday letters, then up to 6 rows of days. Today sits in a red circle.
-    //
-    // Every position and size below is a whole pixel, and the circle and the day number share one box. Fractional
-    // positions made the circle (anti-aliased, can sit on a half pixel) and the digits (text is drawn on whole pixels)
-    // land up to a pixel apart, which is what looked off-centre. (Open Runde's digits are exactly as tall as the gap
-    // between its ascent and descent, so a text box centred on the circle also centres the digits.)
     readonly property var gridSpec: isSmall ? { x: 12, y: 32, w: 134, wdH: 16, rowH: 16.7, wdPx: 10.5, dayPx: 11.5, circ: 17 }
                                   : (isMedium ? { x: 172, y: 11, w: 152, wdH: 18, rowH: 19.5, wdPx: 11, dayPx: 12.5, circ: 18 }
                                               : { x: 15, y: 58, w: 308, wdH: 24, rowH: 44, wdPx: 13, dayPx: 19, circ: 33 })
@@ -307,7 +261,7 @@ Item {
         readonly property int rowH: Math.round(w.gridSpec.rowH * w.s)
         readonly property real wdPx: w.gridSpec.wdPx * w.s
         readonly property real dayPx: w.gridSpec.dayPx * w.s
-        readonly property int circ: 2 * Math.round(w.gridSpec.circ * w.s / 2)      // even, so the centre is a whole pixel
+        readonly property int circ: 2 * Math.round(w.gridSpec.circ * w.s / 2)
 
         Repeater {
             model: 7
@@ -331,7 +285,6 @@ Item {
                 readonly property bool valid: day >= 1 && day <= w.cal.days
                 readonly property bool isToday: valid && day === w.cal.today
                 visible: valid
-                // the box that holds the circle and the number: a whole-pixel square centred in the cell
                 x: Math.round((index % 7 + 0.5) * grid.cw) - grid.circ / 2
                 y: grid.wdH + Math.floor(index / 7) * grid.rowH + Math.round((grid.rowH - grid.circ) / 2)
                 width: grid.circ
@@ -356,7 +309,6 @@ Item {
         }
     }
 
-    // --- small: month name above the grid ---
     Text {
         visible: !w.alt && (w.isSmall)
         x: w.ox + (13 * w.s)
@@ -368,8 +320,7 @@ Item {
         font.weight: Font.Bold
     }
 
-    // --- medium: weekday, big day number and month on the left ---
-    Rectangle {   // divider
+    Rectangle {
         visible: !w.alt && (w.isMedium)
         x: w.ox + (164 * w.s); y: w.oy + (16 * w.s)
         width: 1; height: w.bh - 32 * w.s
@@ -410,7 +361,6 @@ Item {
         font.weight: Font.DemiBold
     }
 
-    // --- large: month + year header, hairline under the weekday row ---
     Row {
         visible: !w.alt && (w.isLarge)
         x: w.ox + (w.pad)
@@ -440,7 +390,6 @@ Item {
         color: w.line
     }
 
-    // --- the designs of the other grid shapes ---
     Loader {
         anchors.fill: parent
         z: 3

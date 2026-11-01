@@ -1,20 +1,12 @@
 #!/bin/sh
-# yuki-restart [ConfigName]      restart the shell cleanly (default: YukiShell)
-#
-# `qs kill` makes Quickshell segfault while it shuts down (a Qt Shortcut destructor), which pops up a "Quickshell has crashed"
-# window and makes yuki-start restart the shell by itself, so a second manual start used to leave two shells running.
-# This stops the supervisor first, ends the shell without running its destructors, and starts one fresh supervisor.
 NAME="${1:-YukiShell}"
 uid=$(id -u)
-# the supervisor (not this script: its name does not end in yuki-start)
 pkill -u "$uid" -f "(^|/)yuki-start( $NAME)?\$" 2>/dev/null
 pkill -KILL -u "$uid" -f "(^|/)(qs|quickshell)( .*)? (-c|--config) $NAME( |\$)" 2>/dev/null
-# wait until both are really gone
 n=0
 while pgrep -u "$uid" -f "(^|/)(qs|quickshell)( .*)? (-c|--config) $NAME( |\$)" >/dev/null 2>&1 && [ "$n" -lt 25 ]; do
     n=$((n + 1)); sleep 0.2
 done
-# a crash window left by an earlier restart is no use any more
 if command -v hyprctl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     hyprctl -j clients 2>/dev/null | python3 -c '
 import json, sys

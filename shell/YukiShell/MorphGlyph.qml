@@ -1,4 +1,3 @@
-// Blur + morph for icons: changing `kind` blurs the old glyph out while the new one sharpens in.
 import QtQuick
 import QtQuick.Effects
 

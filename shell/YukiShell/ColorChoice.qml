@@ -1,8 +1,3 @@
-// ColorChoice - pick a colour in Settings: a row of preset dots, plus a last dot (a rainbow, or the custom colour once one is chosen) that opens
-// a palette to choose from and a field that takes the colour typed as hex ("#0A84FF", "0a84ff", "#08f") or as RGB ("rgb(10, 132, 255)",
-// "10, 132, 255", "10 132 255"). A typed colour is applied with Return or when the field loses focus; the swatch next to it previews it.
-//   ColorChoice { t: pal; presets: ["#0a84ff", "#30d158"]; current: "#0a84ff"; onPicked: hex => ... }
-// `presets` may hold "" for "the default" (drawn in `defaultColor`); `picked` then gets "" back. Anything else arrives as lower-case "#rrggbb".
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
@@ -11,11 +6,11 @@ import "ColorUtil.js" as ColorUtil
 
 Item {
     id: cc
-    required property var t              // the Settings palette (`pal`)
+    required property var t
     property var presets: []
     property string current: ""
     property string defaultColor: "#ffffff"
-    property bool active: true           // false: greyed out and not clickable
+    property bool active: true
     signal picked(string hex)
 
     readonly property string cur: ColorUtil.parse(current)
@@ -24,7 +19,6 @@ Item {
             if (String(presets[i]) === "" ? String(current) === "" : ColorUtil.parse(presets[i]) === cur) return true;
         return false;
     }
-    // what the last dot shows: the rainbow, or the chosen custom colour
     readonly property bool customChosen: cur !== "" && !curIsPreset
 
     width: row.width

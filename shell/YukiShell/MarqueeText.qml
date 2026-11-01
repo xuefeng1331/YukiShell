@@ -1,5 +1,3 @@
-// One line of text that scrolls when it is too long (like the Now Playing subtitle on macOS):
-// it rests for a moment, scrolls left in a loop, and fades out at both ends. Text that fits just sits still.
 import QtQuick
 
 Item {
@@ -10,9 +8,9 @@ Item {
     property string fam: "Open Runde"
     property real pixelSize: 16
     property int weight: Font.Medium
-    property real fade: 18            // px of fade at each end while scrolling
-    property real startPad: 0         // where the text starts when it fits (the region itself may begin further left)
-    property real speed: 34           // px / s
+    property real fade: 18
+    property real startPad: 0
+    property real speed: 34
     property bool animate: true
 
     height: Math.ceil(pixelSize * 1.3)
@@ -60,7 +58,6 @@ Item {
         }
     }
 
-    // soft left / right edges while scrolling (hfade.frag: a real fade, not an on / off cut)
     ShaderEffect {
         anchors.fill: parent
         readonly property Item source: strip

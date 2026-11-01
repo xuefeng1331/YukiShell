@@ -1,6 +1,5 @@
 .pragma library
 
-// Russian interface strings. Keys are the English texts exactly as written in the QML files.
 var strings = {
     "On Your Desktop": "На рабочем столе",
     "No widgets yet": "Виджетов пока нет",
@@ -11,7 +10,6 @@ var strings = {
     "Light or Dark appearance for Spotlight and the top bar dropdown menus only": "Светлое или тёмное оформление только для Spotlight и выпадающих меню верхней панели",
     "Light, Dark, or Auto for the Dock, Menu Bar and Settings. Spotlight and the top bar menus have their own switch below.": "Светлое, тёмное или автоматическое оформление для Dock, строки меню и настроек. Для Spotlight и меню верхней панели есть отдельный переключатель ниже.",
     "S / M / L = small, medium, large. Image widgets: the + button opens a file picker (needs zenity, kdialog or yad); to change the picture later, use Edit on Desktop and press Choose Image on the widget.": "S / M / L — маленький, средний, большой. Виджет «Изображение»: кнопка + открывает выбор файла (нужен zenity, kdialog или yad); чтобы сменить картинку позже, нажмите «Править на рабочем столе» и «Выбрать изображение» на виджете.",
-    // fragments joined with numbers or names in the code
     " Connected": " подключено",
     " Hz · Scale ": " Гц · Масштаб ",
     " min remaining": " мин осталось",
@@ -36,12 +34,10 @@ var strings = {
     "Hide ": "Скрыть ",
     "Quit ": "Завершить ",
 
-    // date formats (Qt.formatDate patterns)
     "d MMMM yyyy": "d MMMM yyyy",
     "ddd MMM d": "ddd, d MMM",
     "dddd, MMMM d": "dddd, d MMMM",
 
-    // Apple menu, app menus, session
     "About This Linux": "Об этом компьютере",
     "Apple menu": "Меню Apple",
     "Application menus": "Меню приложений",
@@ -115,7 +111,6 @@ var strings = {
     "Hyprland Wiki": "Вики Hyprland",
     "Quickshell Documentation": "Документация Quickshell",
 
-    // Dock
     "Dock": "Dock",
     "Show": "Показать",
     "Open": "Открыть",
@@ -129,7 +124,6 @@ var strings = {
     "Pictures": "Изображения",
     "Screenshots": "Снимки экрана",
 
-    // Settings window: sidebar
     "Search": "Поиск",
     "No Results": "Ничего не найдено",
     "Local Account": "Локальная учётная запись",
@@ -155,7 +149,6 @@ var strings = {
     "About": "О системе",
     "Settings": "Настройки",
 
-    // Settings: General
     "Language": "Язык",
     "New update ": "Новое обновление ",
     "Update": "Обновить",
@@ -197,7 +190,6 @@ var strings = {
     "Paste after choosing": "Вставлять после выбора",
     "Types the chosen item into the focused app. Shift+Return only copies.": "Вставляет выбранное в активное приложение. Shift+Return только копирует.",
 
-    // Settings: Appearance
     "Light": "Светлое",
     "Dark": "Тёмное",
     "Auto": "Авто",
@@ -260,7 +252,6 @@ var strings = {
     "Popovers, Spotlight and the Dock always show what's behind them. Off saves GPU.": "Всплывающие окна, Spotlight и Dock всегда показывают то, что за ними. Выкл. экономит GPU.",
     "Off shows app icons instead of window previews.": "Выкл.: значки приложений вместо миниатюр.",
 
-    // Settings: Desktop & Dock
     "Size": "Размер",
     "Magnification": "Увеличение",
     "Enlarge icons as the pointer moves over them": "Увеличивать значки при наведении указателя",
@@ -299,7 +290,6 @@ var strings = {
     "Previews of open windows next to the Settings button.": "Миниатюры открытых окон рядом с кнопкой Настроек.",
     "Changes apply to the Dock immediately.": "Изменения применяются к Dock сразу.",
 
-    // Settings: Applications
     "Drag icons in the Dock to reorder them.": "Перетаскивайте значки в Dock, чтобы менять порядок.",
     "No apps are kept in the Dock": "В Dock нет закреплённых приложений",
     "Right-click a running app and choose Keep in Dock.": "Щёлкните правой кнопкой по запущенному приложению и выберите «Оставить в Dock».",
@@ -308,7 +298,6 @@ var strings = {
     "Add": "Добавить",
     "Medium": "Средний",
 
-    // Settings: Displays
     "Brightness": "Яркость",
     "Night Shift": "Night Shift",
     "Warmer colours to reduce blue light": "Тёплые цвета для снижения синего света",
@@ -326,7 +315,6 @@ var strings = {
     "Menu Bar size": "Размер строки меню",
     "Scales the bar, its menus and Control Center.": "Масштаб строки меню, меню и Пункта управления.",
 
-    // Settings: Menu Bar
     "Menu Bar logo": "Логотип в строке меню",
     "Choose the Arch mark, Apple logo, or a custom image": "Знак Arch, логотип Apple или своя картинка",
     "Arch": "Arch",
@@ -350,7 +338,6 @@ var strings = {
     "Privacy indicators": "Индикаторы конфиденциальности",
     "Keyboard layout": "Раскладка клавиатуры",
 
-    // Settings: Wallpaper
     "Wallpapers": "Обои",
     "Search wallpapers": "Поиск обоев",
     "No wallpaper": "Нет обоев",
@@ -360,7 +347,6 @@ var strings = {
     "Ctrl+Alt+W opens the quick wallpaper picker.": "Ctrl+Alt+W открывает быстрый выбор обоев.",
     "Dynamic": "Динамические",
 
-    // Settings: Notifications / Focus
     "Show notification banners": "Показывать баннеры уведомлений",
     "Off: no banners. Notifications still collect in Notification Center.": "Выкл.: без баннеров. Уведомления по-прежнему в Центре уведомлений.",
     "Play sound for notifications": "Звук для уведомлений",
@@ -373,7 +359,6 @@ var strings = {
     "Keep Awake": "Не засыпать",
     "Stop the computer from going to sleep or locking": "Не давать компьютеру засыпать и блокироваться",
 
-    // Settings: Sound
     "Output": "Выход",
     "Input": "Вход",
     "Output volume": "Громкость выхода",
@@ -384,7 +369,6 @@ var strings = {
     "Volume": "Громкость",
     "No apps are playing audio": "Ни одно приложение не воспроизводит звук",
 
-    // Settings: Battery
     "Energy Mode": "Режим энергопотребления",
     "Power profile used by the system": "Профиль питания системы",
     "Low Power": "Экономия",
@@ -393,7 +377,6 @@ var strings = {
     "Charging": "Заряжается",
     "On battery": "От аккумулятора",
 
-    // Settings: Lock Screen
     "Above Password": "Над паролем",
     "Under Clock": "Под часами",
     "Now Playing position": "Положение «Сейчас играет»",
@@ -418,7 +401,6 @@ var strings = {
     "Colour": "Цвет",
     "Instrumental": "Инструментал",
 
-    // Settings: Users / Keyboard / Mouse / Trackpad
     "Full name": "Полное имя",
     "Account name": "Имя учётной записи",
     "Home folder": "Домашняя папка",
@@ -441,7 +423,6 @@ var strings = {
     "Tap to click": "Касание как нажатие",
     "Ignore trackpad while typing": "Игнорировать трекпад при наборе",
 
-    // Settings: About
     "Configuration": "Конфигурация",
     "Open configuration folder": "Открыть папку конфигурации",
     "Reset…": "Сбросить…",
@@ -453,7 +434,6 @@ var strings = {
     "Owner — the menu bar, the Dock, the Liquid Glass and the widgets. The one who actually knew what he was doing": "Владелец — строка меню, Dock, Liquid Glass и виджеты. Тот, кто действительно знал, что делает",
     "Collaborator — improved the Settings app and window, and every bug you will ever find": "Соавтор — улучшил приложение и окно настроек, а также каждый баг, который вы найдёте",
 
-    // Wi-Fi / Bluetooth / network
     "Wi-Fi is turned off": "Wi-Fi выключен",
     "Network Settings…": "Настройки сети…",
     "Known Networks & Other Networks": "Известные и другие сети",
@@ -592,7 +572,6 @@ var strings = {
     "Use": "Использовать",
     "Refresh": "Обновить",
 
-    // Control Center
     "Add Controls": "Добавить элементы",
     "Edit Controls": "Изменить элементы",
     "No controls. Use Edit Controls to add some.": "Нет элементов. Добавьте их через «Изменить элементы».",
@@ -610,7 +589,6 @@ var strings = {
     "Screen": "Экран",
     "Unit conversion": "Перевод единиц",
 
-    // notifications
     "Notification": "Уведомление",
     "Clear All": "Очистить все",
     "Clear Notification Center": "Очистить Центр уведомлений",
@@ -620,7 +598,6 @@ var strings = {
     "Close": "Закрыть",
     "TIME SENSITIVE": "СРОЧНОЕ",
 
-    // screenshots
     "Screenshot notifications": "Уведомления о снимках",
     "Show a notification": "Показывать уведомление",
     "Print selects an area. Off only copies it to the clipboard.": "Print выделяет область. Выкл.: только копирование в буфер.",
@@ -631,7 +608,6 @@ var strings = {
     "Drag to select an area   •   Return: whole screen   •   Esc: cancel": "Выделите область   •   Return: весь экран   •   Esc: отмена",
     "Quick folders": "Быстрые папки",
 
-    // Spotlight
     "Spotlight Search": "Поиск Spotlight",
     "Spotlight (tap Super)": "Spotlight (нажать Super)",
     "Suggestions": "Предложения",
@@ -666,7 +642,6 @@ var strings = {
     "Utilities": "Утилиты",
     "All": "Все",
 
-    // widgets
     "Add a Widget": "Добавить виджет",
     "Calendar": "Календарь",
     "Weather": "Погода",
@@ -693,7 +668,6 @@ var strings = {
     "Min": "Мин.",
     "Max": "Макс.",
 
-    // Clock app
     "World Clock": "Мировое время",
     "Alarms": "Будильники",
     "Stopwatch": "Секундомер",
@@ -716,7 +690,6 @@ var strings = {
     "London": "Лондон",
     "Tokyo": "Токио",
 
-    // two-line texts and status lines
     "Drag a widget to move it, or − to remove it.": "Перетащите виджет, чтобы переместить, или нажмите −, чтобы удалить.",
     "Editing is on: drag a widget to move it, use the − badge to remove it, then click Stop Editing.": "Правка включена: перетаскивайте виджеты, значок − удаляет виджет, затем нажмите «Завершить правку».",
     "Liquid Glass couldn't start (details in the shell's log)": "Liquid Glass не запустился (подробности в журнале оболочки)",
@@ -733,11 +706,9 @@ var strings = {
     "Nothing here yet.": "Здесь пока пусто.",
     "System Settings": "Системные настройки",
 
-    // lock screen date style samples
     "Friday, October 16": "Пятница, 16 октября",
     "Fri Oct 16": "Пт, 16 окт.",
 
-    // misc
     "Behavior": "Поведение",
     "Recording": "Запись",
     "Restore": "Восстановить",

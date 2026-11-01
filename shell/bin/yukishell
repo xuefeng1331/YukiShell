@@ -34,7 +34,6 @@ HOME = os.path.expanduser("~")
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config")), "quickshell", "YukiShell")
 CACHE = os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache"))
 
-# helpers YukiShell starts, recognised when an earlier YukiShell left them behind (see reapOrphans in YukiBar.qml)
 LEFTOVER_SIGS = [
     ("systemd-inhibit", "--who=yukibar", "Keep Awake inhibitor"),
     ("inotifywait", "%e|%w%f", "wallpaper folder watcher"),
@@ -49,15 +48,12 @@ HELPER_NAMES = {
     "setpriv": "helper wrapper", "wf-recorder": "screen recording", "pkttyagent": "Keep Awake (polkit agent)",
 }
 
-
-# ---------- /proc ----------
 def read(path, mode="r"):
     try:
         with open(path, mode) as f:
             return f.read()
     except OSError:
         return None
-
 
 def stat_of(pid, task=None):
     s = read(f"/proc/{pid}/task/{task}/stat" if task else f"/proc/{pid}/stat")
@@ -68,15 +64,12 @@ def stat_of(pid, task=None):
     return {"comm": head.partition("(")[2], "ppid": int(f[1]), "ticks": int(f[11]) + int(f[12]),
             "threads": int(f[17]), "start": int(f[19])}
 
-
 def argv_of(pid):
     raw = read(f"/proc/{pid}/cmdline", "rb")
     return [a.decode(errors="replace") for a in raw.split(b"\0") if a] if raw else []
 
-
 def all_pids():
     return [int(d) for d in os.listdir("/proc") if d.isdigit()]
-
 
 def memory_of(pid):
     m = {"pss": 0, "rss": 0, "swap": 0}
@@ -99,11 +92,9 @@ def memory_of(pid):
             m["rss"] = m["pss"] = int(st.split()[1]) * PAGE
     return m
 
-
 def uptime_of(start_ticks):
     up = read("/proc/uptime")
     return max(0.0, float(up.split()[0]) - start_ticks / HZ) if up else 0.0
-
 
 def is_qs(argv, config):
     if not argv or os.path.basename(argv[0]) not in ("qs", "quickshell") or "ipc" in argv:
@@ -112,7 +103,6 @@ def is_qs(argv, config):
         if a in ("-c", "--config") and argv[i + 1] == config:
             return True
     return False
-
 
 def thread_group(name):
     if name.startswith("QSGRender"):
@@ -124,7 +114,6 @@ def thread_group(name):
     if name in ("qs", "quickshell"):
         return "main + QML"
     return "other"
-
 
 def thread_ticks(pid):
     out = {}
@@ -138,8 +127,6 @@ def thread_ticks(pid):
             out[t] = (s["comm"], s["ticks"])
     return out
 
-
-# ---------- GPU ----------
 def nvidia_vram():
     if not shutil.which("nvidia-smi"):
         return None
@@ -158,7 +145,6 @@ def nvidia_vram():
         vram[pid] = vram.get(pid, 0) + mib * 1024 * 1024
     return vram
 
-
 def nvidia_summary():
     if not shutil.which("nvidia-smi"):
         return None
@@ -170,7 +156,6 @@ def nvidia_summary():
                 "power": float(power) if power not in ("[N/A]", "N/A", "") else None}
     except (subprocess.SubprocessError, OSError, ValueError, IndexError):
         return None
-
 
 class NvidiaPmon(threading.Thread):
     """per-process GPU load (SM %), one sample a second, averaged over the run"""
@@ -197,7 +182,6 @@ class NvidiaPmon(threading.Thread):
     def load(self, pid):
         s = self.samples.get(pid)
         return sum(s) / len(s) if s else None
-
 
 def drm_snapshot(pid):
     """AMD / Intel (and others with fdinfo): busy nanoseconds per engine and memory, per DRM client"""
@@ -226,7 +210,6 @@ def drm_snapshot(pid):
             clients[cid] = c
     return clients
 
-
 def drm_load(a, b, seconds):
     busy, mem = 0.0, 0
     for cid, cb in b.items():
@@ -236,8 +219,6 @@ def drm_load(a, b, seconds):
         mem += cb["mem"]
     return busy, mem
 
-
-# ---------- sampling ----------
 def identify():
     found = {"shell": [], "lock": [], "wallpaper": []}
     for pid in all_pids():
@@ -252,7 +233,6 @@ def identify():
                 found["wallpaper"].append(pid)
     return found
 
-
 def parent_map():
     m = {}
     for pid in all_pids():
@@ -260,7 +240,6 @@ def parent_map():
         if s:
             m[pid] = s["ppid"]
     return m
-
 
 def descendants(roots, pmap):
     kids = {}
@@ -272,7 +251,6 @@ def descendants(roots, pmap):
             out.append(c)
             todo.append(c)
     return out
-
 
 def leftovers():
     out = []
@@ -289,7 +267,6 @@ def leftovers():
                 out.append({"pid": pid, "what": label})
     return out
 
-
 def dir_size(path):
     total = 0
     for root, _dirs, files in os.walk(path, onerror=lambda e: None):
@@ -299,7 +276,6 @@ def dir_size(path):
             except OSError:
                 pass
     return total
-
 
 def caches():
     out = []
@@ -315,14 +291,12 @@ def caches():
         out.append({"path": base.replace(HOME, "~", 1), "what": label, "bytes": sum(p["bytes"] for p in parts), "parts": parts})
     return out
 
-
 def lock_state():
     try:
         return subprocess.run(["qs", "-c", "YukiLock", "ipc", "call", "lockscreen", "state"], capture_output=True,
                               text=True, timeout=3).stdout.strip()
     except (subprocess.SubprocessError, OSError):
         return ""
-
 
 def sample(seconds):
     found = identify()
@@ -337,7 +311,6 @@ def sample(seconds):
     if pmon:
         pmon.start()
 
-    # short-lived programs the shell starts while we watch (polls, one-off commands)
     known = set(pmap)
     spawned = {}
     start = time.monotonic()
@@ -446,32 +419,24 @@ def sample(seconds):
         "total": total, "gpu": nvidia_summary(), "leftovers": leftovers(), "caches": caches(),
     }
 
-
-# ---------- output ----------
 def version():
     js = read(os.path.join(CONFIG, "Version.js")) or ""
     m = re.search(r'var\s+version\s*=\s*"([^"]+)"', js)
     return m.group(1) if m else "?"
 
-
 COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
-
 
 def c(code, s):
     return f"\033[{code}m{s}\033[0m" if COLOR else s
 
-
 def b(s):
     return c("1", s)
-
 
 def dim(s):
     return c("2", s)
 
-
 def pink(s):
     return c("38;2;238;172;190", s)
-
 
 def size(n):
     if n is None:
@@ -481,10 +446,8 @@ def size(n):
             return f"{n:.0f} {unit}" if unit in ("B", "KiB", "MiB") else f"{n:.1f} {unit}"
         n /= 1024
 
-
 def pct(v):
     return "-" if v is None else f"{v:.1f}%"
-
 
 def dur(s):
     s = int(s)
@@ -493,19 +456,16 @@ def dur(s):
     m, s = divmod(s, 60)
     return f"{d}d{h:02d}h" if d else (f"{h}h{m:02d}m" if h else (f"{m}m{s:02d}s" if m else f"{s}s"))
 
-
 def cpu_col(v):
     t = pct(v).rjust(7)
     if v is None:
         return t
     return c("31", t) if v >= 50 else (c("33", t) if v >= 15 else t)
 
-
 def table_row(label, r, indent=""):
     name = (indent + label)[:36].ljust(36)
     return (f"{name} {str(r['pid']).rjust(7)} {cpu_col(r['cpu'])} {size(r['pss']).rjust(10)} {size(r['rss']).rjust(10)} "
             f"{pct(r['gpu']).rjust(6)} {size(r['vram']).rjust(9)} {dur(r['up']).rjust(8)}")
-
 
 def render(d):
     out = []
@@ -577,8 +537,6 @@ def render(d):
         out.append(b("LEFTOVERS") + "  " + c("32", "none") + dim("  (no helpers left behind by an earlier YukiShell)"))
     return "\n".join(out)
 
-
-# ---------- snapshot clean-up (yukishell sc) ----------
 SC_HELP = """yukishell sc: clean up snapper snapshots
 
   yukishell sc                    keep the newest 4 snapshots, delete the others (asks first)
@@ -601,11 +559,9 @@ GRUB_DROPIN_TEXT = """[Service]
 ExecStartPre=/bin/sh -c 'sleep 3; while pgrep -x grub-mkconfig >/dev/null; do sleep 1; done'
 """
 
-
 def used_bytes(path="/"):
     st = os.statvfs(path)
     return (st.f_blocks - st.f_bfree) * st.f_frsize
-
 
 def snapper_list(config):
     r = subprocess.run(["snapper", "--jsonout", "-c", config, "list"], capture_output=True, text=True)
@@ -614,7 +570,6 @@ def snapper_list(config):
     data = json.loads(r.stdout)
     snaps = data.get(config) or next(iter(data.values()), [])
     return [x for x in snaps if int(x.get("number", 0)) != 0]
-
 
 def plan_cleanup(snaps, keep, keep_ids):
     """-> set of snapshot numbers to keep: the newest `keep`, the asked ids, and the pre/post partner of anything kept"""
@@ -627,11 +582,9 @@ def plan_cleanup(snaps, keep, keep_ids):
         if n in post_of: kept.add(post_of[n])
     return kept
 
-
 def grub_btrfs_installed():
     return os.path.exists("/etc/grub.d/41_snapshots-btrfs") and \
         subprocess.run(["systemctl", "cat", "grub-btrfs-snapper.service"], capture_output=True).returncode == 0
-
 
 def rebuild_grub_menu():
     if not os.path.exists(GRUB_DROPIN):
@@ -640,7 +593,7 @@ def rebuild_grub_menu():
             f.write(GRUB_DROPIN_TEXT)
         subprocess.run(["systemctl", "daemon-reload"])
         print("  " + dim("grub-btrfs-snapper now waits for grub-mkconfig (" + GRUB_DROPIN + ")"))
-    for _ in range(60):          # a rebuild the deletions started: let it finish first
+    for _ in range(60):
         if subprocess.run(["systemctl", "is-active", "-q", "grub-btrfs-snapper.service"]).returncode != 0:
             break
         time.sleep(1)
@@ -657,7 +610,6 @@ def rebuild_grub_menu():
         print("  " + c("32", "GRUB snapshot menu rebuilt") + dim(f" ({n} snapshot entr{'y' if n == 1 else 'ies'})"))
     else:
         print("  " + c("33", "the GRUB snapshot menu didn't rebuild cleanly") + dim(" (the normal boot menu is fine)"))
-
 
 def cmd_sc(args):
     keep, keep_ids, limit, config, dry, yes = 4, [], None, "root", False, False
@@ -720,8 +672,6 @@ def cmd_sc(args):
         r = subprocess.run(["snapper", "-c", config, "set-config", f"NUMBER_LIMIT={limit}", f"NUMBER_LIMIT_IMPORTANT={max(1, limit // 2)}"])
         print("  " + (c("32", f"snapper keeps at most {limit} from now on") if r.returncode == 0 else c("31", "setting the limit failed")))
 
-
-# ---------- commands ----------
 def cmd_stats(args):
     seconds, watch, as_json = 2.0, False, False
     it = iter(args)
@@ -756,7 +706,6 @@ def cmd_stats(args):
     except KeyboardInterrupt:
         print()
 
-
 def main(argv):
     if not argv or argv[0] in ("help", "-h", "--help"):
         print(__doc__.strip())
@@ -770,7 +719,6 @@ def main(argv):
         print(f"YukiShell v{version()}")
     else:
         sys.exit(f"yukishell: unknown command {cmd!r} (try: yukishell stats, yukishell sc, yukishell help)")
-
 
 if __name__ == "__main__":
     try:

@@ -42,9 +42,8 @@ classes = browser_classes()
 before = {c["address"] for c in windows(classes)}
 subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 if not before:
-    sys.exit(0)                                   # nothing running: the browser starts on the current workspace by itself
+    sys.exit(0)
 
-# give the browser a moment to take the link (and maybe map a new window), then bring the right window forward
 target = None
 for _ in range(5):
     time.sleep(0.12)
@@ -53,7 +52,6 @@ for _ in range(5):
     if new:
         target = new[0]
         break
-    # the tab went to the most recently used window; a minimized or hidden one (special workspace) is skipped
     shown = [c for c in wins if c.get("workspace", {}).get("id", -1) > 0] or wins
     target = min(shown, key=lambda c: c.get("focusHistoryID", 1 << 30), default=None)
 if target:

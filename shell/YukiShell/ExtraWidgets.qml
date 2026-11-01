@@ -13,7 +13,7 @@ import "Fonts.js" as Fonts
 Item {
     id: root
     visible: false
-    property var host: null                  // the YukiWidgets instance
+    property var host: null
     readonly property var hub: host ? host.hub : null
     readonly property var bar: hub ? hub.bar : null
     readonly property string fam: host ? host.fontFamily : "Open Runde"
@@ -22,13 +22,11 @@ Item {
     readonly property string cfgDir: host ? host.configDir : Quickshell.env("HOME") + "/.config/yukiwidgets"
     readonly property bool asleep: false
     property var stockSymbols: ["AAPL", "NVDA", "^GSPC", "BTC-USD"]
-    // data is only fetched for widgets that are on the desktop
     function wants(type) { return host ? (host.rev >= 0 && host.count(type) > 0) : false; }
     function comp(type) {
         return ({ batteries: cBatteries, notes: cNotes, photos: cPhotos, reminders: cReminders, alarms: cAlarms, stocks: cStocks })[type] || null;
     }
 
-    // stocks (Yahoo chart API) every 10 min
     property var stocks: ({})
     readonly property bool wantsStocks: root.wants("stocks")
     Process {
@@ -60,8 +58,6 @@ Item {
         }
         return out;
     }
-    // The Repeater used to sit on the plain array, so rewriting the file rebuilt every row and the whole list
-    // replayed its entry animation on every tick. This model is patched in place: only the row that changed moves.
     ListModel { id: remModel }
     property bool remReady: false
     function syncReminders() {
@@ -92,7 +88,6 @@ Item {
         if (bar) bar.playSound("tink", 0.6);
     }
     function openFile(p) { Quickshell.execDetached(["xdg-open", p]); }
-    // the Reminders editor writes the same markdown you would type by hand
     function addReminder(text) {
         var t = String(text || "").trim();
         if (t === "") return;
@@ -117,8 +112,6 @@ Item {
         if (bar) bar.playSound("tink", 0.4);
     }
 
-
-    // photos: a random picture from ~/Pictures (not screenshots / wallpapers), changes every 15 min
     property var photoList: []
     property int photoIdx: 0
     readonly property string photo: photoList.length ? photoList[photoIdx % photoList.length] : ""
@@ -131,7 +124,6 @@ Item {
     }
     Timer { interval: 15 * 60 * 1000; repeat: true; running: root.wantsPhotos && !root.asleep; onTriggered: root.photoIdx++ }
 
-    // batteries: this Mac + anything UPower knows about (headsets, mice, keyboards...)
     readonly property var batteries: {
         var out = [], ds = UPower.devices.values;
         for (var i = 0; i < ds.length; i++) {
@@ -148,12 +140,11 @@ Item {
         return out;
     }
 
-
     component WIcon: Canvas {
         id: wi
         property string kind: "sun"
         property color color: "white"
-        property bool tinted: false         // monochrome (Tinted style)
+        property bool tinted: false
         width: 24; height: 24
         onKindChanged: requestPaint()
         onColorChanged: requestPaint()
@@ -223,11 +214,9 @@ Item {
             readonly property bool med: ctx && ctx.size !== "s"
             readonly property var list: root.batteries
             function ringColor(b) { return ctx && ctx.mono ? ctx.fg : (b.pct <= 20 && !b.charging ? "#FF453A" : "#30D158"); }
-            // small: up to four rings
             Grid {
                 visible: !parent.med
                 anchors.centerIn: parent
-                // one battery is a single column, otherwise the empty second column throws the ring off centre
                 columns: Math.min(2, Math.max(1, Math.min(4, list.length)))
                 spacing: 14
                 Repeater {
@@ -258,7 +247,6 @@ Item {
                     }
                 }
             }
-            // medium: list rows
             Column {
                 visible: parent.med
                 anchors.fill: parent
@@ -307,7 +295,6 @@ Item {
         id: cPhotos
         Item {
             readonly property var ctx: parent ? parent.ctx : null
-            // full bleed: the photo fills the widget (the Loader for photos has no margins)
             Item { id: pMask; anchors.fill: parent; visible: false; layer.enabled: true; Rectangle { anchors.fill: parent; radius: 22; color: "black" } }
             Image {
                 id: pImg
@@ -355,8 +342,6 @@ Item {
                     text: parent.parent.open.length; duration: 420; animateWidth: false
                     color: blue; font.family: Fonts.forWeight(Font.Bold, root.fam); font.pixelSize: 22; font.weight: Font.Bold
                 }
-                // + - add one without leaving the widget. It lives beside the count, never on top of it,
-                // and fades in on hover the way macOS reveals its controls.
                 Rectangle {
                     id: addBtn
                     anchors.right: cnt.left; anchors.rightMargin: 8
@@ -389,14 +374,11 @@ Item {
                 clip: true
                 contentHeight: remCol.height
                 boundsBehavior: Flickable.StopAtBounds
-                // only takes over the drag when there is actually something to scroll, so the widget itself
-                // stays draggable from its list whenever everything already fits
                 interactive: !root.editing && contentHeight > height + 2
               Column {
                 id: remCol
                 width: parent.width
                 spacing: 7
-                // new reminder
                 Item {
                     width: parent.width
                     height: adding ? 22 : 0
@@ -429,7 +411,6 @@ Item {
                         required property int index
                         spacing: 8
                         width: parent.width
-                        // the first list staggers in; a row added later springs in on its own, and nothing else moves
                         property real inT: 0
                         opacity: inT
                         transform: Translate { y: (1 - remRow.inT) * 8 }
@@ -451,7 +432,6 @@ Item {
                             border.width: 1.5
                             border.color: done ? blue : (ctx ? ctx.fg2 : "white")
                             Behavior on border.color { ColorAnimation { duration: 300 } }
-                            // the press itself: a quick squeeze that springs back
                             property real press: 0
                             scale: (0.86 + 0.14 * Math.max(fill, 1 - fill * 0)) * (1 - 0.18 * press) + (fill > 0 ? 0 : 0)
                             SequentialAnimation {
@@ -459,7 +439,6 @@ Item {
                                 NumberAnimation { target: tick; property: "press"; to: 1; duration: 90; easing.type: Easing.OutCubic }
                                 NumberAnimation { target: tick; property: "press"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 3.0 }
                             }
-                            // the tick draws itself in
                             Canvas {
                                 id: tickMark
                                 anchors.centerIn: parent
@@ -492,8 +471,6 @@ Item {
                             width: parent.width - 24
                             height: Math.max(rowTxt.implicitHeight, 18)
                             anchors.verticalCenter: parent.verticalCenter
-                            // Nothing here is a text field, so a click can never leave text selected on the desktop.
-                            // Renaming lives in the Reminders app, which this row opens.
                             HoverHandler { id: rowHover; enabled: !root.editing }
                             Text {
                                 id: rowTxt
@@ -529,7 +506,6 @@ Item {
                 }
               }
             }
-            // the header opens the Reminders app, not a text editor
             MouseArea {
                 anchors.fill: rHead; enabled: !root.editing; cursorShape: Qt.PointingHandCursor
                 onClicked: {
@@ -554,13 +530,11 @@ Item {
             readonly property var alarmList: ck ? ck.alarms : []
             readonly property int maxAlarms: size === "l" ? (live ? 4 : 6) : (size === "m" ? 3 : 1)
 
-            // --- live activity (timer ring / stopwatch) ---
             Item {
                 id: liveBox
                 visible: ca.live
                 width: ca.size === "m" ? 140 : parent.width
                 height: ca.size === "s" ? parent.height : (ca.size === "m" ? parent.height : 132)
-                // timer
                 Item {
                     visible: ca.hasTimer
                     anchors.fill: parent
@@ -593,9 +567,7 @@ Item {
                             Text { anchors.horizontalCenter: parent.horizontalCenter; text: ca.ck ? (ca.ck.timer.state === "paused" ? I18n.tr("Paused") : (ca.ck.timer.label || I18n.tr("Timer"))) : ""; color: ca.fg2; font.family: root.fam; font.pixelSize: Math.max(10, tring.width * 0.085) }
                         }
                     }
-                    // large: a second line with the stopwatch next to the ring
                 }
-                // stopwatch (when no timer, or next to it on the large size)
                 Column {
                     visible: ca.hasSw && (!ca.hasTimer || ca.size === "l")
                     anchors.verticalCenter: parent.verticalCenter
@@ -616,7 +588,6 @@ Item {
                 }
             }
 
-            // --- alarms ---
             Column {
                 id: alarmCol
                 visible: !(ca.size === "s" && ca.live)
@@ -637,7 +608,6 @@ Item {
                         required property var modelData
                         width: alarmCol.width
                         height: ca.size === "s" ? 120 : 34
-                        // small: one big alarm
                         Column {
                             visible: ca.size === "s"
                             y: 6
@@ -660,7 +630,6 @@ Item {
                             }
                             Text { width: parent.width; elide: Text.ElideRight; text: (arow.modelData.label || I18n.tr("Alarm")) + (arow.modelData.days.length ? ", " + ca.ck.repeatText(arow.modelData.days) : ""); color: ca.fg2; font.family: root.fam; font.pixelSize: 11 }
                         }
-                        // on / off
                         LiquidSwitch {
                             id: asw
                             anchors.right: parent.right
@@ -682,7 +651,6 @@ Item {
                     color: ca.fg2; font.family: root.fam; font.pixelSize: ca.size === "s" ? 15 : 13
                 }
             }
-            // anywhere else: open the Clock app
             MouseArea {
                 z: -1; anchors.fill: parent; enabled: !root.editing; cursorShape: Qt.PointingHandCursor
                 onClicked: if (ca.ck) ca.ck.open(ca.hasTimer ? "timers" : (ca.hasSw ? "stopwatch" : "alarms"))
@@ -697,7 +665,6 @@ Item {
             readonly property var syms: root.stockSymbols
             function chg(q) { return q && q.pc ? (q.p - q.pc) / q.pc * 100 : 0; }
             function col(q) { return ctx && ctx.mono ? ctx.fg : (chg(q) >= 0 ? "#30D158" : "#FF453A"); }
-            // small: first symbol, big
             Column {
                 visible: !parent.med
                 anchors.fill: parent
@@ -709,7 +676,6 @@ Item {
                 Text { text: parent.q ? parent.q.p.toFixed(2) : "--"; color: ctx ? ctx.fg : "white"; font.family: Fonts.forWeight(Font.DemiBold, root.fam); font.pixelSize: 18; font.weight: Font.DemiBold }
                 Text { text: parent.q ? (parent.parent.chg(parent.q) >= 0 ? "+" : "") + parent.parent.chg(parent.q).toFixed(2) + "%" : ""; color: parent.parent.col(parent.q); font.family: Fonts.forWeight(Font.DemiBold, root.fam); font.pixelSize: 12; font.weight: Font.DemiBold }
             }
-            // medium: watchlist
             Column {
                 visible: parent.med
                 anchors.fill: parent

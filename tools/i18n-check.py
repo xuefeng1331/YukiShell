@@ -29,10 +29,8 @@ def unescape(raw):
         out.append(c); i += 1
     return "".join(out)
 
-# strings that are the same in every language (brand names, symbols)
 SAME = {"H:mm", "Spotlight", "MacBook", "Tailscale", "\u25cf", "Rice", "Hyprland \u2022 Quickshell \u2022 Catppuccin Mocha"}
 
-# I18n.tr("...") / I18n.tr('...') with a plain string literal as the argument
 call = re.compile(r'I18n\.tr\(\s*(?:"((?:[^"\\\n]|\\.)*)"|\'((?:[^\'\\\n]|\\.)*)\')\s*[,)]')
 
 used = {}
@@ -41,7 +39,6 @@ for f in sorted(shell.glob("*.qml")):
         raw = m.group(1) if m.group(1) is not None else m.group(2)
         used.setdefault(unescape(raw), f.name)
 
-# keyboard shortcut descriptions live in the Lua binds (hypr/scripts/*.lua) and are translated by the Settings -> Keyboard list
 lua_desc = [re.compile(r'description = "([^"]+)"'), re.compile(r'\band "([^"]+)" or nil'),
             re.compile(r'^bind\(.*?,\s*"([^"]+)"(?:,\s*\{[^}]*\})?\)\s*(?:--.*)?$', re.M)]
 for f in sorted((root / "hypr" / "scripts").glob("*.lua")):
@@ -58,7 +55,6 @@ for f in sorted((shell / "lang").glob("*.js")):
         keys.add(unescape(m.group(1)))
     langs[f.stem] = keys
 
-# the lock screen is its own Quickshell config with its own small table (shell/YukiLock/I18n.js, one block per language)
 lock = root / "shell" / "YukiLock"
 lock_used = {}
 for f in sorted(lock.glob("*.qml")):

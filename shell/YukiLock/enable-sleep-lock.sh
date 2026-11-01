@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Add YukiLock to Hypridle's pre-suspend hook without replacing existing idle settings.
-# Lid-close is covered when logind's lid policy suspends the machine.
 set -eu
 
 cfg_home="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -81,7 +79,6 @@ if changed != original:
             os.unlink(tmp)
 PY
 
-# YukiShell starts Hypridle itself; restart it so the newly written hook takes effect.
 if command -v hypridle >/dev/null 2>&1; then
     pkill -x hypridle 2>/dev/null || true
     (hypridle >/dev/null 2>&1 &) 

@@ -1,7 +1,4 @@
 #!/bin/sh
-# tools/check      static checks for the whole repo; exit status 1 if anything fails
-#   Lua configs, fish, sh/bash scripts, Python, JSON, JS (syntax) · QML (syntax + duplicate ids) · translations (tools/i18n-check.py)
-# Tools that are not installed are skipped with a note. Run it before you commit.
 cd "$(dirname "$0")/.." || exit 1
 fail=0
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -17,7 +14,6 @@ section "shell  "; out=$(for f in $(git ls-files | xargs grep -lE '^#!.*(sh|bash
 section "python "; if have python3; then out=$(for f in $(git ls-files '*.py'); do python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$f" 2>&1 | tail -1 | sed "s|^|$f: |"; done); [ -z "$out" ] && ok || bad "$out"; else skip python3; fi
 section "json   "; if have python3; then out=$(for f in $(git ls-files '*.json'); do python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f" 2>&1 | tail -1 | sed "s|^|$f: |"; done); [ -z "$out" ] && ok || bad "$out"; else skip python3; fi
 section "js     "; if have node; then out=$(for f in $(git ls-files '*.js'); do
-    # QML JS libraries start with ".pragma library" and may use ".import"; those two lines are not plain JS
     sed -e 's/^\.pragma.*//' -e 's/^\.import.*//' "$f" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{try{new Function(t)}catch(e){console.log(e.message);process.exit(1)}})' 2>&1 | head -2 | sed "s|^|$f: |"; done); [ -z "$out" ] && ok || bad "$out"; else skip node; fi
 section "qml    "
 # Qt 6's qmllint first: a "qmllint" on PATH can be Qt 5's, which prints nothing at all for Qt 6 files (a broken file passed as "ok")

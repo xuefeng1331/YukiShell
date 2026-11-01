@@ -1,12 +1,3 @@
-// Which MPRIS player the Now Playing widget and the Menu Bar show.
-//
-// The old rule was "the first one that is playing, else the first one", which went wrong in two ways:
-//   * Browsers often register the same media twice (Chromium itself, with no artwork, no artist and a title like
-//     "(3) Song - YouTube", plus plasma-browser-integration with the clean metadata); the first one won.
-//   * When nothing played, the pick followed the list order, so the widget jumped around whenever a player came or went.
-// Now every player gets a score: playing beats paused, richer metadata (artwork, artist, title, length) beats poorer, and
-// the player that started playing most recently breaks ties, so a freshly started player takes over and an old one does not
-// steal the widget back.
 import QtQuick
 import Quickshell
 import Quickshell.Services.Mpris
@@ -14,9 +5,8 @@ import Quickshell.Services.Mpris
 Scope {
     id: pk
 
-    property string lastPlayed: ""         // D-Bus name of the player that most recently started playing
+    property string lastPlayed: ""
 
-    // the animated wallpaper (mpvpaper is mpv) is not music: with the mpv-mpris plugin loaded anyway it would register as a player
     function isWallpaper(p) {
         var u = "";
         try { u = String((p.metadata && p.metadata["xesam:url"]) || ""); } catch (e) { }
@@ -36,7 +26,6 @@ Scope {
     readonly property var player: {
         var ps = Mpris.players.values, best = null, bs = -1;
         for (var i = 0; i < ps.length; i++) {
-            // playerctld only mirrors the other players and stays registered when none is open: alone it is not a player
             if (ps[i].dbusName === "org.mpris.MediaPlayer2.playerctld" || isWallpaper(ps[i])) continue;
             var s = score(ps[i]);
             if (s > bs) { bs = s; best = ps[i]; }
@@ -44,7 +33,6 @@ Scope {
         return best;
     }
 
-    // remember who started playing last (also covers a player that is already playing when the shell starts)
     Instantiator {
         model: Mpris.players
         delegate: QtObject {

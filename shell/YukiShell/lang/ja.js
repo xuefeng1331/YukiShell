@@ -1,6 +1,5 @@
 .pragma library
 
-// Japanese interface strings. Keys are the English texts exactly as written in the QML files.
 var strings = {
     " Connected": " 件接続中",
     " Hz · Scale ": " Hz · スケール ",

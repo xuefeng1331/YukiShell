@@ -1,7 +1,3 @@
-// Small hand-drawn weather glyphs (no icon font / image files needed).
-//   kind: sun | moon | partly | partlyNight | cloud | fog | rain | snow | storm
-//   light: drawn on a light background (the Light widget style): the white clouds would vanish there, so they get deeper
-//          blue-grey tones and a faint outline
 import QtQuick
 
 Canvas {
@@ -17,11 +13,9 @@ Canvas {
     onSizeChanged: requestPaint()
     onWidthChanged: requestPaint()
     onLightChanged: requestPaint()
-    // a canvas that was hidden or not ready when its kind was set has nothing drawn: paint it the moment it can be seen
     onAvailableChanged: if (available) requestPaint()
     onVisibleChanged: if (visible) requestPaint()
 
-    // a darker version of a cloud colour for light backgrounds
     function deep(c) {
         var q = Qt.color(c);
         return "rgb(" + Math.round(q.r * 255 * 0.58) + "," + Math.round(q.g * 255 * 0.63) + "," + Math.round(q.b * 255 * 0.72) + ")";
@@ -32,8 +26,6 @@ Canvas {
         var g = ctx.createLinearGradient(0, cy - 0.3 * w, 0, cy + 0.22 * w);
         g.addColorStop(0, c1);
         g.addColorStop(1, c2);
-        // every part is its own fill (three puffs, then the pill-shaped base): in one path the canvas joins one circle to the next
-        // with a straight line and fills overlaps even-odd, which cut a notch and holes into the cloud
         var puffList = [[-0.22, 0.02, 0.20], [-0.02, -0.10, 0.26], [0.26, 0.03, 0.18]];
         function puffs() {
             for (var i = 0; i < puffList.length; i++) {
@@ -53,7 +45,7 @@ Canvas {
             ctx.closePath();
         }
         ctx.fillStyle = g;
-        if (ic.light) {         // a faint soft edge first, so the cloud reads against a white card
+        if (ic.light) {
             ctx.save();
             ctx.shadowColor = "rgba(0,0,0,0.22)";
             ctx.shadowBlur = Math.max(1.5, 0.06 * w);
@@ -98,7 +90,6 @@ Canvas {
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, 2 * Math.PI);
         ctx.fill();
-        // bite out of the disc -> crescent
         ctx.globalCompositeOperation = "destination-out";
         ctx.beginPath();
         ctx.arc(cx + 0.55 * r, cy - 0.35 * r, 0.82 * r, 0, 2 * Math.PI);

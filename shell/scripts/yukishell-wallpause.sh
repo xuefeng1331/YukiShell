@@ -1,11 +1,7 @@
 #!/bin/sh
-# Pause / resume the animated wallpaper on one monitor (or all) through mpv's IPC socket.
-#   yukishell-wallpause.sh <output|all> <pause|resume>
-# The socket is spoken to with Python (always there on this rice); socat or nc are only fallbacks. It used to need `nc` alone, which
-# is not installed everywhere: the pause then failed silently and the video decoded at full speed behind windows nobody could see through.
 run="${XDG_RUNTIME_DIR:-/tmp}"; v=$([ "$2" = pause ] && echo true || echo false)
 
-send() {  # send <socket>
+send() {
     if command -v python3 >/dev/null 2>&1; then
         python3 -I - "$1" "$v" <<'PY' >/dev/null 2>&1
 import socket, sys

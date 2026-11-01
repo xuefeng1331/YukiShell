@@ -20,11 +20,9 @@ def get_track_id(raw):
     m = re.search(r'spotify:track:([a-zA-Z0-9]{22})', raw)
     if m:
         return m.group(1)
-    # If standard 22-char base62
     if re.match(r'^[a-zA-Z0-9]{22}$', raw):
         return raw
-    # If URL
-    m = re.search(r'track/([a-zA-Z0-9]{22})', raw)   # open.spotify.com/track/ID and /com/spotify/track/ID
+    m = re.search(r'track/([a-zA-Z0-9]{22})', raw)
     if m:
         return m.group(1)
     return None
@@ -103,7 +101,6 @@ def fetch_canvas(track_id, cache_dir):
     video_path = os.path.join(cache_dir, f"{track_id}.mp4")
     if os.path.exists(video_path) and os.path.getsize(video_path) > 1000:
         return video_path
-    # tracks with no Canvas are remembered, so they are not asked for again every time
     miss = os.path.join(cache_dir, f"{track_id}.none")
     if os.path.exists(miss) and (time.time() - os.path.getmtime(miss)) < 7 * 86400:
         return None
@@ -113,7 +110,6 @@ def fetch_canvas(track_id, cache_dir):
     if not token:
         return None
 
-    # EntityCanvazRequest { repeated Entity entities = 1 }  Entity { string entity_uri = 1 }
     entity = ld(1, f"spotify:track:{track_id}".encode("utf-8"))
     payload = ld(1, entity)
     hdr = {
@@ -132,7 +128,7 @@ def fetch_canvas(track_id, cache_dir):
         if m:
             canvas_url = m.group(0).decode("utf-8", "ignore")
         else:
-            open(miss, "w").close()          # answered, but this track has no Canvas
+            open(miss, "w").close()
             return None
     except Exception as e:
         log_err(cache_dir, "canvaz request failed: %r" % (e,))

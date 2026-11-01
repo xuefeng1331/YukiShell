@@ -1,5 +1,3 @@
-// What one monitor shows while locked. The primary monitor gets the full macOS layout (clock, Now Playing,
-// avatar + password); the others show the wallpaper and the clock only, but still forward typing.
 import QtQuick
 import QtQuick.Effects
 import QtMultimedia
@@ -11,29 +9,25 @@ import "I18n.js" as I18n
 
 Item {
     id: ls
-    required property var st            // shared lock state (shell.qml)
+    required property var st
     property bool isPrimary: true
-    property bool shown: false          // entrance animation done / running
-    readonly property real u: Math.max(0.6, height / 1200)   // layout unit, 1.0 on a 1200 px tall screen
-    // UI font: Open Runde (bundled in fonts/, loaded by shell.qml)
+    property bool shown: false
+    readonly property real u: Math.max(0.6, height / 1200)
     readonly property string fam: "Open Runde"
     readonly property string famDisplay: fam
     readonly property bool leaving: st.unlocking
 
     focus: true
 
-    // --- entrance: start once the wallpaper is decoded (or after a short timeout), so it never fades in from black
     Timer { id: showTimer; interval: 450; running: true; onTriggered: ls.shown = true }
     Connections {
         target: wall
         function onStatusChanged() { if (wall.status === Image.Ready || wall.status === Image.Error) ls.shown = true; }
     }
 
-    // whole screen fades in over the (xray) desktop and back out on unlock
     opacity: shown && !leaving ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: ls.leaving ? 420 : 650; easing.type: Easing.OutQuint } }
 
-    // --- Backdrop ---
     Rectangle { anchors.fill: parent; color: "#0b0b10" }
 
     Item {
@@ -47,14 +41,10 @@ Item {
             asynchronous: true
             cache: true
             smooth: true
-            // A 2.5K decode is plenty for a blurred full-screen background and avoids decoding huge 4K/8K originals.
             sourceSize.width: Math.max(1, Math.min(ls.width * 1.15, 2560))
-            // slow settle-in zoom, and a gentle zoom-out as the lock lifts
             scale: ls.leaving ? 1.06 : (ls.shown ? 1.0 : 1.09)
             Behavior on scale { NumberAnimation { duration: ls.leaving ? 520 : 650; easing.type: Easing.OutQuint } }
         }
-        // animated wallpaper: the same video YukiShell plays on the desktop, muted and looping. It plays from the first frame:
-        // the waiting YukiLock has already started Qt Multimedia (shell.qml, warm), which otherwise held the lock back by ~1 s.
         Loader {
             id: wallVideo
             anchors.fill: wall
@@ -70,7 +60,6 @@ Item {
                 VideoOutput { id: vo; anchors.fill: parent; fillMode: VideoOutput.PreserveAspectCrop }
             }
         }
-        // the wallpaper softens (no darkening) while you are entering the password
         MultiEffect {
             source: wallVideo.active ? wallVideo : wall
             anchors.fill: wall
@@ -83,8 +72,6 @@ Item {
             Behavior on blur { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
             Behavior on opacity { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
         }
-        // Album background: while the cover is enlarged the wallpaper gives way to a heavily blurred, slightly
-        // darkened copy of the artwork (Apple Music full-screen player). Part of the scene, so the glass refracts it.
         Item {
             id: artBg
             anchors.fill: parent
@@ -92,7 +79,6 @@ Item {
             visible: opacity > 0.003
             Rectangle { anchors.fill: parent; color: "#0c0c10" }
 
-            // Animated Canvas Video (Spotify supported music)
             Loader {
                 id: canvasLoader
                 anchors.fill: parent
@@ -123,27 +109,24 @@ Item {
                 brightness: -0.15
             }
 
-            // old and new album, each blurred; the new one fades in over the old one during a hand-over
             Repeater {
                 model: canvasLoader.active ? 0 : 2
                 delegate: MultiEffect {
                     required property int index
                     readonly property Item img: index === 0 ? ls.coverOld : ls.coverNew
                     anchors.fill: parent
-                    scale: 1.25                            // pushes the blur's soft edges off-screen
+                    scale: 1.25
                     source: img
                     autoPaddingEnabled: false
                     blurEnabled: true; blurMax: 64; blur: 1.0
                     saturation: 0.25
                     brightness: -0.16
-                    // new: fades in with the hand-over; old: only there while it's being covered
                     opacity: index === 1 ? ls.bgProg : (ls.bgProg < 1 ? 1 : 0)
                     visible: img.status === Image.Ready && opacity > 0.003
                     z: index
                 }
             }
         }
-        // top/bottom vignette so white text always reads, like the macOS lock screen
         Rectangle {
             anchors.fill: parent
             gradient: Gradient {
@@ -155,12 +138,9 @@ Item {
         }
     }
 
-    // shared, pre-blurred copy of the scene that every glass slab (and the clock) refracts
     ShaderEffectSource {
         id: sceneTex
         sourceItem: scene
-        // live: with a video wallpaper the glass follows it at the video's own frame rate (it used to refresh at 12 fps to save GPU
-        // time, which made everything seen through the glass judder). The copy is half resolution, so it stays cheap.
         live: true
         visible: false
         textureSize: Qt.size(Math.max(1, Math.round(ls.width / 2)), Math.max(1, Math.round(ls.height / 2)))
@@ -183,7 +163,6 @@ Item {
         visible: false
     }
 
-    // --- STATUS (top right) ---
     Row {
         visible: ls.isPrimary
         anchors.top: parent.top; anchors.right: parent.right
@@ -222,7 +201,6 @@ Item {
                 text: parent.pct + "%"
                 color: "white"; font.family: ls.fam; font.pixelSize: 13 * ls.u; font.weight: Font.Medium
             }
-            // macOS battery: rounded outline, fill, little cap
             Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 27 * ls.u; height: 13 * ls.u
@@ -249,9 +227,6 @@ Item {
         }
     }
 
-    // --- NOTIFICATIONS + LIVE ACTIVITY (top right, under the status) ---
-    // Notifications are hidden like macOS ("Show previews: When Unlocked"): app icon, app name, "Notification", time.
-    // Clicking one asks for the password: the field glows and fades (1 s). YukiShell writes the list.
     FileView {
         id: notifFile
         path: Quickshell.env("HOME") + "/.cache/yukishell/lock-notifs.json"
@@ -259,7 +234,6 @@ Item {
         onFileChanged: reload()
     }
     readonly property var lockNotifs: { try { return notifFile.loaded ? JSON.parse(notifFile.text()) : []; } catch (e) { return []; } }
-    // the cards live in a keyed ListModel updated in place: clearing one doesn't rebuild (and re-fade) the others
     ListModel { id: lnModel }
     onLockNotifsChanged: {
         var want = lockNotifs.slice(0, 4), i, j, k;
@@ -276,7 +250,6 @@ Item {
             else if (at !== i) lnModel.move(at, i, 1);
         }
     }
-    // Clock app state: a running timer / stopwatch, or an alarm ringing
     FileView {
         id: clockFile
         path: Quickshell.env("HOME") + "/.config/yukishell/clock.json"
@@ -308,12 +281,10 @@ Item {
         y: 48 * ls.u
         width: 340 * ls.u
         spacing: 8 * ls.u
-        // cards below a cleared one glide up into its place
         move: Transition { NumberAnimation { properties: "y"; duration: 420; easing.type: Easing.OutQuint } }
         opacity: ls.shown && !ls.leaving ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
 
-        // live activity
         Item {
             id: liveCard
             width: parent.width
@@ -328,7 +299,6 @@ Item {
             readonly property var tm: ls.clockSt ? ls.clockSt.timer : null
             readonly property real remain: !tm ? 0 : (tm.state === "running" ? Math.max(0, tm.endAt - ls.nowMs) : tm.left)
             readonly property real swMs: (ls.clockSt && ls.clockSt.sw) ? ls.clockSt.sw.acc + (ls.clockSt.sw.running ? ls.nowMs - ls.clockSt.sw.startAt : 0) : 0
-            // timer ring / stopwatch glyph
             Canvas {
                 id: liveRing
                 x: 16 * ls.u; y: 14 * ls.u
@@ -360,7 +330,6 @@ Item {
                     font.features: { "tnum": 1 }
                 }
             }
-            // ringing: Stop / Snooze right here (YukiShell does the stopping)
             Row {
                 visible: ls.liveKind === "ring"
                 x: 16 * ls.u; anchors.bottom: parent.bottom; anchors.bottomMargin: 12 * ls.u
@@ -378,7 +347,6 @@ Item {
             }
         }
 
-        // notifications (newest first; past four they stack, like macOS)
         Repeater {
             model: lnModel
             delegate: Item {
@@ -389,14 +357,11 @@ Item {
                 required property real time
                 required property int index
                 width: rightCol.width
-                // a swiped card folds its slot away so the ones below glide up
                 height: (gone ? 0 : 62 * ls.u)
                 Behavior on height { NumberAnimation { duration: 380; easing.type: Easing.OutQuint } }
                 property real appear: 0
                 Component.onCompleted: appearAnim.start()
                 NumberAnimation { id: appearAnim; target: nc; property: "appear"; from: 0; to: 1; duration: 560; easing.type: Easing.OutQuint }
-                // swipe sideways to clear: the card follows the pointer and fades with distance; past a third of its
-                // width (or flicked) it flies off and YukiShell dismisses it, otherwise it springs back
                 property real dragX: 0
                 property bool gone: false
                 readonly property real far: Math.min(1, Math.abs(dragX) / (width * 0.75))
@@ -415,7 +380,6 @@ Item {
                 Image {
                     x: 14 * ls.u; anchors.verticalCenter: parent.verticalCenter
                     width: 34 * ls.u; height: width
-                    // apps without an icon (YukiShell's own, notify-send...) get the system notifications icon
                     source: nc.icon && status !== Image.Error ? nc.icon : "image://icon/preferences-system-notifications"
                     sourceSize: Qt.size(96, 96)
                     smooth: true; mipmap: true
@@ -430,15 +394,12 @@ Item {
                     anchors.right: parent.right; anchors.rightMargin: 14 * ls.u; y: 13 * ls.u
                     text: ls.notifAge(nc.time); color: Qt.rgba(1, 1, 1, 0.6); font.family: ls.fam; font.pixelSize: 12 * ls.u
                 }
-                // one MouseArea for tap AND swipe: it keeps the pointer for the whole drag (preventStealing), and the card
-                // is only cleared when the button is actually released - an interrupted drag springs back
                 MouseArea {
                     id: ncMa
                     anchors.fill: parent
                     hoverEnabled: true
                     preventStealing: true
                     cursorShape: dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                    // screen coordinates: the card itself moves under the pointer
                     property real pressSX: 0
                     property real startDX: 0
                     property real lastSX: 0
@@ -470,7 +431,6 @@ Item {
                 }
             }
         }
-        // "+N more": the rest, stacked under the last card
         Item {
             visible: ls.lockNotifs.length > 4
             width: parent.width; height: 26 * ls.u
@@ -483,13 +443,11 @@ Item {
         }
     }
 
-    // --- Clock ---
     Item {
         id: clock
         anchors.horizontalCenter: parent.horizontalCenter
         y: (ls.shown && !ls.leaving ? 0.075 : 0.035) * ls.height
         width: Math.max(dateTxt.implicitWidth, timeItem.width)
-        // repel: the bubble pressing up into the clock pushes it up and squashes it against the top
         transform: [
             Translate {
                 y: -ls.pressTop * 0.45
@@ -521,7 +479,6 @@ Item {
             layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.6; shadowOpacity: 0.25; shadowVerticalOffset: 1 }
         }
 
-        // big translucent glass clock: the text is a mask, glasstext.frag refracts the wallpaper through it
         Item {
             id: timeItem
             anchors.top: dateTxt.bottom
@@ -529,21 +486,16 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: timeTxt.implicitWidth + 40
             height: timeTxt.implicitHeight
-            // room captured around the digits: the morph scales / realigns a little past the text box, and the glass
-            // refracts past its edges - without it the clock got cropped mid-animation
             readonly property real mp: Math.max(48 * ls.u, ls.clockPx * 0.5)
-            // the digits morph into each new minute (fade + slight scale) ...
             MorphText {
                 id: timeTxt
                 anchors.centerIn: parent
                 horizontalAlignment: Text.AlignHCenter
                 duration: 560
-                useBlur: false              // no effect INSIDE the glass's hidden source (that made the clock vanish)
-                animateWidth: false         // box snaps to the new width; the digits stay centred through the morph
+                useBlur: false
+                animateWidth: false
                 stretch: false
                 scaleIn: 1.03; scaleOut: 0.97
-                // 12- or 24-hour, as set in YukiShell (no AM/PM, like the macOS / iOS lock screen)
-                // (Qt's "h" only goes 12-hour together with AP, so the hour is computed here)
                 text: ls.st.use24h ? Qt.formatTime(ls.st.now, I18n.tr("H:mm")) : ((ls.st.now.getHours() % 12) || 12) + Qt.formatTime(ls.st.now, ":mm")
                 color: "white"
                 font.family: ls.ckFamily; font.pixelSize: ls.clockPx; font.weight: Font.Bold
@@ -557,7 +509,6 @@ Item {
                 sourceItem: timeTxt; hideSource: true; visible: false; smooth: true
                 sourceRect: Qt.rect(-timeItem.mp, -timeItem.mp, timeTxt.width + 2 * timeItem.mp, timeTxt.height + 2 * timeItem.mp)
             }
-            // ... and the glass digits go soft and come back into focus while that happens (blur + morph)
             MultiEffect {
                 id: timeMaskFx
                 width: timeMaskRaw.sourceRect.width; height: timeMaskRaw.sourceRect.height
@@ -567,19 +518,16 @@ Item {
                 visible: false
             }
             ShaderEffectSource { id: timeMask; sourceItem: timeMaskFx; visible: false; smooth: true }
-            // a LIGHTLY blurred copy of the digits: only used to find the thin glass rim along the edges
             MultiEffect {
                 id: timeHeightFx
                 width: timeMaskFx.width; height: timeMaskFx.height
                 source: timeMask
-                // the rim is a fixed share of the digit size (thin weights get a finer one)
                 blurEnabled: true; blurMax: 16
                 blur: Math.max(0.12, Math.min(0.6, ls.clockPx * (ls.ckWeight < 330 ? 0.02 : 0.04) / 16))
                 autoPaddingEnabled: false
                 visible: false
             }
             ShaderEffectSource { id: timeHeight; sourceItem: timeHeightFx; visible: false; smooth: true }
-            // soft shadow under the glass digits so they lift off light wallpapers too
             MultiEffect {
                 x: timeTxt.x - timeItem.mp; y: timeTxt.y - timeItem.mp + 8 * ls.u
                 width: timeMaskFx.width; height: timeMaskFx.height
@@ -594,7 +542,6 @@ Item {
                 x: timeTxt.x - timeItem.mp; y: timeTxt.y - timeItem.mp
                 width: timeMaskFx.width; height: timeMaskFx.height
                 fragmentShader: Qt.resolvedUrl("glasstext.frag.qsb")
-                // where the glass really is on screen (follows the clock's animations)
                 readonly property point fp: { ls.clockPx; clock.y; clock.x; timeItem.x; timeTxt.x; timeTxt.width; return timeGlass.mapToItem(ls, 0, 0); }
                 property variant src: glassTex
                 property variant mask: timeMask
@@ -602,7 +549,6 @@ Item {
                 property vector2d itemSize: Qt.vector2d(width, height)
                 property vector2d srcSize: Qt.vector2d(ls.width, ls.height)
                 property vector2d srcOffset: Qt.vector2d(fp.x, fp.y)
-                // Apple's two clock materials (Settings -> Lock Screen -> Clock): Solid = vibrancy, Glass = Liquid Glass
                 property real mode: ls.ckGlass ? 1 : 0
                 property real intensity: ls.ckGlass ? ls.ckIntensity : 0.55 + 0.4 * ls.ckIntensity
                 property real refract: (6 + 4 * (1 - ls.ckIntensity)) * ls.u
@@ -614,7 +560,6 @@ Item {
                 Behavior on tint { ColorAnimation { duration: 500 } }
                 onStatusChanged: if (status === ShaderEffect.Error) console.log("[yukilock] clock shader:", log)
             }
-            // fallback when the shader is missing
             Text {
                 visible: timeGlass.status === ShaderEffect.Error
                 anchors.fill: timeTxt
@@ -625,9 +570,6 @@ Item {
         }
     }
 
-    // --- Cover hand-over ---
-    // Two picture slots. A new cover loads into the back slot; once it's there (or after 1.5 s) the bubble's cover
-    // "burns" over to it (burn.frag) and the blurred album background cross-fades, both in step.
     readonly property string coverUrl: media.pl && media.pl.trackArtUrl ? media.pl.trackArtUrl : ""
     property int coverIdx: 0
     property real coverProg: 1
@@ -637,7 +579,7 @@ Item {
         if (coverUrl === "" || !ls.isPrimary) return;
         var cur = coverIdx === 0 ? coverA : coverB;
         if (cur.source.toString() === coverUrl) return;
-        if (cur.source.toString() === "") { cur.source = coverUrl; return; }     // first cover: just show it
+        if (cur.source.toString() === "") { cur.source = coverUrl; return; }
         (coverIdx === 0 ? coverB : coverA).source = coverUrl;
         coverPending = true;
         coverWait.restart();
@@ -656,7 +598,6 @@ Item {
     }
     Timer { id: coverWait; interval: 1500; onTriggered: ls.coverTry() }
     NumberAnimation { id: coverAnim; target: ls; property: "coverProg"; from: 0; to: 1; duration: 1100; easing.type: Easing.InOutCubic }
-    // the blurred album background: its own, quicker hand-over (0.65 s ease-out)
     property real bgProg: 1
     NumberAnimation { id: bgAnim; target: ls; property: "bgProg"; from: 0; to: 1; duration: 650; easing.type: Easing.OutCubic }
     Image { id: coverA; visible: false; width: 600; height: 600; fillMode: Image.PreserveAspectCrop; asynchronous: true; mipmap: true; sourceSize: Qt.size(600, 600); onStatusChanged: ls.coverTry() }
@@ -664,10 +605,6 @@ Item {
     readonly property Item coverNew: coverIdx === 0 ? coverA : coverB
     readonly property Item coverOld: coverIdx === 0 ? coverB : coverA
 
-    // --- Now playing ---
-    // the same rule as YukiShell's PlayerPicker.qml: playing beats paused, then the richer metadata wins. Browsers register the
-    // same media twice (Chromium itself, with no cover and no artist, and plasma-browser-integration with both); taking the first
-    // playing one showed the copy without the cover.
     readonly property var player: {
         var ps = Mpris.players.values, best = null, bs = -1;
         for (var i = 0; i < ps.length; i++) {
@@ -679,31 +616,21 @@ Item {
         return best;
     }
     readonly property bool hasMedia: player !== null && player !== undefined && (player.trackTitle || "") !== ""
-    // Apple "artwork mode" (tap the cover: it leaves the bubble, as wide as the bubble) and Apple Music style lyrics
-    // (lyrics button). Only one at a time.
-    // npMode: "" | "art" | "lyrics" | "artlyrics" (big cover on the left, lyrics on the right - Apple Music full screen)
     readonly property bool artMode: (ls.st.npMode === "art" || ls.st.npMode === "artlyrics") && hasMedia && isPrimary && !leaving
     readonly property bool lyricsMode: (ls.st.npMode === "lyrics" || ls.st.npMode === "artlyrics") && hasMedia && isPrimary && !leaving
     readonly property bool sideMode: ls.st.npMode === "artlyrics" && hasMedia && isPrimary && !leaving
-    // 0 -> 1: cover + bubble slide left, the lyrics move beside them
     property real sideT: sideMode ? 1 : 0
     Behavior on sideT { NumberAnimation { id: sideAnim; duration: 650; easing.type: Easing.OutQuint } }
     readonly property real sideGap: 32 * u
     readonly property real sideLyrW: Math.min(560 * u, width - 372 * u - sideGap - 96 * u)
-    // 0 -> 1 springs; the cover, the bubble, the lyrics and the clock all follow them, so they move as one
     property real artT: artMode ? 1 : 0
     Behavior on artT { NumberAnimation { id: artAnim; duration: 650; easing.type: Easing.OutQuint } }
     property real lyrT: lyricsMode ? 1 : 0
     Behavior on lyrT { NumberAnimation { id: lyrAnim; duration: 650; easing.type: Easing.OutQuint } }
     readonly property bool npAnimating: artAnim.running || lyrAnim.running || sideAnim.running
     function clamp01(v) { return Math.max(0, Math.min(1, v)); }
-    // how much the clock gives way (follows the cover / lyrics ease-out)
     readonly property real squash: Math.max(artT, lyrT)
-    // --- clock style (Settings -> Lock Screen -> Clock) ---
-    //   font: rounded (default; Nunito, falls back to the bundled Open Runde) | serif (Noto Serif Display) | inter (Open Runde)
-    //   material: solid (vibrancy) | glass (Liquid Glass)
     readonly property var ckCfg: (ls.st.clockCfg && !ls.st.clockCfg.__ignore) ? ls.st.clockCfg : ({})
-    // anything else (including the removed "condensed" font) falls back to rounded
     readonly property string ckFont: ["rounded", "serif", "inter"].indexOf(ckCfg.f) >= 0 ? ckCfg.f : "rounded"
     readonly property bool ckFontOk: {
         var want = ckFont === "serif" ? "Noto Serif Display" : (ckFont === "inter" ? "Open Runde" : "Nunito");
@@ -712,13 +639,11 @@ Item {
     readonly property string ckFamily: !ckFontOk ? "Open Runde"
         : (ckFont === "serif" ? "Noto Serif Display" : (ckFont === "inter" ? "Open Runde" : "Nunito"))
     readonly property int ckWeight: (typeof ckCfg.w === "number" && ckCfg.w >= 100 && ckCfg.w <= 1000) ? ckCfg.w : 1000
-    // material: "solid" (vibrancy) | "glass" (Liquid Glass); older settings: liquid -> clear glass, frosted -> frosted glass
     readonly property bool ckGlass: ckCfg.m !== "solid"
     readonly property real ckIntensity: typeof ckCfg.i === "number" ? Math.max(0, Math.min(1, ckCfg.i))
                                        : (ckCfg.m === "liquid" ? 0.12 : (ckCfg.m === "solid" ? 0.8 : 0.6))
     readonly property color ckTint: (typeof ckCfg.c === "string" && ckCfg.c !== "") ? ckCfg.c : "#EEACBE"
     readonly property bool ckLiquid: ckGlass && ckIntensity < 0.35
-    // the light on the glass follows the pointer (tilting a phone); rests at the top-left
     HoverHandler { id: lightHover }
     property real lightX: -0.6
     property real lightY: -0.8
@@ -728,25 +653,20 @@ Item {
         interval: 80; repeat: true; running: lightHover.hovered && ls.ckGlass && ls.isPrimary
         onTriggered: {
             var c = clock.mapToItem(ls, clock.width / 2, clock.height / 2);
-            var dx = c.x - lightHover.point.position.x, dy = c.y - lightHover.point.position.y;   // light comes from the pointer
+            var dx = c.x - lightHover.point.position.x, dy = c.y - lightHover.point.position.y;
             var l = Math.sqrt(dx * dx + dy * dy) || 1;
-            // never straight from below: the glass reads best lit from above
             ls.lightX = -dx / l; ls.lightY = Math.min(-0.25, -dy / l);
         }
     }
     readonly property bool ckShortDate: ckCfg.d === "short"
-    // size per font (all shrink together when the cover / lyrics need the room)
     readonly property real ckBase: (ckFont === "serif" ? 168 : (ckFont === "rounded" ? 176 : 172))
                                    * (ckWeight < 330 ? 1.12 : 1.0)
     readonly property real clockPx: ckBase * (1 - 0.46 * squash) * u
     readonly property real clockWght: Math.max(100, Math.min(1000, ckWeight - 80 * squash * (ckWeight / 680)))
     readonly property real lyricsH: Math.min(ls.height * 0.42, 440 * ls.u)
-    // vertical room above the bubble: the cover, the lyrics, or (side by side) the taller of the two
-    // lyrics go UNDER the bubble when it sits in the top spot (the bubble stays put), above it in the bottom spot
     readonly property bool lyricsBelow: ls.st.mediaSlot !== "bottom"
     readonly property real panelRoom: Math.max(Math.max(0, artT) * (media.width + 24 * ls.u), lyricsBelow ? 0 : Math.max(0, lyrT) * (1 - sideT) * (lyricsH + 24 * ls.u))
     readonly property int springMs: 650
-    // how far the dragged bubble is pressed past its top / bottom spot (px), 0 when not dragging
     readonly property real pressTop: media.dragging ? Math.max(0, media.slotTop - (media.base + media.dragOff)) : 0
     readonly property real pressBottom: media.dragging ? Math.max(0, (media.base + media.dragOff) - media.slotBottom) : 0
     function squishK(px) { return Math.min(1, px / (70 * u)); }
@@ -761,9 +681,6 @@ Item {
         x: (ls.width - width) / 2 - ls.sideT * (ls.sideLyrW + ls.sideGap) / 2
         readonly property bool on: ls.shown && !ls.leaving && ls.hasMedia
         onOnChanged: if (!on) ls.st.npMode = ""
-        // two fixed spots: under the clock, or just above the password field. Drag the card between them.
-        // with the cover floating, the top spot leaves room for it between the clock and the bubble
-        // computed from where the clock and the login column END UP, not where they are mid-animation
         readonly property real slotTop: 0.075 * ls.height + clock.height + 22 * ls.u + ls.panelRoom
         readonly property real slotBottom: ls.height - login.height - 78 * ls.u - height - 26 * ls.u
         readonly property real base: ls.st.mediaSlot === "bottom" ? slotBottom : slotTop
@@ -771,12 +688,10 @@ Item {
         property bool settling: false
         readonly property bool dragging: mediaDrag.active
         y: base + dragOff
-        // y only animates for real moves (cover / lyrics opening, slot changes), never while the lock appears
         property bool settled: false
         Timer { running: ls.shown; interval: 900; onTriggered: media.settled = true }
         opacity: on ? 1 : 0
         scale: !on ? 0.94 : (dragging ? 1.04 : 1)
-        // the bubble squashes too where it presses into the clock / the login
         transform: Scale {
             origin.x: media.width / 2; origin.y: ls.pressTop > 0 ? 0 : media.height
             xScale: 1 + 0.05 * ls.squishK(Math.max(ls.pressTop, ls.pressBottom))
@@ -794,7 +709,6 @@ Item {
             cursorShape: Qt.ClosedHandCursor
             onTranslationChanged: {
                 if (!active) return;
-                // follow the pointer, with rubber-banding past the two spots
                 var lo = media.slotTop - media.base, hi = media.slotBottom - media.base, t = translation.y;
                 if (t < lo) t = lo - Math.sqrt(lo - t) * 7;
                 else if (t > hi) t = hi + Math.sqrt(t - hi) * 7;
@@ -803,7 +717,6 @@ Item {
             onActiveChanged: {
                 ls.st.poke();
                 if (active) { settleAnim.stop(); return; }
-                // snap to the nearer spot and remember it
                 var cur = media.base + media.dragOff;
                 var slot = Math.abs(cur - media.slotBottom) < Math.abs(cur - media.slotTop) ? "bottom" : "top";
                 media.settling = true;
@@ -822,7 +735,6 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.OutQuint } }
         Behavior on scale { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
 
-        // keep the latest track info while fading out, so the card doesn't go blank mid-animation
         property var pl: null
         Connections { target: ls; function onPlayerChanged() { if (ls.player) media.pl = ls.player; } }
         Component.onCompleted: pl = ls.player
@@ -842,10 +754,8 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 220 } }
         }
 
-        // cover art
         Item {
             id: art
-            // the cover leaves the glass bubble: it is drawn on the screen itself, above the bubble
             parent: ls
             z: media.z + 1
             visible: media.visible
@@ -865,7 +775,6 @@ Item {
             }
             Rectangle { anchors.fill: parent; radius: art.r; color: Qt.rgba(1, 1, 1, 0.12) }
             TapHandler {
-                // cover tap: bubble <-> big cover; with lyrics open the cover joins them on the left (and leaves again)
                 onTapped: {
                     var m = ls.st.npMode;
                     ls.st.npMode = m === "" ? "art" : m === "art" ? "" : m === "lyrics" ? "artlyrics" : "lyrics";
@@ -921,7 +830,6 @@ Item {
             }
         }
 
-        // scrubber
         Item {
             id: scrub
             x: 18 * ls.u; width: parent.width - 36 * ls.u
@@ -984,7 +892,6 @@ Item {
             }
         }
 
-        // lyrics button (Apple's quote bubble), right of the controls
         Item {
             id: lyrBtn
             x: media.width - 16 * ls.u - width
@@ -1010,12 +917,10 @@ Item {
                         var c = getContext("2d"); c.reset();
                         var s = width / 18; c.scale(s, s);
                         c.fillStyle = ink; c.strokeStyle = ink; c.lineWidth = 1.5; c.lineJoin = "round";
-                        // speech bubble
                         c.beginPath();
                         c.moveTo(4.5, 2.5); c.lineTo(13.5, 2.5); c.arcTo(16, 2.5, 16, 5, 2.5); c.lineTo(16, 10.5); c.arcTo(16, 13, 13.5, 13, 2.5);
                         c.lineTo(8, 13); c.lineTo(4.6, 15.8); c.lineTo(4.6, 13); c.arcTo(2, 13, 2, 10.5, 2.5); c.lineTo(2, 5); c.arcTo(2, 2.5, 4.5, 2.5, 2.5);
                         c.closePath(); c.stroke();
-                        // quote marks
                         function q(x) { c.beginPath(); c.arc(x, 7, 1.35, 0, Math.PI * 2); c.fill(); c.beginPath(); c.moveTo(x + 1.2, 7); c.quadraticCurveTo(x + 1.3, 9.6, x - 0.6, 10.4); c.stroke(); }
                         q(6.6); q(10.8);
                     }
@@ -1027,7 +932,6 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    // lyrics button: with the cover enlarged the cover slides left and the lyrics appear beside it
                     var m = ls.st.npMode;
                     ls.st.npMode = m === "" ? "lyrics" : m === "lyrics" ? "" : m === "art" ? "artlyrics" : "art";
                     if (ls.lyricsMode && (ls.lyrStatus === "idle" || ls.lyrStatus === "none")) ls.fetchLyrics();
@@ -1036,7 +940,6 @@ Item {
             }
         }
 
-        // transport controls
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             y: scrub.y + scrub.height + 6 * ls.u
@@ -1051,7 +954,6 @@ Item {
                     readonly property bool can: media.pl !== null && (modelData === "prev" ? media.pl.canGoPrevious
                                                 : modelData === "next" ? media.pl.canGoNext : media.pl.canTogglePlaying)
                     opacity: can ? 1 : 0.35
-                    // glass halo on hover
                     Rectangle {
                         anchors.centerIn: parent
                         width: 40 * ls.u; height: width; radius: width / 2
@@ -1086,8 +988,6 @@ Item {
         }
     }
 
-    // --- LYRICS (Apple Music style) ---
-    // estimated playback position: MPRIS is polled twice a second, the lyrics need it smooth
     property real posBase: 0
     property real posAt: 0
     property bool posPlaying: false
@@ -1098,12 +998,9 @@ Item {
         onTriggered: ls.estPos = ls.posBase + (ls.posPlaying ? (Date.now() - ls.posAt) / 1000 : 0)
     }
 
-    // Spotify Canvas: short looping video artwork for supported tracks
     property string canvasVideo: ""
     readonly property string spotifyTrackId: {
         if (!media.pl) return "";
-        // MPRIS trackId is often a generic D-Bus object path; do not let it mask the Spotify URL.
-        // Quickshell's MprisPlayer has no trackId / url property: the raw MPRIS fields live in `metadata`
         var md = media.pl.metadata || {};
         var candidates = [String(md["xesam:url"] || ""), String(md["mpris:trackid"] || ""), String(media.pl.uniqueId || "")];
         for (var i = 0; i < candidates.length; i++) {
@@ -1135,9 +1032,8 @@ Item {
         }
     }
 
-    // lyrics for the current track: NetEase, LRCLIB, and Genius, cached in ~/.cache/yukilock/lyrics
-    property var lyrLines: []              // [{ t: seconds (-1 = unsynced), text }]
-    property string lyrStatus: "idle"      // idle | loading | synced | plain | none
+    property var lyrLines: []
+    property string lyrStatus: "idle"
     readonly property string trackKey: media.pl ? (media.pl.trackArtist || "") + "\u0001" + (media.pl.trackTitle || "") : ""
     Timer { id: lyrFetchDelay; interval: 400; onTriggered: { ls.lyrTries = 0; ls.fetchLyrics(); } }
     property int lyrTries: 0
@@ -1155,9 +1051,7 @@ Item {
         'k=$(printf "%s|%s" "$a" "$t" | md5sum | cut -c1-16); f="$c/$k.json"',
         '[ -s "$f" ] && { cat "$f"; exit 0; }',
         'tmp=$(mktemp); answered=0; r=""',
-        // titles like "Song (feat. X)" / "Song - Remastered 2011": also try the bare title
         'bare=$(printf "%s" "$t" | sed -E "s/ *[(\\[][^)\\]]*[)\\]]//g; s/ +- +(.*[Rr]emaster.*|[Ll]ive.*|[Rr]adio [Ee]dit.*)$//")',
-        // --- 1. NetEase Cloud Music: fast, not rate-limited. Same title + same length (±4 s) or it doesn't count.
         'ne() { code=$(curl -s --max-time 6 -A "Mozilla/5.0" -o "$tmp" -w "%{http_code}" -G "https://music.163.com/api/search/get" --data-urlencode "s=$1" -d type=1 -d limit=10); [ "$code" = 200 ] || return 1; answered=1',
         '  id=$(jq -r --arg t "$bare" --argjson d "$d" \'def n: ascii_downcase | gsub("[^\\\\p{L}\\\\p{N}]"; ""); ($t | n) as $q | [.result.songs[]? | select((.name | n) as $nm | ($nm == $q) or ($nm | startswith($q)) or ($q | startswith($nm))) | select($d == 0 or (((.duration / 1000) - $d) | fabs) <= 4)][0].id // empty\' "$tmp")',
         '  [ -n "$id" ] || return 1',
@@ -1165,7 +1059,6 @@ Item {
         '  l=$(jq -r ".lrc.lyric // empty" "$tmp"); case "$l" in *"[0"*|*"[1"*) ;; *) return 1;; esac',
         '  r=$(jq -nc --arg l "$l" "{syncedLyrics: \\$l}"); }',
         'ne "$a $bare" || ne "$bare"',
-        // --- 2. LRCLIB (rate-limited per second: wait and retry briefly), length-checked too
         'ua="YukiLock/1.0 (https://github.com/xuefeng1331/YukiShell)"; api=https://lrclib.net/api',
         'req() { n=0; while [ $n -lt 2 ]; do code=$(curl -s --max-time 8 -A "$ua" -o "$tmp" -w "%{http_code}" -G "$@"); case "$code" in 200) answered=1; return 0;; 404) answered=1; return 1;; 429) n=$((n+1)); sleep 1.5;; *) return 1;; esac; done; return 1; }',
         'pick=\'[.[] | select(.syncedLyrics != null or .plainLyrics != null) | select($d == 0 or (((.duration // 0) - $d) | fabs) <= 4)] | ([.[] | select(.syncedLyrics != null)][0] // .[0]) // empty\'',
@@ -1174,7 +1067,6 @@ Item {
         '[ -z "$r" ] && [ "$bare" != "$t" ] && lsearch --data-urlencode "track_name=$bare" --data-urlencode "artist_name=$a"',
         '[ -z "$r" ] && lsearch --data-urlencode "q=$a $bare"',
         'rm -f "$tmp"',
-        // --- 3. Genius: token-free, rich lyrics source
         'if [ -z "$r" ] || [ "$(printf "%s" "$r" | jq -r ".syncedLyrics // empty" 2>/dev/null)" = "" ]; then',
         '  g=$(python3 "$HOME/.config/quickshell/YukiLock/genius-lyrics.py" "$a" "$bare" "$c" 2>/dev/null || true)',
         '  if [ -n "$g" ] && [ "$g" != "{}" ]; then',
@@ -1183,7 +1075,6 @@ Item {
         '  fi',
         'fi',
         'if [ -n "$r" ]; then printf "%s" "$r" | jq -c "{synced: .syncedLyrics, plain: .plainLyrics, instrumental: .instrumental}" | tee "$f"',
-        // a source really answered and nobody has it: remember; otherwise (offline / still limited) let the UI retry
         'elif [ "$answered" = 1 ]; then echo "{}" | tee "$f"',
         'else echo "{\\"retry\\":true}"; fi'
     ].join("\n")
@@ -1210,7 +1101,6 @@ Item {
                     for (i = 0; i < pl.length; i++) out.push({ t: -1, text: pl[i].trim() });
                     ls.lyrLines = out; ls.lyrStatus = "plain";
                 } else if (o.retry) {
-                    // rate-limited / offline: try again shortly (a few times)
                     if (ls.lyrTries < 4) { ls.lyrTries++; ls.lyrStatus = "loading"; lyrRetry.restart(); }
                     else { ls.lyrLines = []; ls.lyrStatus = "offline"; }
                 } else if (o.instrumental) {
@@ -1222,7 +1112,6 @@ Item {
         }
     }
 
-    // current line (a hair early, like Apple Music)
     readonly property int lyrCur: {
         if (lyrStatus !== "synced") return -1;
         var p = estPos + 0.25, c = -1;
@@ -1233,13 +1122,10 @@ Item {
     Item {
         id: lyr
         visible: ls.lyrT > 0.01 && media.visible
-        // lines past the feathered edges are cut off for real: not drawn and not clickable (they used to sit invisibly
-        // over the media controls and swallow clicks)
         clip: true
         z: media.z + 1
         readonly property real wTop: Math.min(ls.width - 80 * ls.u, 620 * ls.u)
         readonly property real hSide: media.width + 24 * ls.u + media.height
-        // lyrics-only: below the bubble (top spot, filling the room down to the password field) or above it (bottom spot)
         readonly property real belowY: media.y + media.height + 24 * ls.u
         readonly property real belowH: Math.max(140 * ls.u, Math.min(ls.lyricsH, (ls.height - login.height - 78 * ls.u - 24 * ls.u) - belowY))
         readonly property real soloH: ls.lyricsBelow ? belowH : ls.lyricsH
@@ -1253,7 +1139,6 @@ Item {
         scale: 0.94 + 0.06 * ls.lyrT
         transformOrigin: ls.sideMode ? Item.Left : (ls.lyricsBelow ? Item.Top : Item.Bottom)
 
-        // manual scroll (wheel); synced lyrics snap back to the current line a few seconds later
         property real manual: 0
         Timer { id: manualReset; interval: 3500; onTriggered: if (ls.lyrStatus === "synced") lyr.manual = 0 }
         WheelHandler {
@@ -1261,14 +1146,12 @@ Item {
         }
         Behavior on manual { NumberAnimation { duration: 260; easing.type: Easing.OutQuint } }
 
-        // where the column scrolls to: the current line sits about a third of the way down
         readonly property real target: {
             var it = ls.lyrCur >= 0 ? lyrRep.itemAt(ls.lyrCur) : null;
             var base = it ? it.y - height * 0.30 : -height * 0.30;
             return base + manual;
         }
 
-        // the lines, faded out at the top and bottom edges
         Item {
             id: lyrView
             anchors.fill: parent
@@ -1295,7 +1178,6 @@ Item {
                         readonly property bool gap: (modelData.text || "") === ""
                         width: lyrCol.width
                         height: gap ? 34 * ls.u : lt.implicitHeight
-                        // Apple Music's wave: every line follows the scroll on its own spring, lines further down a little later
                         transform: Translate {
                             id: lnTr
                             y: -lyr.target
@@ -1315,11 +1197,9 @@ Item {
                             transformOrigin: Item.Left
                             scale: ln.cur || ls.lyrStatus !== "synced" ? 1 : 0.965
                             Behavior on scale { NumberAnimation { duration: 420; easing.type: Easing.OutQuint } }
-                            // lines away from the current one go soft, like Apple Music (only near lines get a blur layer)
                             layer.enabled: ls.lyrStatus === "synced" && !ln.cur && Math.abs(ln.rel) <= 6
                             layer.effect: MultiEffect { blurEnabled: true; blurMax: 16; blur: Math.min(0.55, 0.14 * Math.abs(ln.rel)) }
                         }
-                        // instrumental break: three breathing dots
                         Row {
                             visible: ln.gap
                             anchors.verticalCenter: parent.verticalCenter
@@ -1340,8 +1220,6 @@ Item {
                                 }
                             }
                         }
-                        // tap a line to jump there
-                        // where this line is on screen right now (after the scroll), to ignore lines in / past the feather
                         readonly property real shownY: y + lnTr.y
                         readonly property bool inBand: shownY + height > lyr.height * 0.20 && shownY < lyr.height * 0.74
                         TapHandler {
@@ -1368,11 +1246,9 @@ Item {
         }
     }
 
-    // --- USER + PASSWORD (bottom) ---
     Column {
         id: login
         visible: ls.isPrimary
-        // repel: the bubble pressing down into the avatar / password pushes them down and squashes them
         transform: [
             Translate {
                 y: ls.pressBottom * 0.45
@@ -1393,7 +1269,6 @@ Item {
         Behavior on y { NumberAnimation { duration: ls.leaving ? 380 : 650; easing.type: Easing.OutQuint } }
         Behavior on opacity { NumberAnimation { duration: ls.leaving ? 260 : 650; easing.type: Easing.OutQuint } }
 
-        // avatar
         Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: 70 * ls.u; height: width
@@ -1439,14 +1314,12 @@ Item {
             layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.5; shadowOpacity: 0.3; shadowVerticalOffset: 1 }
         }
 
-        // password pill
         Item {
             id: pwBox
             anchors.horizontalCenter: parent.horizontalCenter
             width: (ls.st.pass.length > 0 || ls.st.engaged ? 236 : 210) * ls.u
             height: 36 * ls.u
             Behavior on width { NumberAnimation { duration: 450; easing.type: Easing.OutQuint } }
-            // pressed: Liquid Glass "squish" (a bit wider, a bit flatter); it stays squished while you hold
             readonly property bool pressed: pwMa.pressed || ls.enterHeld
             transform: [
                 Translate { id: shakeT; x: 0 },
@@ -1492,7 +1365,6 @@ Item {
                 border.width: 1.5; border.color: "white"
                 opacity: pwGlow.opacity * 0.9
             }
-            // hover / press: contour glow along the pill, brighter while held
             MouseArea {
                 id: pwMa
                 anchors.fill: parent
@@ -1518,8 +1390,6 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 140 } }
             }
 
-            // password dots: one entry per character, so only the dot you just typed animates in (and only the one you
-            // deleted animates out) - the row slides over smoothly as it grows / shrinks; the rest never move or blink
             ListModel { id: dotModel }
             function syncDots() {
                 var want = ls.st.pass.length, alive = 0, i;
@@ -1538,7 +1408,7 @@ Item {
                 Row {
                     id: dotRow
                     anchors.verticalCenter: parent.verticalCenter
-                    x: Math.min(0, parent.width - width)          // long passwords: the newest dots stay in view
+                    x: Math.min(0, parent.width - width)
                     Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                     Repeater {
                         model: dotModel
@@ -1565,7 +1435,6 @@ Item {
                 }
             }
 
-            // Caps Lock indicator, macOS style: the ⇪ symbol inside the field, left of the arrow
             Item {
                 id: capsIcon
                 anchors.verticalCenter: parent.verticalCenter
@@ -1585,18 +1454,15 @@ Item {
                         c.scale(s, s);
                         c.strokeStyle = "white"; c.fillStyle = "white";
                         c.lineWidth = 1.5; c.lineJoin = "round"; c.lineCap = "round";
-                        // arrow outline: point at the top, shoulders, stem
                         c.beginPath();
                         c.moveTo(9, 2.2); c.lineTo(15.6, 9.2); c.lineTo(12, 9.2); c.lineTo(12, 12.4);
                         c.lineTo(6, 12.4); c.lineTo(6, 9.2); c.lineTo(2.4, 9.2); c.closePath();
                         c.stroke();
-                        // bar under it
                         c.beginPath(); c.moveTo(6, 15.4); c.lineTo(12, 15.4); c.stroke();
                     }
                 }
             }
 
-            // arrow / spinner on the right
             Item {
                 id: goBtn
                 anchors.right: parent.right; anchors.rightMargin: 6 * ls.u
@@ -1625,7 +1491,6 @@ Item {
                     }
                     onWidthChanged: requestPaint()
                 }
-                // spinner while PAM is checking
                 Canvas {
                     anchors.fill: parent
                     visible: ls.st.busy
@@ -1647,7 +1512,6 @@ Item {
             }
         }
 
-        // hint / error line (blur-morphs between "Enter your password..." and "Incorrect password")
         MorphText {
             horizontalAlignment: Text.AlignHCenter
             anchors.horizontalCenter: parent.horizontalCenter
@@ -1659,8 +1523,6 @@ Item {
         }
     }
 
-    // --- Input ---
-    // Every monitor takes the keyboard; the text lives in the shared state, so typing works whichever surface has focus.
     Timer { id: capsSoon; interval: 60; onTriggered: ls.st.checkCaps() }
     property bool enterHeld: false
     Keys.onReleased: event => { if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { if (!event.isAutoRepeat) ls.enterHeld = false; } }
@@ -1670,7 +1532,7 @@ Item {
         if (ls.st.busy || ls.st.unlocking) { event.accepted = true; return; }
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             ls.enterHeld = true;
-            if (event.isAutoRepeat) { event.accepted = true; return; }   // holding Enter keeps the squish, submits once
+            if (event.isAutoRepeat) { event.accepted = true; return; }
             ls.st.submit();
         } else if (event.key === Qt.Key_Escape) {
             ls.st.pass = "";
@@ -1692,7 +1554,6 @@ Item {
         hoverEnabled: true
         property point last: Qt.point(-1, -1)
         onPositionChanged: mouse => {
-            // ignore the synthetic move a new surface gets on map
             if (last.x >= 0 && (Math.abs(mouse.x - last.x) > 2 || Math.abs(mouse.y - last.y) > 2)) ls.st.poke();
             last = Qt.point(mouse.x, mouse.y);
         }

@@ -1,8 +1,6 @@
 #!/bin/sh
-# tools/doctor     check this machine against what the rice uses; says what each missing command would disable.
-# Exit status 1 only when a REQUIRED command is missing. Package names are Arch / CachyOS ones.
 req_missing=0
-row() {  # row <required|optional> <command> <package> <what it is for>
+row() {
     if command -v "$2" >/dev/null 2>&1; then return; fi
     [ "$1" = required ] && { req_missing=1; tag="MISSING"; } || tag="missing"
     printf '  %-8s %-16s pacman -S %-18s %s\n' "$tag" "$2" "$3" "$4"
@@ -42,12 +40,10 @@ row optional dolphin        dolphin              "Super+E file manager"
 row optional chromium       chromium             "Super+W browser"
 row optional qt6ct          qt6ct                "the theme of Qt apps such as Dolphin (with breeze)"
 row optional python3        python               "UI sound generator, installer helpers"
-# mpv only talks to media widgets / keys through the mpv-mpris plugin (a file, not a command)
 if command -v mpv >/dev/null 2>&1 && ! ls /etc/mpv/scripts/mpris.so /usr/share/mpv/scripts/mpris.so "${XDG_CONFIG_HOME:-$HOME/.config}"/mpv/scripts/mpris.so >/dev/null 2>&1; then
     printf '  %-8s %-16s pacman -S %-18s %s\n' missing mpv-mpris mpv-mpris "mpv in the Now Playing widget and on the media keys"
     found=1
 fi
-# the input method icon on the menu bar follows Ctrl+Space through a small Python helper that needs PyGObject
 if command -v fcitx5 >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && ! python3 -c "import gi" >/dev/null 2>&1; then
     printf '  %-8s %-16s pacman -S %-18s %s\n' missing python-gobject python-gobject "the input method icon on the menu bar follows Ctrl+Space"
     found=1

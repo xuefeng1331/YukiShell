@@ -9,10 +9,8 @@ import json, subprocess, sys, time
 
 W, H = 1280, 800
 
-
 def hc(*args):
     return subprocess.run(["hyprctl", *args], capture_output=True, text=True).stdout
-
 
 def chromium_windows():
     try:
@@ -20,10 +18,8 @@ def chromium_windows():
     except ValueError:
         return {}
 
-
 def rule(on):
     hc("eval", f"FLOAT_CHROMIUM_RULE:set_enabled({'true' if on else 'false'})")
-
 
 before = set(chromium_windows())
 rule(True)
@@ -35,7 +31,7 @@ try:
         new = {a: c for a, c in chromium_windows().items() if a not in before}
         if new:
             addr, win = sorted(new.items())[0]
-            if not win["floating"]:      # the rule didn't catch it: float it the slow way
+            if not win["floating"]:
                 sel = f'window = "address:{addr}"'
                 hc("dispatch", f"hl.dsp.window.float({{ action = \"enable\", {sel} }})")
                 hc("dispatch", f"hl.dsp.window.resize({{ x = {W}, y = {H}, \"exact\", {sel} }})")

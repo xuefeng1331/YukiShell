@@ -1,10 +1,9 @@
-// Picker wheel for the Clock app (macOS / iOS time picker): snaps to rows; rows fade and shrink away from the middle.
 import QtQuick
 
 ListView {
     id: wh
     property int start: 0
-    property var labels: []            // shown text per row
+    property var labels: []
     property int fontPx: 24
     property int align: Text.AlignHCenter
     property color ink: "white"

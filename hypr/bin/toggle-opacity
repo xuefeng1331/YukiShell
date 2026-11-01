@@ -17,21 +17,21 @@ def glass_level():
         pass
     return 0.55
 
-LEVEL = {"solid": 1.0, "glass": glass_level(), "clear": 0.0}   # kitty background opacity per state
-NEXT = {"solid": "glass", "glass": "clear", "clear": "solid"}    # the cycle, in the order solid -> glass -> clear
+LEVEL = {"solid": 1.0, "glass": glass_level(), "clear": 0.0}
+NEXT = {"solid": "glass", "glass": "clear", "clear": "solid"}
 
 def hc(*a):
     return subprocess.run(["hyprctl", *a], capture_output=True, text=True).stdout
 
 def target():
-    if len(sys.argv) > 1:                               # toggle-opacity <address>: act on that window
+    if len(sys.argv) > 1:
         return next((c for c in json.loads(hc("-j", "clients")) if c["address"] == sys.argv[1]), None)
     cx, cy = (float(v) for v in hc("cursorpos").replace(" ", "").split(","))
     shown = {m["activeWorkspace"]["id"] for m in json.loads(hc("-j", "monitors"))}
     hit = [c for c in json.loads(hc("-j", "clients"))
            if c["mapped"] and not c["hidden"] and c["workspace"]["id"] in shown
            and c["at"][0] <= cx < c["at"][0] + c["size"][0] and c["at"][1] <= cy < c["at"][1] + c["size"][1]]
-    if hit:                                             # floating windows sit above tiled ones; then most recently focused
+    if hit:
         return min(hit, key=lambda c: (not c["floating"], c["focusHistoryID"]))
     return json.loads(hc("-j", "activewindow") or "{}") or None
 
@@ -66,9 +66,6 @@ def set_no_blur(on):
     hc("dispatch", f'hl.dsp.window.set_prop({{ prop = "no_blur", value = "{"true" if on else "false"}", window = "address:{w["address"]}" }})')
 
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "toggle-opacity.json")
-# What YukiShell's Liquid Glass needs to know: Hyprland hands the shell its window pictures drawn over opaque black, so a see-through
-# window would show up in the glass as a dark slab. Per window: "bg" = the background's own alpha (kitty), "win" = Hyprland's
-# whole-window opacity (Dolphin). Windows not listed are kitty at its kitty.conf level, everything else opaque.
 ALPHA = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "yukishell-winalpha.json")
 
 def record(bg=None, win=None, same_pid=False):
@@ -76,7 +73,7 @@ def record(bg=None, win=None, same_pid=False):
     except (OSError, ValueError): data = {}
     clients = json.loads(hc("-j", "clients"))
     live = {c["address"] for c in clients}
-    data = {a: v for a, v in data.items() if a in live and isinstance(v, dict)}      # forget windows that are gone
+    data = {a: v for a, v in data.items() if a in live and isinstance(v, dict)}
     addrs = [c["address"] for c in clients if c["pid"] == w["pid"]] if same_pid else [w["address"]]
     for a in addrs:
         e = data.get(a, {})
@@ -85,7 +82,7 @@ def record(bg=None, win=None, same_pid=False):
         data[a] = e
     tmp = ALPHA + ".tmp"
     json.dump(data, open(tmp, "w"))
-    os.replace(tmp, ALPHA)       # the shell watches this file: never let it read a half-written one
+    os.replace(tmp, ALPHA)
 
 def kitty_shortcut(target_state):
     """kitty started without remote control: press its own opacity shortcuts in that window (ctrl+shift+a, then 1 = solid,
@@ -98,26 +95,25 @@ def kitty_shortcut(target_state):
         send("", key)
 
 if w["class"] == "kitty" or w["class"].startswith("dash-"):
-    if 0 < window_opacity() < 1:                        # a whole-window fade (older toggle / fallback) is on: this press undoes it
+    if 0 < window_opacity() < 1:
         set_window_opacity("-1")
         record(win=1.0)
         sys.exit(0)
     lvl = kitty_level(w["pid"])
-    if lvl is not None:                                 # remote control: the real current opacity decides the next state
+    if lvl is not None:
         nxt = "glass" if lvl >= 0.99 else ("solid" if lvl <= 0.01 else "clear")
         kitty_cmd(w["pid"], "set-background-opacity", "--all", str(LEVEL[nxt]))
-        record(bg=LEVEL[nxt], same_pid=True)            # --all: every window of this kitty
+        record(bg=LEVEL[nxt], same_pid=True)
     else:
         try: state = json.load(open(STATE))
         except (OSError, ValueError): state = {}
         live = {c["address"] for c in json.loads(hc("-j", "clients"))}
-        state = {a: v for a, v in state.items() if a in live and v in NEXT}      # forget windows that are gone
-        nxt = NEXT[state.get(w["address"], "glass")]    # an unknown window is assumed to be on the configured glass look
+        state = {a: v for a, v in state.items() if a in live and v in NEXT}
+        nxt = NEXT[state.get(w["address"], "glass")]
         kitty_shortcut(nxt)
         state[w["address"]] = nxt
         json.dump(state, open(STATE, "w"))
         record(bg=LEVEL[nxt])
     set_no_blur(nxt == "clear")
     sys.exit(0)
-# Not a terminal: this key only ever changes terminals, so anything else is left alone.
 sys.exit(0)

@@ -1,12 +1,11 @@
-// Monochrome glyphs, extracted unchanged from MacShell/MacBar.qml (component Glyph)
 import QtQuick
 
 Canvas {
     id: gl
     property string kind: ""
     property color color: "white"
-    property real level: 3          // speaker / sun intensity 0..3, wifi bars 0..3, battery 0..100
-    property bool flag: false       // "disabled" slash for wifi / bluetooth
+    property real level: 3
+    property bool flag: false
     width: 18; height: 18
     antialiasing: true
     onKindChanged: requestPaint()
@@ -33,7 +32,6 @@ Canvas {
             for (var i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
             if (fill) { ctx.closePath(); ctx.fill(); } else ctx.stroke();
         }
-        // filled polygon with rounded corners (radius r), used by the media icons
         function rpoly(p, r) {
             var n = p.length / 2;
             ctx.beginPath();
@@ -147,7 +145,6 @@ Canvas {
             circ(9, 9.4, 2.7); ctx.stroke();
             line(6.8, 3, 11.2, 3);
         } else if (k === "ethernet") {
-        // Apple's Ethernet symbol: <···>
         poly([5.2, 4.6, 1.6, 9, 5.2, 13.4], false);
         poly([12.8, 4.6, 16.4, 9, 12.8, 13.4], false);
         circ(6.5, 9, 1.1); ctx.fill();
@@ -161,19 +158,16 @@ Canvas {
             rrect(5, 2, 8, 14, 4); ctx.stroke();
             line(9, 3.5, 9, 7);
         } else if (k === "cursor") {
-            // the arrow pointer
             poly([5, 2.5, 5, 14.5, 8.2, 11.4, 10.4, 16, 12.4, 15.1, 10.3, 10.6, 14.5, 10.6], true);
         } else if (k === "trackpad") {
             rrect(2, 3.5, 14, 11, 2.2); ctx.stroke();
             line(2.6, 11.6, 15.4, 11.6); line(9, 11.6, 9, 14);
         } else if (k === "shuffle") {
-            // two crossing arrows
             ctx.beginPath(); ctx.moveTo(2, 5.5); ctx.lineTo(5, 5.5); ctx.bezierCurveTo(8.5, 5.5, 9.5, 12.5, 13, 12.5); ctx.lineTo(15.5, 12.5); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(2, 12.5); ctx.lineTo(5, 12.5); ctx.bezierCurveTo(8.5, 12.5, 9.5, 5.5, 13, 5.5); ctx.lineTo(15.5, 5.5); ctx.stroke();
             poly([13.6, 3.4, 16, 5.5, 13.6, 7.6], false);
             poly([13.6, 10.4, 16, 12.5, 13.6, 14.6], false);
         } else if (k === "repeat" || k === "repeat1") {
-            // loop: rounded path with an arrow head on each run
             ctx.beginPath(); ctx.moveTo(3, 9); ctx.lineTo(3, 7.5); ctx.arcTo(3, 5, 5.5, 5, 2.5); ctx.lineTo(15, 5); ctx.stroke();
             poly([12.8, 2.9, 15, 5, 12.8, 7.1], false);
             ctx.beginPath(); ctx.moveTo(15, 9); ctx.lineTo(15, 10.5); ctx.arcTo(15, 13, 12.5, 13, 2.5); ctx.lineTo(3, 13); ctx.stroke();
@@ -270,7 +264,7 @@ Canvas {
         } else if (k === "restart") {
             ctx.beginPath(); ctx.arc(9, 9, 5.8, -1.0, 4.4, false); ctx.stroke();
             poly([9.7, 2.7, 6.6, 1.6, 7.8, 5.4], true);
-        } else if (k === "reset") {     // counter-clockwise arrow: back to the default
+        } else if (k === "reset") {
             ctx.beginPath(); ctx.arc(9, 9, 5.5, -PI * 5 / 6, PI * 5 / 6, false); ctx.stroke();
             poly([2.6, 9.0, 2.0, 4.8, 6.4, 6.9], true);
         } else if (k === "logout") {

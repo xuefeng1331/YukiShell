@@ -6,16 +6,6 @@ import Quickshell.Io
 import "I18n.js" as I18n
 import "Fonts.js" as Fonts
 
-// The rice's own file and folder chooser. zenity / kdialog list files as tiny rows; for choosing a picture that is the wrong tool,
-// so this shows them as big thumbnails (the size is a slider) with a large preview of the one under the pointer / selected.
-//
-//   filePicker.pick({ mode: "image", title: "Choose a picture", startDir: "/home/me/Pictures" }, function (path) { ... })
-//     mode "image"  -> pictures (and folders to walk through); the callback gets the picture's path
-//     mode "folder" -> folders only; the callback gets the folder's path (the open one when nothing is selected)
-//   The callback is always called once: with "" when the window is closed or cancelled.
-//
-// It is an ordinary floating window ("YukiShell Picker", see hypr/scripts/rules.lua), so it works from the Dock's Settings, from the
-// desktop widgets and from the wallpaper picker alike. Look and feel (dark / font / thumbnail size) come from the owner.
 Window {
     id: win
 
@@ -28,16 +18,14 @@ Window {
     color: "transparent"
     flags: Qt.Window | Qt.FramelessWindowHint
 
-    // --- handed in by the owner (YukiDock) ---
     property bool dark: true
     property string fam: "Open Runde"
     property color accent: "#0A84FF"
-    property int thumbSize: 220                 // px of one thumbnail's width; remembered by the owner
-    property string lastDir: ""                 // where the next picker starts when it is not told otherwise
+    property int thumbSize: 220
+    property string lastDir: ""
     signal thumbSizeEdited(int size)
 
-    // --- what is being asked ---
-    property string mode: "image"               // image | folder
+    property string mode: "image"
     property string heading: ""
     property string curDir: ""
     property string query: ""
@@ -45,7 +33,6 @@ Window {
     readonly property bool folderMode: mode === "folder"
     readonly property string home: Quickshell.env("HOME")
 
-    // --- look ---
     readonly property color cBg: dark ? "#1E1E20" : "#F5F5F7"
     readonly property color cSide: dark ? "#29292B" : "#E9E9EC"
     readonly property color cText: dark ? "#F5F5F7" : "#1D1D1F"
@@ -61,10 +48,9 @@ Window {
     function shortName(p) { var i = p.lastIndexOf("/"); return i >= 0 && p.length > 1 ? p.substring(i + 1) : p; }
     function parentOf(p) { var i = p.lastIndexOf("/"); return i <= 0 ? "/" : p.substring(0, i); }
 
-    // --- opening / closing ---
     property var backStack: []
     function pick(opts, cb) {
-        if (win.callback) win.finish("");                      // a second request: the first one is cancelled
+        if (win.callback) win.finish("");
         opts = opts || {};
         win.mode = opts.mode === "folder" ? "folder" : "image";
         win.heading = opts.title || (win.folderMode ? I18n.tr("Choose a folder") : I18n.tr("Choose a picture"));
@@ -104,7 +90,6 @@ Window {
     }
     function goUp() { if (win.curDir !== "/") win.goTo(win.parentOf(win.curDir)); }
 
-    // --- the folder listing (watched by Qt: files dropped in appear by themselves) ---
     readonly property var imageExts: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "avif", "tif", "tiff"]
     readonly property var nameFilters: {
         var q = win.query.trim().replace(/[\[\]*?\\]/g, ""), out = [];
@@ -125,12 +110,11 @@ Window {
         nameFilters: win.folderMode ? ["*"] : win.nameFilters
     }
 
-    readonly property int cellThumb: folderMode ? 130 : thumbSize     // folders have no pictures to show, so their tiles stay small
+    readonly property int cellThumb: folderMode ? 130 : thumbSize
     readonly property int sel: grid.currentIndex
     readonly property bool hasSel: sel >= 0 && sel < fm.count
     readonly property string selPath: hasSel ? String(fm.get(sel, "filePath")) : ""
     readonly property bool selIsDir: hasSel && fm.get(sel, "fileIsDir") === true
-    // the preview follows the pointer over the grid, then falls back to the selection
     property int hoverIdx: -1
     readonly property int prevIdx: (hoverIdx >= 0 && hoverIdx < fm.count) ? hoverIdx : sel
     readonly property string prevPath: (prevIdx >= 0 && prevIdx < fm.count) ? String(fm.get(prevIdx, "filePath")) : ""
@@ -153,7 +137,6 @@ Window {
     }
     readonly property bool canChoose: win.folderMode ? win.curDir !== "" : (win.hasSel && !win.selIsDir)
 
-    // --- places in the sidebar ---
     property var places: []
     Process {
         id: placesProc
@@ -178,12 +161,10 @@ Window {
     }
     onVisibleChanged: {
         if (visible) placesProc.running = true;
-        else if (callback) finish("");                           // closed from outside = cancelled
+        else if (callback) finish("");
     }
-    // wallpaper folders chosen in Settings come with the owner so the picker can jump straight to them
     property var extraPlaces: []
 
-    // --- window ---
     Rectangle {
         id: frame
         anchors.fill: parent
@@ -199,7 +180,6 @@ Window {
         Shortcut { sequences: ["Alt+Left"]; enabled: win.visible; onActivated: win.goBack() }
         Shortcut { sequences: ["Ctrl+L"]; enabled: win.visible; onActivated: { pathEdit.editing = true; pathInput.text = win.curDir; pathInput.forceActiveFocus(); pathInput.selectAll(); } }
 
-        // --- sidebar ---
         Rectangle {
             id: side
             x: 1; y: 1
@@ -209,7 +189,6 @@ Window {
             Rectangle { anchors.right: parent.right; width: 14; height: parent.height; color: parent.color }
             Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: win.cLine }
 
-            // close
             Rectangle {
                 x: 16; y: 16; width: 13; height: 13; radius: 7
                 color: closeMa.containsMouse ? "#FF5F57" : (win.active ? "#FF5F57" : win.cText3)
@@ -266,7 +245,6 @@ Window {
             }
         }
 
-        // --- header: back / up, path, search (the empty strip also moves the window) ---
         Item {
             id: head
             x: side.width + 1; y: 0
@@ -297,7 +275,6 @@ Window {
                 }
             }
 
-            // path: clickable parts, or a text box (Ctrl+L / click the empty end of the bar)
             Rectangle {
                 id: pathEdit
                 property bool editing: false
@@ -370,7 +347,6 @@ Window {
                         }
                     }
                 }
-                // empty part of the bar: type a path instead
                 MouseArea {
                     visible: !pathEdit.editing
                     anchors.fill: parent
@@ -438,7 +414,6 @@ Window {
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: win.cLine }
         }
 
-        // --- the big thumbnails ---
         Item {
             id: body
             x: side.width + 1; y: head.height
@@ -464,7 +439,6 @@ Window {
                 Keys.onReturnPressed: win.activate(currentIndex)
                 Keys.onEnterPressed: win.activate(currentIndex)
                 Keys.onPressed: event => {
-                    // typing a letter starts a search, like a file manager
                     if (event.text !== "" && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier)) && event.key !== Qt.Key_Space
                         && event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter && event.key !== Qt.Key_Escape && event.key !== Qt.Key_Backspace && event.text.charCodeAt(0) >= 32) {
                         searchInput.forceActiveFocus();
@@ -492,7 +466,6 @@ Window {
                     readonly property real tileW: grid.cellWidth - 18
                     readonly property real tileH: Math.round(win.cellThumb * 0.78)
 
-                    // Liquid Glass marker for the one under the pointer / the chosen one
                     GlassHover {
                         x: 4; y: 2
                         width: grid.cellWidth - 8; height: cell.tileH + 48
@@ -503,7 +476,6 @@ Window {
                         pressed: cellMa.pressed
                         area: cellMa
                     }
-                    // the picture
                     Item {
                         id: tile
                         x: 9; y: 8
@@ -575,7 +547,6 @@ Window {
                 }
             }
 
-            // --- big preview ---
             Rectangle {
                 visible: body.previewW > 0
                 x: parent.width - body.previewW; y: 8
@@ -633,14 +604,12 @@ Window {
             }
         }
 
-        // --- footer: thumbnail size, count, buttons ---
         Item {
             id: foot
             x: side.width + 1; y: parent.height - height
             width: parent.width - x; height: 62
             Rectangle { width: parent.width; height: 1; color: win.cLine }
 
-            // size slider
             Item {
                 id: sizer
                 x: 18; anchors.verticalCenter: parent.verticalCenter
@@ -707,7 +676,6 @@ Window {
             }
         }
 
-        // a little folder drawn from rounded boxes (no icon theme needed)
         component FolderIcon: Item {
             property color tone: "#8E98B5"
             Rectangle { x: 0; y: 0; width: parent.width * 0.42; height: parent.height * 0.34; radius: parent.height * 0.12; color: Qt.darker(parent.tone, 1.18) }

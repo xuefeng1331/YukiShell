@@ -1,11 +1,5 @@
 import QtQuick
 
-// Slider that looks and behaves exactly like the Control Center sliders (CCSlider in YukiBar.qml): a thin 4 px track with a
-// coloured fill; the small rounded-square knob is always shown, holding it springs the knob bigger and turns it into Liquid
-// Glass (you see the bar through the lens, with the Control Center border), and while the value moves the knob stretches,
-// leans and wobbles with a little spring.
-//
-// Unlike the Control Center one it works on any range (from / to / stepSize) and can carry a caption under each end.
 Item {
     id: s
 
@@ -17,36 +11,32 @@ Item {
     property string leftLabel: ""
     property string rightLabel: ""
     signal moved(real v)
-    signal released()                                   // the pointer let go of the knob (after the last moved())
-    readonly property bool pressed: sma.pressed         // the knob is being held
+    signal released()
+    readonly property bool pressed: sma.pressed
     signal glassFailed()
 
-    // look
-    property color fg: "white"                          // resting knob
-    property color fillColor: fg                        // the filled part of the bar
+    property color fg: "white"
+    property color fillColor: fg
     property color knobColor: fg
     property color trackColor: Qt.rgba(1, 1, 1, 0.20)
     property color labelColor: Qt.rgba(1, 1, 1, 0.56)
     property string fontFamily: ""
-    property real labelSize: 11          // the end labels ("Sharp" / "Very blurry"); Settings passes its caption size
-    property color baseColor: "#2B2B2D"                 // what lies under the slider (the lens refracts it)
+    property real labelSize: 11
+    property color baseColor: "#2B2B2D"
     property bool dark: true
-    property real knobSize: 1.0                         // knob size multiplier (the settings sliders use a bigger one)
-    property real pressGrow: 1.0                        // how much the knob grows (and turns to glass) while held
-    property bool tileHover: false                      // the pointer is anywhere over the row that holds this slider
-    // glass
-    property bool glass: false                          // false: the knob stays a plain rounded square
+    property real knobSize: 1.0
+    property real pressGrow: 1.0
+    property bool tileHover: false
+    property bool glass: false
     property url shaderUrl: ""
     property real glassLiquid: 1.0
     property real glassRim: 0.45
     property real glassGrain: 0.03
     property real glassTint: 0.42
     property color borderTint: "#8A9AB5"
-    // value bubble: the current value in a little pill above the knob, while the pointer is over the slider and always while it is
-    // being dragged (Settings turns it on; the Control Center sliders keep it off)
     property bool showValue: false
-    property string valueSuffix: ""                    // e.g. " px", "×", "%"
-    property var valueText: undefined                   // optional function (value) -> string, for sliders whose value is not the shown number
+    property string valueSuffix: ""
+    property var valueText: undefined
     property color bubbleColor: dark ? "#3A3A3C" : "#FFFFFF"
     property color bubbleText: dark ? "#F5F5F7" : "#1D1D1F"
     function fmtValue(v) {
@@ -67,7 +57,6 @@ Item {
     readonly property real trackW: Math.max(1, width - 28)
     readonly property real pos: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
 
-    // knob animation state: hover pops a rounded square in, holding it springs it bigger and turns it to glass
     readonly property bool hovering: sma.containsMouse || sma.pressed || tileHover
     property real hoverT: hovering ? 1 : 0
     Behavior on hoverT { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.2 } }
@@ -75,7 +64,6 @@ Item {
     Behavior on pressT { NumberAnimation { duration: sma.pressed ? 420 : 300; easing.type: Easing.OutBack; easing.overshoot: 3.0 } }
     onPressTChanged: if (pressT > 0.02 && !ses.live) ses.scheduleUpdate()
 
-    // jiggle: the knob stretches, leans and wobbles when the value moves; how hard depends on how fast it moves
     property real vel: 0
     property real jig: 0
     property real lastP: pos
@@ -93,7 +81,6 @@ Item {
     }
     Timer { id: jigIdle; interval: 70; onTriggered: { s.vel = 0; s.jig = 0; } }
 
-    // --- track + fill ---
     Rectangle {
         x: s.trackX; y: s.cy - 2; width: s.trackW; height: 4; radius: 2
         color: s.trackColor
@@ -105,7 +92,6 @@ Item {
         color: s.fillColor
     }
 
-    // --- captions ---
     Text {
         visible: s.leftLabel !== ""
         y: 25
@@ -122,7 +108,6 @@ Item {
         font.family: s.fontFamily; font.pixelSize: s.labelSize
     }
 
-    // --- what the lens sees: a hidden duplicate of the bar on its backdrop ---
     readonly property real m: 24
     Item {
         id: lyr
@@ -150,26 +135,23 @@ Item {
         visible: false
     }
 
-    // --- knob: a rounded square on hover; held, it grows with a little spring and becomes Liquid Glass ---
     Item {
         id: knob
         readonly property real kw: (21 + 6 * s.pressGrow * s.pressT) * s.knobSize
         readonly property real kh: (14 + 3 * s.pressGrow * s.pressT) * s.knobSize
         width: Math.max(1, kw); height: Math.max(1, kh)
-        x: s.trackX + s.pos * s.trackW - width / 2 - s.jig * 3        // trails a little behind when moving
+        x: s.trackX + s.pos * s.trackW - width / 2 - s.jig * 3
         y: s.cy - height / 2
-        // always visible (no longer only on hover); hovering just pops it a touch bigger
         visible: true
         scale: 1 + 0.08 * Math.min(1.3, s.hoverT)
         rotation: s.jig * 7
-        transform: Scale {                  // squash and stretch along the movement: longer and flatter the faster it goes
+        transform: Scale {
             origin.x: knob.width / 2; origin.y: knob.height / 2
             xScale: 1 + 0.32 * Math.min(1.5, Math.abs(s.jig))
             yScale: 1 - 0.16 * Math.min(1.5, Math.abs(s.jig))
         }
         readonly property real rad: Math.max(2, Math.min(height / 2, 8 + 3 * s.pressT))
 
-        // solid square (fades out while the glass takes over)
         Rectangle {
             anchors.fill: parent
             radius: knob.rad
@@ -194,16 +176,14 @@ Item {
                     thickness: 16
                     strengthMul: 0.85
                     liquid: s.glassLiquid
-                    rim: s.glassRim                 // the same edge light as the Dock (liquidglass.frag)
+                    rim: s.glassRim
                     grain: s.glassGrain
                     tint: s.glassTint
                     shadowAmt: 0.5
                     flatInner: 1
                     onFailed: s.glassFailed()
                 }
-                // edge: the same border as the Control Center buttons
                 CornerBorder { z: 2; anchors.fill: parent; cornerR: knob.rad; dark: s.dark; tint: s.borderTint; amount: 1; lineW: 0.8 }
-                // glassy sheen: a soft specular highlight along the top, fading out towards the middle
                 Rectangle {
                     anchors.fill: parent
                     radius: knob.rad
@@ -217,7 +197,6 @@ Item {
         }
     }
 
-    // --- value bubble ---
     Item {
         id: bubble
         z: 10
@@ -229,7 +208,6 @@ Item {
         Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.0 } }
         transformOrigin: Item.Bottom
         width: Math.max(28, bt.implicitWidth + 14); height: 22
-        // centred over the knob (follows it, jiggle included), never past the slider's ends
         x: Math.max(-6, Math.min(s.width - width + 6, knob.x + knob.width / 2 - width / 2))
         y: knob.y - height - 6 - 2 * s.pressT
         Rectangle {
@@ -244,7 +222,7 @@ Item {
             text: s.fmtValue(s.value)
             color: s.bubbleText
             font.family: s.fontFamily; font.pixelSize: 12; font.weight: Font.DemiBold
-            font.features: ({ "tnum": 1 })        // tabular figures: the pill doesn't jitter while the number changes
+            font.features: ({ "tnum": 1 })
         }
     }
 

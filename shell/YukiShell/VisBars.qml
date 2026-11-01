@@ -1,32 +1,22 @@
 import QtQuick
 import QtQuick.Shapes
 
-// Draws the audio spectrum from AudioVis.qml: rising bars, bars growing both ways from the middle, or a smooth wave.
-//
-//   VisBars { src: hub.vis; active: playing && visualizerOn; style: "bars"; colorTop: ...; colorBottom: ... }
-//
-// While `active` it asks the source to listen (and tells it to stop again when hidden / destroyed). `demo` draws a slow made-up
-// pattern instead of the real sound (the Settings preview, the widget gallery).
 Item {
     id: vb
 
     property var src: null
     property bool active: false
     property bool demo: false
-    property string style: "bars"             // bars | mirror | wave
+    property string style: "bars"
     property color colorTop: "white"
     property color colorBottom: Qt.rgba(1, 1, 1, 0.15)
     property real gain: 1.0
-    property int count: 32                    // how many bars (the wave always uses 32 points)
-    // what is drawn: never thinner than 3 px a column, so a narrow tile with many columns does not smear into a block
+    property int count: 32
     readonly property int n: Math.max(1, Math.min(count, Math.floor(width / 3)))
-    property real barFill: 0.62               // width of a bar as a share of its slot
-    // soft: columns with (almost) no sound fade away instead of showing as dots, and the ends of the row fade out
+    property real barFill: 0.62
     property bool soft: false
-    // paused: the bars stay where they were when the music stopped (and stop listening); they move again when it resumes
     property bool hold: false
     property var held: []
-    // the last frame that had sound in it: pausing lets the bars fall for a moment before `hold` turns on, so that is what is kept
     property var lastLoud: []
     onLvChanged: {
         if (hold || !lv || lv.length === 0) return;
@@ -49,7 +39,6 @@ Item {
     Component.onCompleted: sync()
     Component.onDestruction: { if (vb.src) vb.src.want(vb.key, false); }
 
-    // the made-up pattern: a few travelling sine humps
     property real phase: 0
     Timer {
         interval: 40; repeat: true; running: vb.demo && vb.live
@@ -61,10 +50,6 @@ Item {
         }
     }
 
-    // value (0..1) of slot i out of `n`: the source has 128 bands, a slot takes its share of them (half average, half peak, so a
-    // beat in one band still shows when there are few columns)
-    // all bar heights for this frame, worked out in ONE pass (each bar used to call level() from its own bindings: 64 bars x 60 frames
-    // a second kept the main thread ~13 % busy while music played)
     readonly property var levels: {
         var out = [], n = vb.n;
         if (vb.style === "wave") return out;
@@ -81,7 +66,6 @@ Item {
         return Math.min(1, Math.pow(Math.max(0, v), 0.85));
     }
 
-    // --- bars / mirror ---
     Repeater {
         model: vb.style === "wave" ? 0 : vb.n
         delegate: Rectangle {
@@ -89,7 +73,7 @@ Item {
             readonly property real slot: vb.width / vb.n
             readonly property real bw: Math.max(2, slot * vb.barFill)
             readonly property real lvl: vb.levels[index] || 0
-            readonly property real edge: vb.soft ? Math.pow(Math.sin(Math.PI * (index + 0.5) / vb.n), 0.6) : 1   // fixed per bar: both ends fade
+            readonly property real edge: vb.soft ? Math.pow(Math.sin(Math.PI * (index + 0.5) / vb.n), 0.6) : 1
             width: bw
             height: Math.max(bw, lvl * vb.height)
             opacity: vb.soft ? Math.min(1, lvl / 0.06) * edge : 1
@@ -103,7 +87,6 @@ Item {
         }
     }
 
-    // --- wave: the 32 values joined by a smooth curve, filled below ---
     readonly property var wavePts: {
         if (vb.style !== "wave") return [];
         var n = 32, y = [], pts = [], i, k;
@@ -111,7 +94,7 @@ Item {
         var steps = 4;
         for (i = 0; i < n - 1; i++) {
             var p0 = y[Math.max(0, i - 1)], p1 = y[i], p2 = y[i + 1], p3 = y[Math.min(n - 1, i + 2)];
-            for (k = 0; k < steps; k++) {                               // Catmull-Rom between p1 and p2
+            for (k = 0; k < steps; k++) {
                 var t = k / steps, t2 = t * t, t3 = t2 * t;
                 var yy = 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
                 pts.push(Qt.point((i + t) / (n - 1) * vb.width, Math.max(0, Math.min(vb.height, yy))));
@@ -120,13 +103,12 @@ Item {
         pts.push(Qt.point(vb.width, y[n - 1]));
         return pts;
     }
-    // the same points closed along the bottom edge (a PathPolyline starts at its own first point, so the closing corners are points too)
     readonly property var fillPts: wavePts.length > 0 ? [Qt.point(0, vb.height)].concat(wavePts, [Qt.point(vb.width, vb.height)]) : []
     Shape {
         visible: vb.style === "wave"
         anchors.fill: parent
         preferredRendererType: Shape.CurveRenderer
-        ShapePath {                                    // the fill under the line
+        ShapePath {
             strokeWidth: -1
             fillGradient: LinearGradient {
                 x1: 0; y1: 0; x2: 0; y2: vb.height
@@ -136,7 +118,7 @@ Item {
             startX: 0; startY: vb.height
             PathPolyline { path: vb.fillPts }
         }
-        ShapePath {                                    // the line itself
+        ShapePath {
             strokeWidth: 2.2
             strokeColor: vb.colorTop
             fillColor: "transparent"

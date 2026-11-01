@@ -1,9 +1,5 @@
 .pragma library
 
-// Lock screen translations (YukiLock runs as its own Quickshell config, so it keeps its own small table).
-// I18n.tr("English text") returns the text in the chosen language, or the English text.
-// The full interface tables live in ../YukiShell/lang/; add a language there and give it a block here too.
-
 var dicts = {
     ru: {
         " more notification": " ещё уведомл.",
@@ -145,8 +141,6 @@ var dicts = {
     }
 };
 
-// the language chosen in System Settings (shell.qml sets Qt.uiLanguage), or the system locale.
-// Chinese is split in two: Traditional for zh_TW / zh_HK / zh_MO / Hant, Simplified otherwise.
 function code() {
     var l = String(Qt.uiLanguage !== "" ? Qt.uiLanguage : (Qt.locale().name || "en")).replace(/-/g, "_");
     var p = l.split("_")[0];
