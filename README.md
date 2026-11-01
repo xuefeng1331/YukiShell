@@ -86,6 +86,7 @@ distros should be fine. Package names below are the Arch ones.
 | `fcitx5`, `fcitx5-bamboo`, `fcitx5-chinese-addons` | Vietnamese and Chinese typing |
 | `python-gobject` | the input method icon on the menu bar follows `Ctrl+Space` right away |
 | `dolphin`, `chromium` | the default file manager and browser (`Super+E`, `Super+W`) |
+| `swayimg` | the image viewer: pictures open with just the picture, floating and centred |
 | `python-numpy` | only used once, to generate the UI sound effects |
 
 Don't feel like reading the table? Run `tools/doctor`. It checks your machine and tells you exactly what's missing and what that turns off.
@@ -460,6 +461,10 @@ isn't using the Lua config. `tools/doctor` checks both.
 **Dolphin's terminal.** *Open Terminal* (`Shift+F4`, or right-click a folder) opens kitty in that folder. The terminal panel inside
 Dolphin (`F4`) can only be Konsole: Dolphin embeds Konsole's terminal component there, and no other terminal can be embedded. Install
 `konsole` if you want that panel.
+
+**Pictures open in a browser or an image editor.** Install `swayimg` and run `./install.sh` again: pictures then open in swayimg,
+floating and centred, with nothing but the picture. `←` / `→` go through the folder, scroll zooms, `Enter` shows thumbnails, `F` is
+full screen, `T` shows file info, `Esc` closes. Its settings are in `swayimg/init.lua`.
 
 **Dolphin's *Open With* has no apps to choose from.** KDE apps get their list of installed apps from an app menu file that Plasma
 ships and Hyprland doesn't. `install.sh` links one to `~/.config/menus/applications.menu` (installed before this fix? run it once more). If an app

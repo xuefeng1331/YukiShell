@@ -39,6 +39,7 @@ link "$here/qt/CatppuccinMauve.colors" "$HOME/.local/share/color-schemes/Catppuc
 link "$here/chromium/chromium-flags.conf" "$cfg/chromium-flags.conf"
 # the app menu KDE apps read outside Plasma: without it Dolphin's "Open With" dialog has no apps to choose from
 link "$here/xdg/menus/applications.menu" "$cfg/menus/applications.menu"
+link "$here/swayimg/init.lua"              "$cfg/swayimg/init.lua"
 
 # the YukiVideo plugin: one video decoder for the animated wallpaper in all the glass (optional; needs cmake + Qt 6 dev files)
 "$here/tools/build-plugins" >/dev/null 2>&1 || echo "note: YukiVideo plugin not built (install cmake and the Qt 6 dev packages, then run tools/build-plugins)."
@@ -108,6 +109,13 @@ if command -v vlc >/dev/null; then
     else
         printf '[qt] # Qt interface\nqt-video-autoresize=0\n' > "$cfg/vlc/vlcrc"
     fi
+fi
+# pictures open in swayimg (just the picture, swayimg/init.lua), unless you already chose a viewer: only replaces a browser or nothing
+if command -v swayimg >/dev/null && command -v xdg-mime >/dev/null && [ -f /usr/share/applications/swayimg.desktop ]; then
+    case "$(xdg-mime query default image/png 2>/dev/null)" in
+        ""|*chromium*|*chrome*|*firefox*|*librewolf*|*brave*|*vivaldi*|*zen*|*floorp*|*waterfox*|*thorium*)
+            xdg-mime default swayimg.desktop $(sed -n 's/^MimeType=//p' /usr/share/applications/swayimg.desktop | tr ';' ' ') ;;
+    esac
 fi
 # Qt apps' theme without Plasma (QT_QPA_PLATFORMTHEME=qt6ct in hypr/scripts/look.lua): the same colours, Breeze style, Papirus icons
 mkdir -p "$cfg/qt6ct/colors"

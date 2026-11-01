@@ -28,6 +28,15 @@ hl.window_rule({
     size = "(monitor_w*0.66) (monitor_h*0.66)",
 })
 
+-- swayimg, the image viewer (swayimg/init.lua), the same way: a picture opens over your work, centred, instead of tiling into it.
+hl.window_rule({
+    name  = "float-image-viewer",
+    match = { class = "^(swayimg)$" },
+    float = true,
+    center = true,
+    size = "(monitor_w*0.66) (monitor_h*0.66)",
+})
+
 -- File pickers float, centred, instead of tiling next to your work. "Choose a picture", Chromium's Open/Save, Dolphin and the like all
 -- go through the desktop portal (xdg-desktop-portal-gtk / -kde); zenity, kdialog and yad are covered too, and so are the GTK/Qt
 -- dialogs that name themselves "Open File", "Save As" etc. (Chromium page titles end in " - Chromium", so they never match.)
