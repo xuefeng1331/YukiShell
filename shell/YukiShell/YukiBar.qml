@@ -5423,7 +5423,29 @@ Scope {
                     width: ui.width
                     height: root.barH
                     color: "transparent"
-                    MouseArea { anchors.fill: parent; onClicked: ui.pop = "" }
+                    MouseArea {
+                        id: barWheel
+                        anchors.fill: parent
+                        onClicked: ui.pop = ""
+                        // scrolling the empty bar: left of the workspace numbers sets the brightness, right of them the volume
+                        // (one 5% step per mouse notch; a touchpad's small deltas add up to a notch)
+                        property real wheelAcc: 0
+                        property string wheelSide: ""
+                        onWheel: wheel => {
+                            var l = leftRow.mapToItem(barWheel, leftRow.width, 0).x, r = rightRow.mapToItem(barWheel, 0, 0).x;
+                            var a = wsRow.visible ? wsRow.mapToItem(barWheel, 0, 0).x : width / 2;
+                            var b = wsRow.visible ? wsRow.mapToItem(barWheel, wsRow.width, 0).x : width / 2;
+                            var side = wheel.x > l && wheel.x < a ? "brightness" : (wheel.x > b && wheel.x < r ? "volume" : "");
+                            if (side === "") { wheel.accepted = false; return; }
+                            if (side !== wheelSide) { wheelSide = side; wheelAcc = 0; }
+                            wheelAcc += wheel.angleDelta.y;
+                            while (Math.abs(wheelAcc) >= 120) {
+                                var d = wheelAcc > 0 ? 0.05 : -0.05;
+                                wheelAcc -= wheelAcc > 0 ? 120 : -120;
+                                if (side === "brightness") root.hwBrightness(d); else root.hwVolume(d);
+                            }
+                        }
+                    }
 
                     Row {
                         id: leftRow
