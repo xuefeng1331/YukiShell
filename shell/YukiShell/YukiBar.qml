@@ -67,6 +67,7 @@
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import "Launch.js" as Launch
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
@@ -3155,15 +3156,16 @@ Scope {
         var r = searchApps(q);
         return r.length > 0 ? [{ name: "Top Hits", apps: r }] : [];
     }
-    function launchApp(e) {
+    function launchApp(e, floating) {
         var u = {};
         for (var k in appUsage) u[k] = appUsage[k];
         u[e.id] = (u[e.id] || 0) + 1;
         appUsage = u;
         saveTimer.restart();
-        e.execute();
+        var a = Launch.argv(e, floating === true, terminal);
+        if (a) Quickshell.execDetached(a); else e.execute();
     }
-    function appRunner(e) { return function () { launchApp(e); }; }
+    function appRunner(e) { return function (floating) { launchApp(e, floating); }; }
     function appItems(q, limit) {
         var r = searchApps(q), out = [];
         for (var i = 0; i < r.length && i < limit; i++)
@@ -4896,21 +4898,21 @@ Scope {
                     var n = spResults.length;
                     if (n > 0) spSel = (Math.min(spSel, n - 1) + d + n) % n;
                 }
-                function spActivate(i) {
+                function spActivate(i, floating) {
                     var it = spResults[i];
                     if (!it) return;
                     if (it.confirm === true && armed !== it.title) { armed = it.title; return; }
                     pop = "";
-                    if (it.run) it.run();
+                    if (it.run) it.run(floating === true);
                 }
-                function spEnter() {
+                function spEnter(floating) {
                     if (spMode === "apps") {
                         var r = root.searchApps(spQuery);
-                        if (r.length > 0) { pop = ""; root.launchApp(r[0]); }
+                        if (r.length > 0) { pop = ""; root.launchApp(r[0], floating === true); }
                     } else if (spMode === "emoji") {
                         var em = spResults[Math.min(spSel, spResults.length - 1)];
                         if (em) { pop = ""; root.emojiPick(em); }
-                    } else spActivate(Math.min(spSel, spResults.length - 1));
+                    } else spActivate(Math.min(spSel, spResults.length - 1), floating === true);
                 }
                 function spKey(ev) {
                     var k = ev.key, n = spResults.length;
@@ -4935,7 +4937,7 @@ Scope {
                             var it = spResults[Math.min(spSel, n - 1)];
                             pop = "";
                             root.clipPick(it, false);
-                        } else spEnter();
+                        } else spEnter((ev.modifiers & Qt.ShiftModifier) !== 0);
                         ev.accepted = true;
                     }
                 }
@@ -9560,7 +9562,7 @@ Scope {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         onPositionChanged: mouse => { if (ui.spPointerMoved(parent, mouse.x, mouse.y) && ui.spSel !== rr.index) { ui.spHover = true; ui.spSel = rr.index; } }
-                                        onClicked: ui.spActivate(rr.index)
+                                        onClicked: mouse => ui.spActivate(rr.index, (mouse.modifiers & Qt.ShiftModifier) !== 0)
                                     }
                                 }
                             }
@@ -9766,7 +9768,7 @@ Scope {
                                         var out = p.x < spot.x || p.x > spot.x + spot.width || p.y < spot.y || p.y > spot.y + spot.height;
                                         clipGhost.drop(out);
                                     }
-                                    onClicked: if (!dragged) ui.spActivate(cr.index)
+                                    onClicked: mouse => { if (!dragged) ui.spActivate(cr.index, (mouse.modifiers & Qt.ShiftModifier) !== 0); }
                                 }
                             }
                         }
@@ -10171,7 +10173,7 @@ Scope {
                                                         id: cma
                                                         anchors.fill: parent
                                                         hoverEnabled: true
-                                                        onClicked: { ui.pop = ""; root.launchApp(cell.e); }
+                                                        onClicked: mouse => { ui.pop = ""; root.launchApp(cell.e, (mouse.modifiers & Qt.ShiftModifier) !== 0); }
                                                     }
                                                 }
                                             }

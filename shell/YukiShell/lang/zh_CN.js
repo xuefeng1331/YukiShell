@@ -398,6 +398,8 @@ var strings = {
     "New Tab": "新建标签页",
     "New Terminal": "新建终端",
     "New Window": "新建窗口",
+    "New Floating Window": "新建浮动窗口",
+    "Open Floating": "浮动打开",
     "New York": "纽约",
     "Night Shift": "夜览",
     "No Alarms": "没有闹钟",

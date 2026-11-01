@@ -9,6 +9,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import "I18n.js" as I18n
 import "Version.js" as Version
+import "Launch.js" as Launch
 import "Fonts.js" as Fonts
 
 Scope {
@@ -5470,7 +5471,7 @@ Scope {
         return out;
     }
 
-    function activate(item, forceNew) {
+    function activate(item, forceNew, floating) {
         if (item.kind === "win") { if (item.tl) item.tl.activate(); return; }
         if (item.special === "settings") { root.openPrefs("general"); return; }
         var wins = windowsFor(item.key);
@@ -5490,7 +5491,9 @@ Scope {
             try { ent = DesktopEntries.byId(rid); } catch (err) { ent = null; }
             if (!ent) { try { ent = DesktopEntries.heuristicLookup ? DesktopEntries.heuristicLookup(item.key) : null; } catch (err2) { ent = null; } }
             var ok = false;
-            if (ent && typeof ent.execute === "function") { try { ent.execute(); ok = true; } catch (err3) { ok = false; } }
+            var la = ent ? Launch.argv(ent, floating === true, root.bar ? root.bar.terminal : "kitty") : null;
+            if (la) { Quickshell.execDetached(la); ok = true; }
+            else if (ent && typeof ent.execute === "function") { try { ent.execute(); ok = true; } catch (err3) { ok = false; } }
             if (!ok) {
                 var id = rid;
                 console.log("[yukidock] launching", id, "via gtk-launch (desktop entry unavailable)");
@@ -5567,6 +5570,8 @@ Scope {
                      run: function () { togglePin(item); } });
             m.push({ kind: "item", label: wins.length > 0 ? I18n.tr("New Window") : I18n.tr("Open"),
                      run: function () { activate(item, true); } });
+            m.push({ kind: "item", label: wins.length > 0 ? I18n.tr("New Floating Window") : I18n.tr("Open Floating"),
+                     run: function () { activate(item, true, true); } });
         }
         if (wins.length > 0) {
             m.push({ kind: "sep" });
@@ -6860,7 +6865,8 @@ Scope {
                                             ui.menuItem = cell.modelData;
                                         } else {
                                             cell.hop();
-                                            root.activate(cell.modelData, mouse.button === Qt.MiddleButton);
+                                            var fl = (mouse.modifiers & Qt.ShiftModifier) !== 0;
+                                            root.activate(cell.modelData, mouse.button === Qt.MiddleButton || fl, fl);
                                         }
                                     }
                                 }

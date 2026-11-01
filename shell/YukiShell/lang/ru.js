@@ -63,6 +63,8 @@ var strings = {
     "Open Home Folder": "Открыть домашнюю папку",
     "New Files Window": "Новое окно «Файлов»",
     "New Window": "Новое окно",
+    "New Floating Window": "Новое плавающее окно",
+    "Open Floating": "Открыть плавающим",
     "New Private Window": "Новое приватное окно",
     "New Tab": "Новая вкладка",
     "Close Tab": "Закрыть вкладку",

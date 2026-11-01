@@ -398,6 +398,8 @@ var strings = {
     "New Tab": "새로운 탭",
     "New Terminal": "새로운 터미널",
     "New Window": "새로운 윈도우",
+    "New Floating Window": "새 플로팅 창",
+    "Open Floating": "플로팅으로 열기",
     "New York": "뉴욕",
     "Night Shift": "Night Shift",
     "No Alarms": "알람 없음",

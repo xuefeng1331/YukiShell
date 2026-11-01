@@ -398,6 +398,8 @@ var strings = {
     "New Tab": "新增標籤頁",
     "New Terminal": "新增終端機",
     "New Window": "新增視窗",
+    "New Floating Window": "新增浮動視窗",
+    "Open Floating": "浮動開啟",
     "New York": "紐約",
     "Night Shift": "夜覽",
     "No Alarms": "沒有鬧鐘",

@@ -398,6 +398,8 @@ var strings = {
     "New Tab": "Tab mới",
     "New Terminal": "Terminal mới",
     "New Window": "Cửa sổ mới",
+    "New Floating Window": "Cửa sổ nổi mới",
+    "Open Floating": "Mở dạng nổi",
     "New York": "New York",
     "Night Shift": "Night Shift",
     "No Alarms": "Không có báo thức",
