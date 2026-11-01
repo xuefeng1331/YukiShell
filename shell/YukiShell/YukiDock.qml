@@ -4838,11 +4838,12 @@ Scope {
                     t: pal
                     SRow {
                         t: pal
-                        visible: wpPane.curVideo !== ""
                         title: I18n.tr("Pause behind windows")
-                        subtitle: I18n.tr("Stops a video wallpaper while windows cover the desktop.")
+                        subtitle: wpPane.curVideo !== "" ? I18n.tr("Stops a video wallpaper while windows cover the desktop.")
+                                                         : I18n.tr("Only for a live or animated wallpaper. Set one to change this.")
                         SSwitch {
                             t: pal
+                            enabled: wpPane.curVideo !== ""
                             checked: root.bar ? root.bar.wallPauseCovered : false
                             onToggled: v => { if (root.bar) root.bar.wallPauseCovered = v; }
                         }
