@@ -14,6 +14,7 @@ Item {
     property color noteTop: "#e9e9ed"
     property color noteBottom: "#e0e0e5"
     property real noteScale: 0.62
+    readonly property real noteSc: bare ? 1.18 : noteScale
     property real dropOpacity: 0.28
     property real dropBlur: 0.24
     property real dropDown: 4
@@ -57,8 +58,9 @@ Item {
                 layer.samples: 4
                 Shape {
                     anchors.fill: parent
-                    transform: Scale { origin.x: 245; origin.y: 252; xScale: art.noteScale; yScale: art.noteScale }
-                    x: 11; y: 4
+                    transform: Scale { origin.x: 245; origin.y: 252; xScale: art.noteSc; yScale: art.noteSc }
+                    // without a tile the note fills the box and lines up with the text margin (centred where the art is centred)
+                    x: art.bare && !art.wd.isLarge ? 172 * art.noteSc - 245 : 11; y: 4
                     ShapePath {
                         strokeColor: "transparent"
                         fillGradient: LinearGradient {

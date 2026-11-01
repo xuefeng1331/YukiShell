@@ -52,7 +52,6 @@ Item {
     readonly property bool isLarge: size === "large"
     property string lay: size
     readonly property bool alt: lay === "tall" || lay === "strip" || lay === "hero"
-    property real fit: 1
     readonly property real aspect: isSmall ? 1 : (isMedium ? 395 / 185 : 395 / 385)
     readonly property real bw: width
     readonly property real bh: isLarge ? height : Math.min(height, width / aspect)
@@ -60,15 +59,16 @@ Item {
     readonly property real oy: Math.round((height - bh) / 2)
     readonly property int hoursMedium: Math.max(4, Math.min(hourly.length || 4, Math.floor((bw - 172 * s - pad + 4 * s) / (44 * s))))
     readonly property int hoursLarge: Math.max(6, Math.min(hourly.length || 6, Math.floor((bw - 2 * pad) / (54 * s))))
-    readonly property real s: scaleF * fit * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
-    readonly property real radiusPx: 28 * s / fit
+    // the design box (158, 338 or 358 wide) fills the card, so the designed margins stay even at every size
+    readonly property real s: isSmall ? Math.min(width, height) / 158 : Math.min(width / (isMedium ? 338 : 358), height / (isMedium ? 338 / aspect : 360))  // 360: the large layout with its 5 day rows
+    readonly property real radiusPx: 28 * scaleF * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
     readonly property bool glassOn: style === "liquid" && glassReady && !preview && wallUrl != ""
     property bool glassShown: false
     property bool glassFull: false
     onGlassOnChanged: if (!glassOn) { glassShown = false; glassFull = false; }
     onGlassShownChanged: if (glassShown) fullT.restart()
     Timer { id: fullT; interval: 250; onTriggered: w.glassFull = w.glassShown }
-    width: (isSmall ? 158 : (isLarge ? 358 : 338)) * s
+    width: (isSmall ? 158 : (isLarge ? 358 : 338)) * scaleF * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
     height: (isLarge ? 354 : 168) * scaleF
 
     readonly property var iconKinds: ["sun", "moon", "partly", "partlyNight", "cloud", "fog", "rain", "snow", "storm"]

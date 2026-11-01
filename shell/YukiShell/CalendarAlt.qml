@@ -73,7 +73,7 @@ Item {
             x: 12 * a.u; y: tLine.y + 8 * a.u
             width: parent.width - 24 * a.u
             Repeater {
-                model: 7
+                model: Math.max(7, Math.floor((a.height - 176 * a.u) / (31 * a.u)))  // taller cards carry on into the next weeks
                 delegate: Item {
                     required property int index
                     readonly property var d: a.dayAt(index)

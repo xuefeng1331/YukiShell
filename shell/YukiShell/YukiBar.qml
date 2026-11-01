@@ -7993,7 +7993,7 @@ Scope {
                                 spacing: 1
                                 Text {
                                     width: parent.width; elide: Text.ElideRight
-                                    text: np.pl && np.pl.trackTitle ? np.pl.trackTitle : I18n.tr("Now Playing")
+                                    text: !np.pl ? I18n.tr("No Music Playing") : (np.pl.trackTitle ? np.pl.trackTitle : I18n.tr("Now Playing"))
                                     color: np.pl ? ccPal.fg : ccPal.fg2
                                     font.family: root.fontForWeight(Font.DemiBold, ccPal.fam); font.pixelSize: 13; font.weight: Font.DemiBold
                                 }

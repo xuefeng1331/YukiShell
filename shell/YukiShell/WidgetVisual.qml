@@ -18,11 +18,6 @@ Item {
     property string sname: ""
     property real sw: 1920
     property real sh: 1080
-    readonly property real fit: {
-        if (width <= 0 || height <= 0 || !host || !host.dims) return 1;
-        var d = host.dims(wsize);
-        return Math.max(0.5, Math.min(width / d[0], height / d[1]));
-    }
     property Item wallItem: null
         Component {
             id: weatherVisual
@@ -30,7 +25,6 @@ Item {
                 accentTint: host.accentTintVec
                 scaleF: host.widgetScale
                 style: wstyle
-                fit: v.fit
                 lay: v.wlay
                 size: wsize
                 fam: host.fontFamily
@@ -71,7 +65,6 @@ Item {
                 accentTint: host.accentTintVec
                 scaleF: host.widgetScale
                 style: wstyle
-                fit: v.fit
                 lay: v.wlay
                 size: wsize
                 mode: wmode

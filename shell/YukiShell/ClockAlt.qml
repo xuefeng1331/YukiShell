@@ -50,7 +50,7 @@ Item {
         Label { anchors.horizontalCenter: parent.horizontalCenter; y: 16 * a.u; text: a.wd.cityCode; px: 12; weight: Font.Bold; color: a.ink2; font.letterSpacing: 0.6 * a.u }
         Column {
             anchors.horizontalCenter: parent.horizontalCenter
-            y: 42 * a.u
+            y: 42 * a.u + Math.max(0, (parent.height - 114 * a.u - height) / 2)  // centred between the city and the seconds dots
             spacing: 10 * a.u
             Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.hh }
             Tile { width: a.width - 34 * a.u; height: width * 0.86; txt: a.mm }

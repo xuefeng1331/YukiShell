@@ -42,21 +42,22 @@ Item {
     readonly property bool isLarge: size === "large"
     property string lay: size
     readonly property bool alt: lay === "tall" || lay === "strip" || lay === "hero"
-    property real fit: 1
     readonly property real aspect: isSmall ? 1 : (isMedium ? 395 / 185 : 395 / 385)
-    readonly property real bw: Math.min(width, height * aspect)
-    readonly property real bh: Math.min(height, width / aspect)
+    // small stays square; medium and large stretch over the whole card like the weather widget
+    readonly property real bw: isSmall ? Math.min(width, height) : width
+    readonly property real bh: isSmall ? Math.min(width, height) : height
     readonly property real ox: Math.round((width - bw) / 2)
     readonly property real oy: Math.round((height - bh) / 2)
-    readonly property real s: scaleF * fit * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
-    readonly property real radiusPx: 28 * s / fit
+    // the design box (158, 338 or 358 wide) fills the card, so the designed margins stay even at every size
+    readonly property real s: isSmall ? bw / 158 : Math.min(width / (isMedium ? 338 : 358), height / (isMedium ? 338 / aspect : 349))
+    readonly property real radiusPx: 28 * scaleF * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
     readonly property bool glassOn: style === "liquid" && glassReady && !preview && wallUrl != ""
     property bool glassShown: false
     property bool glassFull: false
     onGlassOnChanged: if (!glassOn) { glassShown = false; glassFull = false; }
     onGlassShownChanged: if (glassShown) fullT.restart()
     Timer { id: fullT; interval: 250; onTriggered: w.glassFull = w.glassShown }
-    width: (isSmall ? 158 : (isLarge ? 358 : 338)) * s
+    width: (isSmall ? 158 : (isLarge ? 358 : 338)) * scaleF * (isSmall ? 168 / 158 : (isMedium ? 358 / 338 : 1.0))
     height: (isLarge ? 354 : 168) * scaleF
 
     readonly property bool dark: mode === "dark" || (mode !== "light" && darkGlass)
@@ -254,11 +255,13 @@ Item {
         id: grid
         x: w.ox + (Math.round(w.gridSpec.x * w.s))
         y: w.oy + (Math.round(w.gridSpec.y * w.s))
-        width: Math.round(w.gridSpec.w * w.s)
-        height: wdH + 6 * rowH
+        width: w.isSmall ? Math.round(w.gridSpec.w * w.s) : Math.round(w.bw - w.gridSpec.x * w.s - w.pad)
+        height: wdH + rows * rowH
         readonly property real cw: width / 7
         readonly property int wdH: Math.round(w.gridSpec.wdH * w.s)
-        readonly property int rowH: Math.round(w.gridSpec.rowH * w.s)
+        // the weeks this month needs share the rows' space, so a 5-week month ends at the bottom margin too
+        readonly property int rows: Math.ceil((w.cal.lead + w.cal.days) / 7)
+        readonly property real rowH: (w.isLarge ? w.bh - w.gridSpec.y * w.s - wdH - w.pad : 6 * w.gridSpec.rowH * w.s) / rows
         readonly property real wdPx: w.gridSpec.wdPx * w.s
         readonly property real dayPx: w.gridSpec.dayPx * w.s
         readonly property int circ: 2 * Math.round(w.gridSpec.circ * w.s / 2)

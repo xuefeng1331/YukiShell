@@ -60,7 +60,7 @@ Scope {
         var sp = spanArr(x), c = sp[0], r = sp[1];
         if (c === 1) return r === 1 ? "small" : "tall";
         if (r === 1) return c >= 4 ? "strip" : "medium";
-        if (c >= 4) return "hero";
+        if (c >= 4 && r === 2) return "hero";  // the hero design is landscape: 4x3 and 4x4 use the large layout
         return sizeClass(x, type);
     }
     function dims(x) {
@@ -552,7 +552,7 @@ Scope {
                   "-d", "hourly=temperature_2m,weather_code,is_day",
                   "-d", "daily=temperature_2m_max,temperature_2m_min,weather_code",
                   "-d", "temperature_unit=" + (root.tempUnit === "F" ? "fahrenheit" : "celsius"),
-                  "-d", "timezone=auto", "-d", "forecast_days=6"]
+                  "-d", "timezone=auto", "-d", "forecast_days=16"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -564,11 +564,11 @@ Scope {
                     root.wxLo = Math.round(o.daily.temperature_2m_min[0]);
                     var hrs = [], ht = o.hourly.time, cur = String(o.current.time).substring(0, 13), start = 0, i;
                     for (i = 0; i < ht.length; i++) if (ht[i].substring(0, 13) === cur) { start = i; break; }
-                    for (i = start; i < ht.length && hrs.length < 6; i++)
+                    for (i = start; i < ht.length && hrs.length < 24; i++)  // tall and large layouts show as many rows as fit
                         hrs.push({ h: root.hourLabel(ht[i], hrs.length === 0), t: Math.round(o.hourly.temperature_2m[i]),
                                    k: root.wmo(o.hourly.weather_code[i], o.hourly.is_day[i] === 1).k });
                     var dys = [], dt = o.daily.time;
-                    for (i = 0; i < dt.length && i < 5; i++)
+                    for (i = 0; i < dt.length; i++)
                         dys.push({ d: root.dayLabel(dt[i], i), lo: Math.round(o.daily.temperature_2m_min[i]),
                                    hi: Math.round(o.daily.temperature_2m_max[i]), k: root.wmo(o.daily.weather_code[i], true).k });
                     root.wxHourly = hrs; root.wxDaily = dys;
