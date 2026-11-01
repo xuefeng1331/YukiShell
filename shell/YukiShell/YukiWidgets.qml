@@ -65,8 +65,8 @@ Scope {
     }
     function dims(x) {
         var sp = spanArr(x), c = sp[0], r = sp[1];
-        var b = [c === 1 ? 185 : c * 179 + (c - 1) * 28 + 9, r === 1 ? 185 : r * 179 + (r - 1) * 23 + 4];
-        return [Math.round(b[0] * widgetScale), Math.round(b[1] * widgetScale)];
+        var ss = screenSize(), g = gridInfo(ss[0], ss[1]);
+        return [Math.round(g.cellW + (c - 1) * g.pitchX), Math.round((r === 1 ? 185 : r * 179 + (r - 1) * 23 + 4) * widgetScale)];
     }
     property real playerScale: 0.8
     readonly property var visSrc: hub ? hub.vis : null
@@ -85,9 +85,9 @@ Scope {
     readonly property int gridCell: Math.round(179 * widgetScale)
     readonly property int gridGapX: Math.round(28 * widgetScale)
     readonly property int gridGapY: Math.round(23 * widgetScale)
-    readonly property int gridLeft: 21
+    readonly property int gridLeft: 28  // same as the gap under the 28 px bar
     readonly property int gridTop: 56
-    readonly property int gridRight: 21
+    readonly property int gridRight: 28
     readonly property int gridBottom: 24
     function screenSize() {
         var scr = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null;
@@ -98,10 +98,10 @@ Scope {
         var availH = screenH - gridTop - gridBottom;
         var cols = Math.max(1, Math.floor((availW + gridGapX) / (gridCell + gridGapX)));
         var rows = Math.max(1, Math.floor((availH + gridGapY) / (gridCell + gridGapY)));
-        var usedW = cols * gridCell + (cols - 1) * gridGapX;
-        var spareW = Math.max(0, availW - usedW);
-        return { cols: cols, rows: rows, left: gridLeft + Math.floor(spareW / 2), top: gridTop,
-                 pitchX: gridCell + gridGapX, pitchY: gridCell + gridGapY };
+        var cellW = Math.round(185 * widgetScale);
+        // columns spread so the last one ends exactly gridRight from the edge
+        return { cols: cols, rows: rows, left: gridLeft, top: gridTop, cellW: cellW,
+                 pitchX: cols > 1 ? (availW - cellW) / (cols - 1) : gridCell + gridGapX, pitchY: gridCell + gridGapY };
     }
     function spans(x) { return spanArr(x); }
 
@@ -129,9 +129,9 @@ Scope {
         return false;
     }
     function validSlot(span, col, row, skipId, g, screenW, screenH) {
-        var d = dims(span), p = [g.left + col * g.pitchX, g.top + row * g.pitchY];
+        var d = dims(span), p = [g.left + Math.round(col * g.pitchX), g.top + row * g.pitchY];
         return p[0] >= gridLeft && p[1] >= gridTop
-            && p[0] + d[0] <= screenW - gridRight && p[1] + d[1] <= screenH - gridBottom
+            && p[0] + d[0] <= screenW - gridRight + 1 && p[1] + d[1] <= screenH - gridBottom
             && !overlaps(p[0], p[1], d, skipId) ? p : null;
     }
     function firstFreeSlot(size, skipId) {
