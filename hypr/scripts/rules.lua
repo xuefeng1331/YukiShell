@@ -1,6 +1,6 @@
 hl.window_rule({ name = "suppress-maximize", match = { class = ".*" }, suppress_event = "maximize" })
 
-FLOAT_NEW_RULE = hl.window_rule({ name = "float-new-windows", match = { class = ".*" }, float = true, center = true, size = "1280 800" })
+FLOAT_NEW_RULE = hl.window_rule({ name = "float-new-windows", match = { class = ".*" }, float = true, center = true, size = "900 560" })
 
 hl.window_rule({
     name  = "fix-xwayland-drags",
@@ -86,5 +86,5 @@ FLOAT_CHROMIUM_RULE = hl.window_rule({
     match = { class = "^[Cc]hromium$" },
     float = true,
     center = true,
-    size = "1280 800",
+    size = "900 560",
 })

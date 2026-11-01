@@ -12,6 +12,6 @@ function argv(entry, floating, terminal) {
         return ["sh", "-c", 'exec "$HOME/.config/hypr/bin/float-chromium"'];
     if (entry.runInTerminal) cmd = (terminal || "kitty") + " -e " + cmd;
     if (entry.workingDirectory) cmd = "cd " + q(entry.workingDirectory) + " && exec " + cmd;
-    var opts = floating ? '{ float = true, center = true, size = "1280 800" }' : "{ tile = true }";
+    var opts = floating ? '{ float = true, center = true, size = "900 560" }' : "{ tile = true }";
     return ["hyprctl", "dispatch", "hl.dsp.exec_cmd([==[" + cmd + "]==], " + opts + ")"];
 }
