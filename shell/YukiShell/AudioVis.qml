@@ -42,9 +42,12 @@ Scope {
         stdout: StdioCollector { onStreamFinished: av.available = text.indexOf("yes") >= 0 }
     }
     Timer { id: retry; interval: 4000 }
+    // cava takes a moment to start and reach PipeWire: keep it a while after the last user lets go (a pause), so resuming is instant
+    Timer { id: linger; interval: 120000 }
+    onWantedChanged: if (wanted) linger.stop(); else linger.restart()
     OwnedProcess {
         id: cava
-        running: av.wanted && av.available && !retry.running
+        running: (av.wanted || linger.running) && av.available && !retry.running
         cmd: ["sh", "-c",
             "cfg=\"${XDG_RUNTIME_DIR:-/tmp}/yukishell-cava.conf\"; "
             + "printf '%s\\n' '[general]' \"bars = $1\" 'framerate = 60' '[input]' 'method = pipewire' '[output]' 'method = raw' 'channels = mono' 'mono_option = average' "

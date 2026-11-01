@@ -24,12 +24,26 @@ Item {
         for (var i = 0; i < lv.length; i++) sum += lv[i];
         if (sum / lv.length > 0.04) lastLoud = lv.slice();
     }
-    onHoldChanged: if (hold) held = lastLoud.length > 0 ? lastLoud : (lv ? lv.slice() : [])
+    onHoldChanged: {
+        if (hold) held = lastLoud.length > 0 ? lastLoud : (lv ? lv.slice() : []);
+        else if (held.length > 0 && !demo) { waking = true; wakeT.restart(); }
+    }
+    // after a resume the frozen bars stay until live audio arrives, so the visualizer never blanks while cava catches up
+    property bool waking: false
+    Timer { id: wakeT; interval: 2500; onTriggered: vb.waking = false }
+    Connections {
+        target: vb.waking ? vb.src : null
+        function onBarsChanged() {
+            var b = vb.src.bars, s = 0;
+            for (var i = 0; i < b.length; i++) s += b[i];
+            if (s / Math.max(1, b.length) > 0.02) { vb.waking = false; wakeT.stop(); }
+        }
+    }
 
     readonly property bool live: active && visible && !hold
     readonly property string key: "vb" + Math.random().toString(36).slice(2)
     property var fake: []
-    readonly property var lv: hold ? held : (demo ? fake : (src ? src.bars : []))
+    readonly property var lv: (hold || waking) ? held : (demo ? fake : (src ? src.bars : []))
     opacity: active ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
