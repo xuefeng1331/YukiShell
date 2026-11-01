@@ -100,6 +100,15 @@ if command -v swayimg >/dev/null && command -v xdg-mime >/dev/null && [ -f /usr/
             xdg-mime default swayimg.desktop $(sed -n 's/^MimeType=//p' /usr/share/applications/swayimg.desktop | tr ';' ' ') ;;
     esac
 fi
+if command -v chromium >/dev/null && command -v xdg-mime >/dev/null; then
+    # links opened from other apps get a small floating Chromium window (float-chromium); Super+W still opens a normal one
+    mkdir -p "$HOME/.local/share/applications"
+    printf '[Desktop Entry]\nType=Application\nName=Chromium (floating window)\nIcon=chromium\nExec=%s %%U\nMimeType=x-scheme-handler/http;x-scheme-handler/https;\nNoDisplay=true\n' \
+        "$cfg/hypr/bin/float-chromium" > "$HOME/.local/share/applications/yuki-link.desktop"
+    case "$(xdg-mime query default x-scheme-handler/https 2>/dev/null)" in
+        ""|chromium.desktop) xdg-mime default yuki-link.desktop x-scheme-handler/http x-scheme-handler/https ;;
+    esac
+fi
 mkdir -p "$cfg/qt6ct/colors"
 link "$here/qt/qt6ct/YukiShell.conf" "$cfg/qt6ct/colors/YukiShell.conf"
 printf '[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nicon_theme=Papirus-Dark\nstandard_dialogs=default\nstyle=Breeze\n\n[Fonts]\ngeneral="Noto Sans,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"\nfixed="JetBrainsMono Nerd Font,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"\n' \
