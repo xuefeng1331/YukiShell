@@ -7934,8 +7934,8 @@ Scope {
                                 id: art
                                 x: 12; y: 12
                                 width: 52; height: 52; radius: 10
-                                color: ccPal.btnOff
-                                Glyph { visible: artImg.status !== Image.Ready; anchors.centerIn: parent; width: 22; height: 22; kind: "note"; color: ccPal.fg2 }
+                                color: "transparent"
+                                Glyph { visible: artImg.status !== Image.Ready; anchors.centerIn: parent; width: 30; height: 30; kind: "note"; color: ccPal.fg2 }
                                 Item {
                                     id: artMask
                                     anchors.fill: parent
@@ -7961,6 +7961,7 @@ Scope {
                                     }
                                 }
                                 Rectangle {
+                                    visible: artImg.status === Image.Ready
                                     anchors.fill: parent
                                     radius: art.radius
                                     color: "transparent"

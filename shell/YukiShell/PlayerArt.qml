@@ -6,7 +6,8 @@ Item {
     id: art
     required property var wd
     property real r: 7
-    readonly property bool bare: !wd.hasPlayer && !wd.preview
+    // no player, or a track without a cover: just the note, no tile, rim, border or shadow
+    readonly property bool bare: !wd.preview && (!wd.hasPlayer || String(wd.artSrc) === "" || artImg.status === Image.Error)
 
     property color idleBgTop: "#3b3b40"
     property color idleBgBottom: "#27272b"
@@ -62,8 +63,8 @@ Item {
                         strokeColor: "transparent"
                         fillGradient: LinearGradient {
                             x1: 0; y1: 0; x2: 0; y2: 512
-                            GradientStop { position: 0.0; color: art.bare ? "white" : art.noteTop }
-                            GradientStop { position: 1.0; color: art.bare ? "white" : art.noteBottom }
+                            GradientStop { position: 0.0; color: art.bare ? art.wd.fg : art.noteTop }
+                            GradientStop { position: 1.0; color: art.bare ? art.wd.fg : art.noteBottom }
                         }
                         PathSvg { path: art.notePath }
                     }
