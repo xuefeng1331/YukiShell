@@ -19,11 +19,14 @@
 
 <table>
 <tr>
-<td width="50%" align="center">
-<img src="docs/screenshots/now-playing.png" alt="The Now Playing widget"><br><sub>Now Playing widget, with the audio visualizer</sub><br><br>
+<td width="38%" align="center">
+<img src="docs/screenshots/now-playing.png" alt="The music widget"><br><sub>Music widget with the audio visualizer</sub><br><br>
 <img src="docs/screenshots/weather.png" alt="The weather widget"><br><sub>Weather widget</sub>
 </td>
-<td width="50%" align="center">
+<td width="22%" align="center">
+<img src="docs/screenshots/control-center.png" alt="The Control Center"><br><sub>Control Center</sub>
+</td>
+<td width="40%" align="center">
 <img src="docs/screenshots/settings.png" alt="System Settings"><br><sub>System Settings, in seven languages</sub>
 </td>
 </tr>
