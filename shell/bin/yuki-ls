@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""ls -la in YukiShell colours (ll, la, cll): folders blue, executables pink, everything else a blue-to-pink gradient
+across the line, the same as ff / fff. Piped into another command it is plain ls -la."""
+import os, subprocess, sys
+
+BLUE, PINK = (0x89, 0xb4, 0xfa), (0xee, 0xac, 0xbe)  # the prompt's Arch-icon blue and folder pink
+
+
+def rgb(c):
+    return '\x1b[38;2;%d;%d;%dm' % c
+
+
+def colour(lines):
+    width = max(map(len, lines), default=1)
+    out = []
+    for l in lines:
+        if l[:1] == 'd':
+            s = rgb(BLUE) + l
+        elif l[:1] == '-' and 'x' in l[1:10]:
+            s = rgb(PINK) + l
+        else:
+            s = ''.join(ch if ch == ' ' else rgb(tuple(round(a + (b - a) * i / max(1, width - 1)) for a, b in zip(BLUE, PINK))) + ch
+                        for i, ch in enumerate(l))
+        out.append(s + '\x1b[0m' if l else l)
+    return out
+
+
+if __name__ == '__main__':
+    if not sys.stdout.isatty():
+        os.execvp('ls', ['ls', '-la', *sys.argv[1:]])
+    r = subprocess.run(['ls', '-la', '--color=never', *sys.argv[1:]], capture_output=True, text=True, errors='surrogateescape')
+    sys.stderr.write(r.stderr)
+    if r.stdout:
+        print('\n'.join(colour(r.stdout.rstrip('\n').split('\n'))))
+    sys.exit(r.returncode)

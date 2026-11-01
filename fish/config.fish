@@ -10,7 +10,7 @@ end
 
 alias ls 'ls --color=auto'
 alias grep 'grep --color=auto'
-alias la 'ls -la'
+alias la yuki-ls
 
 # --- bash habits that fish lacks ---
 # !! and !$ expand to the last command / its last argument

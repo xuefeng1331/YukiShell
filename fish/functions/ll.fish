@@ -1,3 +1,3 @@
-function ll --wraps=ls --description 'ls -la'
-    ls -la --color=auto $argv
+function ll --wraps=ls --description 'ls -la in YukiShell colours'
+    yuki-ls $argv
 end

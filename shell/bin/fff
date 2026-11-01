@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+import sys
+import os
+import pty
+import re
+import subprocess
+import fcntl
+import struct
+import termios
+import time
+
+def parse_to_gib(val, unit):
+    try:
+        val = float(val)
+    except ValueError:
+        return 0.0
+    unit = unit.lower()
+    if 't' in unit:
+        return val * 1024
+    elif 'g' in unit:
+        return val
+    elif 'm' in unit:
+        return val / 1024
+    elif 'k' in unit:
+        return val / (1024 * 1024)
+    else:
+        return val / (1024 * 1024 * 1024)
+
+def modify_line(line):
+    # Detect and strip newline to keep it simple, add it back at the end
+    newline = ""
+    if line.endswith("\r\n"):
+        newline = "\r\n"
+        line = line[:-2]
+    elif line.endswith("\n"):
+        newline = "\n"
+        line = line[:-1]
+
+    # Split by the last occurrence of the vertical box border '│'
+    if '│' in line:
+        parts = line.rsplit('│', 1)
+        left = parts[0] + '│'
+        right = parts[1]
+        
+        # Strip ANSI escapes from the left part to identify the key reliably
+        clean_left = re.sub(r'\x1b\[[0-9;]*m', '', left).lower()
+        
+        if any(k in clean_left for k in ['distro', 'kernel', 'uptime', 'wm']):
+            suffix = ""
+            val_match = re.search(r"((\s|\x1b\[[0-9;]*m)*)$", right)
+            if val_match:
+                suffix = val_match.group(1)
+            val = right.strip()
+            val_clean = re.sub(r'\x1b\[[0-9;]*m', '', val)
+            return left + "\x1b[36m" + val_clean + "\x1b[m" + suffix + newline
+
+        elif 'monitor' in clean_left:
+            suffix = ""
+            val_match = re.search(r"((\s|\x1b\[[0-9;]*m)*)$", right)
+            if val_match:
+                suffix = val_match.group(1)
+            return f"{left}  \x1b[36mROG Swift OLED PG32UCWM 3840x2160@240Hz\x1b[m{suffix}{newline}"
+
+        elif 'board' in clean_left:
+            suffix = ""
+            val_match = re.search(r"((\s|\x1b\[[0-9;]*m)*)$", right)
+            if val_match:
+                suffix = val_match.group(1)
+            return left + "  \x1b[36mASUS ROG Crosshair X870E Dark Hero\x1b[m" + suffix + newline
+
+        elif 'cpu' in clean_left:
+            # Preserve trailing spaces/ANSI resets from original value
+            suffix = ""
+            val_match = re.search(r"((\s|\x1b\[[0-9;]*m)*)$", right)
+            if val_match:
+                suffix = val_match.group(1)
+            return left + "  \x1b[36mAMD Ryzen 9 9950X3D2 (16C/32T) @ 5.60 GHz\x1b[m" + suffix + newline
+            
+        elif 'gpu' in clean_left:
+            suffix = ""
+            val_match = re.search(r"((\s|\x1b\[[0-9;]*m)*)$", right)
+            if val_match:
+                suffix = val_match.group(1)
+            return left + "  \x1b[36mNVIDIA ASUS ROG Astral GeForce RTX 5090 32GB [Discrete]\x1b[m" + suffix + newline
+            
+        elif 'memory' in clean_left:
+            # Parse current usage from right side
+            match = re.search(r"([0-9.]+)\s*([a-zA-Z]+)", right)
+            if match:
+                used_val = match.group(1)
+                used_unit = match.group(2)
+                used_gib = parse_to_gib(used_val, used_unit)
+                fake_total_gib = 128.0
+                fake_percent = int((used_gib / fake_total_gib) * 100)
+                
+                return f"{left}  \x1b[36m{used_val} {used_unit} / 128.00 GiB ({fake_percent}%)\x1b[m{newline}"
+                
+        elif 'swap' in clean_left:
+            match = re.search(r"([0-9.]+)\s*([a-zA-Z]+)", right)
+            if match:
+                used_val = match.group(1)
+                used_unit = match.group(2)
+                used_gib = parse_to_gib(used_val, used_unit)
+                fake_total_gib = 128.0
+                fake_percent = int((used_gib / fake_total_gib) * 100) if fake_total_gib > 0 else 0
+                
+                return f"{left}  \x1b[36m{used_val} {used_unit} / 128.00 GiB ({fake_percent}%)\x1b[m{newline}"
+                
+        elif 'disk' in clean_left:
+            match = re.search(r"([0-9.]+)\s*([a-zA-Z]+)", right)
+            if match:
+                used_val = match.group(1)
+                used_unit = match.group(2)
+                used_gib = parse_to_gib(used_val, used_unit)
+                fake_total_gib = 16384 # 16 TiB
+                fake_percent = (used_gib / fake_total_gib) * 100
+
+                # Check if there is extra info like filesystem name (e.g. "- btrfs")
+                extra = ""
+                if '-' in right:
+                    extra = " - " + right.split('-', 1)[1].strip()
+
+                return f"{left}  \x1b[36m{used_val} {used_unit} / 16.00 TiB ({fake_percent:.1f}%){extra}\x1b[m{newline}"
+
+    return line + newline
+
+def get_winsize(fd):
+    # rows, cols, xpixel, ypixel - the pixel fields matter as much as the
+    # cell counts: fastfetch's Kitty-graphics image scaling uses xpixel/
+    # ypixel to know how many pixels a cell is, and without them (e.g. left
+    # as 0) it mis-scales the image into corrupted-looking blocks.
+    packed = fcntl.ioctl(fd, termios.TIOCGWINSZ, struct.pack('HHHH', 0, 0, 0, 0))
+    return struct.unpack('HHHH', packed)
+
+def get_stable_winsize(fd, max_wait=1.0, poll_interval=0.03, required_stable=3):
+    # When this is launched straight into a freshly created (and, here,
+    # freshly tiled) window, Hyprland resizes it *after* the pty already
+    # exists, and that SIGWINCH can arrive after we've already read the
+    # size once. Reading immediately then races the resize: run it by
+    # hand in a window that's already settled and it's fine, but launch it
+    # via the dashboard script and fastfetch can catch the terminal still
+    # at its pre-tiling size and fall back to the ascii logo. Poll until
+    # the reported size stops changing (or we give up) instead of trusting
+    # a single read.
+    last = None
+    stable_count = 0
+    deadline = time.monotonic() + max_wait
+    while time.monotonic() < deadline:
+        try:
+            ws = get_winsize(fd)
+        except OSError:
+            ws = None
+        if ws and ws[0] > 0 and ws[1] > 0:
+            if ws == last:
+                stable_count += 1
+                if stable_count >= required_stable:
+                    return ws
+            else:
+                stable_count = 0
+            last = ws
+        time.sleep(poll_interval)
+    return last or (24, 80, 0, 0)
+
+ESC = re.compile(r'(\x1b_.*?\x1b\\|\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\))', re.S)
+BLUE, PINK = (0x89, 0xb4, 0xfa), (0xee, 0xac, 0xbe)  # the prompt's Arch-icon blue and folder pink
+KEEP = set('●○⬤')  # the palette dots on the "colors" row keep their own colours
+
+def gradient(text):
+    """Recolour every visible character by its column: blue at the left edge, pink at the end of the longest line."""
+    lines = text.split('\n')
+    width = max((sum(len(p.replace('\r', '')) for p in ESC.split(l)[0::2]) for l in lines), default=1)
+    out = []
+    for line in lines:
+        parts, col, sgr, res = ESC.split(line), 0, '', []
+        for i, part in enumerate(parts):
+            if i % 2:
+                if part.startswith('\x1b[') and part.endswith('m'): sgr = part
+                else: res.append(part)
+                continue
+            for ch in part:
+                if ch == '\r': res.append(ch); continue
+                if ch in KEEP: res.append(sgr + ch)
+                elif ch != ' ':
+                    t = col / max(1, width - 1)
+                    res.append('\x1b[38;2;%d;%d;%dm' % tuple(round(a + (b - a) * t) for a, b in zip(BLUE, PINK)) + ch)
+                else: res.append(ch)
+                col += 1
+        out.append(''.join(res) + ('\x1b[0m' if res else ''))
+    return '\n'.join(out)
+
+def main():
+    real = '--real' in sys.argv[1:]  # ff: same look, real specs
+    args = [a for a in sys.argv[1:] if a != '--real']
+    # We will use pty to spawn fastfetch so it outputs colors and images normally
+    masters, slaves = pty.openpty()
+
+    # A freshly opened pty defaults to a 0x0 window size, which makes
+    # fastfetch think there's no room for a real image and fall back to a
+    # tiny/ascii logo. Copy our actual terminal size onto the pty so it
+    # renders the image at full quality.
+    winsize = get_stable_winsize(sys.stdout.fileno())
+    fcntl.ioctl(slaves, termios.TIOCSWINSZ, struct.pack('HHHH', *winsize))
+
+    # Run fastfetch. --logo-type kitty forces the real Kitty graphics
+    # protocol instead of fastfetch's "auto" detection, which is what was
+    # silently falling back to a blocky Unicode-block render: auto mode
+    # tries to detect terminal image support live, and that detection was
+    # flaky/inconsistent when launched this way (through a pty relay,
+    # non-interactively) even though the terminal genuinely is kitty.
+    # Forcing it sidesteps the detection entirely.
+    process = subprocess.Popen(
+        ['fastfetch', '--logo-type', 'kitty', *args],
+        stdout=slaves,
+        stderr=slaves,
+        close_fds=True
+    )
+    os.close(slaves)
+    
+    # Read output
+    output_bytes = b""
+    while True:
+        try:
+            data = os.read(masters, 4096)
+            if not data:
+                break
+            output_bytes += data
+        except OSError:
+            break
+            
+    os.close(masters)
+    process.wait()
+    
+    # Decode using surrogateescape to preserve raw binary graphics if any
+    output_str = output_bytes.decode('utf-8', errors='surrogateescape')
+    
+    # Process line-by-line
+    lines = output_str.splitlines(keepends=True)
+    modified_lines = lines if real else [modify_line(line) for line in lines]
+    
+    # Print out modified output
+    sys.stdout.buffer.write(gradient("".join(modified_lines)).encode('utf-8', errors='surrogateescape'))
+    sys.stdout.buffer.flush()
+
+if __name__ == "__main__":
+    main()

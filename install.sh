@@ -19,7 +19,7 @@ link "$here/btop/themes/mocha-glass.theme"      "$cfg/btop/themes/mocha-glass.th
 link "$here/cava/config"                        "$cfg/cava/config"
 link "$here/cava/dashboard.conf"               "$cfg/cava/dashboard.conf"
 link "$here/fish/config.fish"                   "$cfg/fish/config.fish"
-for f in cll ll warp fish_prompt fish_right_prompt; do link "$here/fish/functions/$f.fish" "$cfg/fish/functions/$f.fish"; done
+for f in "$here"/fish/functions/*.fish; do link "$f" "$cfg/fish/functions/${f##*/}"; done
 for v in 3 4; do
     link "$here/gtk-$v.0/gtk.css"      "$cfg/gtk-$v.0/gtk.css"
     link "$here/gtk-$v.0/settings.ini" "$cfg/gtk-$v.0/settings.ini"
@@ -30,6 +30,8 @@ link "$here/shell/bin/yuki-start"              "$HOME/.local/bin/yuki-start"
 link "$here/shell/bin/yuki-restart"            "$HOME/.local/bin/yuki-restart"
 link "$here/shell/bin/yuki-brightness"         "$HOME/.local/bin/yuki-brightness"
 link "$here/shell/bin/yukishell"               "$HOME/.local/bin/yukishell"
+link "$here/shell/bin/yuki-ls"                 "$HOME/.local/bin/yuki-ls"
+link "$here/shell/bin/fff"                     "$HOME/.local/bin/fff"
 link "$here/shell/scripts"                     "$cfg/hypr-yukishell/scripts"
 [ -f "$cfg/hypr-yukishell/env" ] || { mkdir -p "$cfg/hypr-yukishell"; cp "$here/shell/env.example" "$cfg/hypr-yukishell/env"; }
 link "$here/qt/CatppuccinMauve.colors" "$HOME/.local/share/color-schemes/CatppuccinMauve.colors"
