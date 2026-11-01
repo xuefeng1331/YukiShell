@@ -97,6 +97,7 @@ var strings = {
     "Clock and calendar": "Đồng hồ và lịch",
     "Close": "Đóng",
     "Close Tab": "Đóng tab",
+    "Force Quit Window": "Buộc thoát cửa sổ",
     "Close Window": "Đóng cửa sổ",
     "Color": "Màu",
     "Colour": "Màu",

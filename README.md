@@ -146,6 +146,7 @@ menu bar show each item's shortcut next to it.
 | `Super+W` / `Super+E` | Chromium / Dolphin (Dolphin opens tiled: full screen on an empty workspace, beside your other windows otherwise) |
 | `Super+Shift+W` / `Super+Shift+E` | floating Chromium / Dolphin, centred |
 | `Super+Q` | close window |
+| `Super+Shift+Q` | force quit (kills an app that stopped responding) |
 | `Super+F` | fullscreen (press again to go back) |
 | `Super+Shift+F` | maximize, keeping the bar and gaps |
 | `Super+Alt+Space` | toggle floating (new windows open floating, centred; *Settings → Desktop & Dock → Open windows floating*) |
@@ -190,7 +191,7 @@ menu bar show each item's shortcut next to it.
 | `Super+Shift+R` | restart the shell |
 | `Super+Shift+C` | reload the Hyprland config |
 
-There's no key to quit Hyprland, reboot, shut down or force-quit an app. I've hit those by accident before. They're in the menus and need a second click.
+There's no key to quit Hyprland, reboot or shut down. I've hit those by accident before. They're in the menus and need a second click.
 
 ## What's in it
 

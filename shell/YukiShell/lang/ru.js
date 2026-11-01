@@ -70,6 +70,7 @@ var strings = {
     "New Private Window": "Новое приватное окно",
     "New Tab": "Новая вкладка",
     "Close Tab": "Закрыть вкладку",
+    "Force Quit Window": "Принудительно закрыть окно",
     "Close Window": "Закрыть окно",
     "Reopen Closed Tab": "Открыть закрытую вкладку",
     "Open…": "Открыть…",

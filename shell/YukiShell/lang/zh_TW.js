@@ -97,6 +97,7 @@ var strings = {
     "Clock and calendar": "時鐘和行事曆",
     "Close": "關閉",
     "Close Tab": "關閉標籤頁",
+    "Force Quit Window": "強制結束視窗",
     "Close Window": "關閉視窗",
     "Color": "顏色",
     "Colour": "顏色",

@@ -12,6 +12,7 @@ bind(mod .. " + SHIFT + Return", hl.dsp.exec_cmd("kitty", { float = true, center
 bind(mod .. " + SHIFT + E",      hl.dsp.exec_cmd("dolphin", { float = true, center = true, size = "1100 700" }), "Open a Floating Files Explorer")   -- floating file manager
 bind(mod .. " + SHIFT + W",      hl.dsp.exec_cmd("~/.config/hypr/bin/float-chromium"), "Open a Floating Browser")                             -- floating browser window (script: a running Chromium ignores exec rules)
 bind(mod .. " + Q",              hl.dsp.window.close(), "Close Window")
+bind(mod .. " + SHIFT + Q",      hl.dsp.window.kill(),  "Force Quit Window")   -- kills the app (SIGKILL), for one that stopped responding
 bind(mod .. " + F",              hl.dsp.window.fullscreen(), "Full Screen")
 bind(mod .. " + ALT + space",    hl.dsp.window.float({ action = "toggle" }), "Toggle Floating")     -- the only key for it (Super+T was a leftover of the first rice commit)
 bind(mod .. " + ALT + D",      hl.dsp.exec_cmd("~/.config/hypr/bin/dashboard"), "Dashboard")

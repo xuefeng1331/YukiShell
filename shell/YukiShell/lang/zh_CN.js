@@ -97,6 +97,7 @@ var strings = {
     "Clock and calendar": "时钟和日历",
     "Close": "关闭",
     "Close Tab": "关闭标签页",
+    "Force Quit Window": "强制退出窗口",
     "Close Window": "关闭窗口",
     "Color": "颜色",
     "Colour": "颜色",

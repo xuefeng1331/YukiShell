@@ -3646,7 +3646,7 @@ Scope {
                     m.push(mi("Show Hidden Windows", "", function () { root.sh("~/.config/hypr/bin/hide-window show"); }));
                     m.push(msep());
                     m.push(mi(I18n.tr("Quit ") + n, (term || (browser && !/firefox|librewolf|floorp|zen|waterfox/.test(id))) ? "Ctrl+Shift+Q" : "Ctrl+Q", function () { root.quitActive(); }));
-                    m.push(mc(I18n.tr("Force Quit ") + n, function () { root.forceQuitActive(aw); }));
+                    var fq = mc(I18n.tr("Force Quit ") + n, function () { root.forceQuitActive(aw); }); fq.shortcut = hk("Force Quit Window"); m.push(fq);
                 }
             } else if (name === "file") {
                 if (!has) {
