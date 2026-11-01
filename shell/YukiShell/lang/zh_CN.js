@@ -470,6 +470,7 @@ var strings = {
     "Pink": "粉色",
     "Play sound for notifications": "为通知播放声音",
     "Plays a video wallpaper inside the glass. Off uses a still frame.": "在玻璃中播放视频壁纸。关闭时使用静止画面。",
+    "Only for a live or animated wallpaper. Set one to change this.": "仅适用于动态壁纸。设置动态壁纸后即可更改。",
     "Play user interface sound effects": "播放用户界面音效",
     "Player": "播放器",
     "Power profile used by the system": "系统使用的电源模式",

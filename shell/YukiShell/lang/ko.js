@@ -470,6 +470,7 @@ var strings = {
     "Pink": "분홍색",
     "Play sound for notifications": "알림 소리 재생",
     "Plays a video wallpaper inside the glass. Off uses a still frame.": "유리 안에서 동영상 배경화면을 재생합니다. 끄면 정지 화면을 씁니다.",
+    "Only for a live or animated wallpaper. Set one to change this.": "라이브 또는 움직이는 배경화면에서만 사용할 수 있습니다. 설정하면 바꿀 수 있습니다.",
     "Play user interface sound effects": "사용자 인터페이스 효과음 재생",
     "Player": "플레이어",
     "Power profile used by the system": "시스템에서 사용하는 전원 프로필",

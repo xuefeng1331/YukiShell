@@ -248,6 +248,7 @@ var strings = {
     "Real-time glass": "Стекло в реальном времени",
     "Animated wallpaper in glass": "Анимированные обои в стекле",
     "Plays a video wallpaper inside the glass. Off uses a still frame.": "Видеообои играют внутри стекла. Выкл.: неподвижный кадр.",
+    "Only for a live or animated wallpaper. Set one to change this.": "Только для живых или анимированных обоев. Установите их, чтобы изменить.",
     "Live window capture": "Живой захват окон",
     "Popovers, Spotlight and the Dock always show what's behind them. Off saves GPU.": "Всплывающие окна, Spotlight и Dock всегда показывают то, что за ними. Выкл. экономит GPU.",
     "Off shows app icons instead of window previews.": "Выкл.: значки приложений вместо миниатюр.",

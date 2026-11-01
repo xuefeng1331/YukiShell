@@ -470,6 +470,7 @@ var strings = {
     "Pink": "ピンク",
     "Play sound for notifications": "通知の音を鳴らす",
     "Plays a video wallpaper inside the glass. Off uses a still frame.": "ガラスの中で動画の壁紙を再生します。オフでは静止画を使います。",
+    "Only for a live or animated wallpaper. Set one to change this.": "ライブ／アニメーション壁紙でのみ使えます。設定すると変更できます。",
     "Play user interface sound effects": "ユーザインターフェイスのサウンドエフェクトを再生",
     "Player": "プレーヤー",
     "Power profile used by the system": "システムが使用する電源プロファイル",

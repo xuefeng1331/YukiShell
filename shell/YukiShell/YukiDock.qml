@@ -2057,9 +2057,11 @@ Scope {
                     SRow {
                         t: pal
                         title: I18n.tr("Animated wallpaper in glass")
-                        subtitle: I18n.tr("Plays a video wallpaper inside the glass. Off uses a still frame.")
+                        subtitle: root.bar && root.bar.wallpaperVideo !== "" ? I18n.tr("Plays a video wallpaper inside the glass. Off uses a still frame.")
+                                                                           : I18n.tr("Only for a live or animated wallpaper. Set one to change this.")
                         SSwitch {
                             t: pal
+                            enabled: root.bar ? root.bar.wallpaperVideo !== "" : false
                             checked: root.bar ? root.bar.liveWallGlass : false
                             onToggled: v => { if (root.bar) root.bar.liveWallGlass = v; }
                         }
@@ -4848,9 +4850,11 @@ Scope {
                     SRow {
                         t: pal
                         title: I18n.tr("Animated wallpaper in glass")
-                        subtitle: I18n.tr("Plays a video wallpaper inside the glass. Off uses a still frame.")
+                        subtitle: root.bar && root.bar.wallpaperVideo !== "" ? I18n.tr("Plays a video wallpaper inside the glass. Off uses a still frame.")
+                                                                           : I18n.tr("Only for a live or animated wallpaper. Set one to change this.")
                         SSwitch {
                             t: pal
+                            enabled: root.bar ? root.bar.wallpaperVideo !== "" : false
                             checked: root.bar ? root.bar.liveWallGlass : false
                             onToggled: v => { if (root.bar) root.bar.liveWallGlass = v; }
                         }

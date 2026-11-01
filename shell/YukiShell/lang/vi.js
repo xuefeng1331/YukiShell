@@ -470,6 +470,7 @@ var strings = {
     "Pink": "Hồng",
     "Play sound for notifications": "Phát âm thanh cho thông báo",
     "Plays a video wallpaper inside the glass. Off uses a still frame.": "Phát hình nền video bên trong lớp kính. Tắt sẽ dùng một khung hình tĩnh.",
+    "Only for a live or animated wallpaper. Set one to change this.": "Chỉ dùng cho hình nền động. Hãy đặt một hình nền động để thay đổi.",
     "Play user interface sound effects": "Phát hiệu ứng âm thanh giao diện người dùng",
     "Player": "Trình phát",
     "Power profile used by the system": "Chế độ nguồn mà hệ thống sử dụng",
