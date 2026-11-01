@@ -485,6 +485,7 @@ Item {
     readonly property real ctlL: isStrip ? textR + 10 : (isHero ? sideX - 25 : 0)
     readonly property real ctlR: isStrip ? wr - 50 : wr
     readonly property bool ctlSides: !isTall
+    readonly property real sideIn: ctlL === 0 ? mx - 9 : 25  // 44-wide button, 26-wide glyph: glyph edge lands on mx
     readonly property real ambT: isSmall ? 77 : timeCY + 12
     readonly property real ambB: isSmall ? artY + artS : hr
     readonly property real ambL: isSmall ? artX + artS + 14 : (isStrip ? barL - 12 : (isHero ? sideX - 25 : 0))
@@ -687,7 +688,7 @@ Item {
         PlayerBtn {
             visible: !w.isSmall && w.ctlSides
             wd: w
-            x: (w.ctlL + 25) * w.k
+            x: (w.ctlL + w.sideIn) * w.k
             y: w.ctlCY * w.k - height / 2
             width: 44 * w.k
             height: width
@@ -741,7 +742,7 @@ Item {
         PlayerBtn {
             visible: !w.isSmall && w.ctlSides
             wd: w
-            x: (w.ctlR - 25 - 44) * w.k
+            x: (w.ctlR - w.sideIn - 44) * w.k
             y: w.ctlCY * w.k - height / 2
             width: 44 * w.k
             height: width
