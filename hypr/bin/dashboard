@@ -11,7 +11,9 @@ fi
 
 open() {  # open <class> <command...>; wait for the window before the next one so the tiling splits in order
     local n; n=$(count); local cls=$1; shift
-    kitty --class "$cls" "$@" >/dev/null 2>&1 &
+    # started by Hyprland with { tile = true } (like Super+E's Dolphin): "Open windows floating" (Settings -> Windows, on by
+    # default) floats every other new window, which piled the three on top of each other in the middle of the screen
+    hyprctl dispatch "hl.dsp.exec_cmd([[kitty --class $cls $*]], { tile = true })" >/dev/null
     for _ in $(seq 40); do [ "$(count)" -gt "$n" ] && break; sleep 0.05; done
 }
 pre() { hyprctl dispatch "hl.dsp.layout(\"preselect $1\")" >/dev/null; }
