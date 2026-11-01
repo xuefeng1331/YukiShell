@@ -5361,41 +5361,16 @@ Scope {
                     transformOrigin: Item.TopRight
                     Behavior on opacity { NumberAnimation { duration: 160 } }
                     Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    LGlass {
-                        anchors.fill: parent
-                        backdrop: ui.glassSrc
-                        shaderUrl: root.glassShaderUrl
-                        liquid: root.liquidActive
-                        dark: root.effDark
-                        bx: levelOsd.x; by: levelOsd.y
-                        cornerR: height / 2
-                        tint: root.glassOpacity
-                        thickness: 22
-                        strength: 0.8 * root.glassLiquid
-                        rim: root.glassRim
-                        grain: root.glassGrain
-                        blur: root.glassBlur
-                        debug: root.glassDebug
-                        onShaderError: root.glassState = "failed"
-                        rimTint: 1
-                        ringW: 1.4
-                        shadowAmt: 0
-                        flatInner: 1
-                    }
-                    MenuBorder {
-                        z: 2
-                        anchors.fill: parent
-                        cornerR: height / 2
-                        dark: root.effDark
-                        tint: root.menuBorderColor
-                        outline: false
-                    }
+                    // the same glass as the bar's popups (volume, Wi-Fi, calendar); it is drawn unscaled, hence the division
+                    PopGlassCtx { id: osdGlass; pop: levelOsd; frame: ui; source: ui.glassSrc; fullW: levelOsd.width / root.barPopupScale; fullH: levelOsd.height / root.barPopupScale }
+                    GGlass { anchors.fill: parent; gx: osdGlass.ctx; cornerR: height / 2; thickness: 22; shadowAmt: 0; flatInner: 1 }
+                    MenuBorder { z: 2; anchors.fill: parent; cornerR: height / 2; dark: osdGlass.ctx.dark; tint: osdGlass.ctx.borderTint; amount: 1 }
                     Glyph {
                         x: 20; anchors.verticalCenter: parent.verticalCenter
                         width: 24; height: 24
                         kind: root.osdKind === "brightness" ? "sun" : "speaker"
                         level: root.osdKind === "brightness" ? 3 : (root.osdValue < 0.34 ? 1 : (root.osdValue < 0.67 ? 2 : 3))
-                        color: "white"
+                        color: pal.fg
                     }
                     Row {
                         id: osdBar
@@ -5408,7 +5383,7 @@ Scope {
                             Rectangle {
                                 required property int index
                                 width: osdBar.segW; height: 4; radius: 2
-                                color: "white"
+                                color: pal.fg
                                 opacity: Math.max(0.28, Math.min(1, root.osdValue * osdBar.n - index) * 0.95)
                                 Behavior on opacity { NumberAnimation { duration: 90 } }
                             }
