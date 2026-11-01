@@ -7281,35 +7281,56 @@ Scope {
                     onPressed: ui.menuItem = null
                 }
 
-                // the right-click menu: the same frosted glass bubble as the hover label, light / dark with the appearance, its tail
-                // pointing at the icon. Settings' grid: 28 px rows, 8 px row corners, 14 px text; 6 px padding inside a 14 px corner.
-                DockGlassPanel {
+                // the right-click menu: the same Liquid Glass as the menu bar's menus (LiquidPane.qml + MenuBorder, the same settings),
+                // over the Dock's own backdrop, centred over the icon. Settings' grid: 28 px rows, 8 px row corners, 14 px text; 6 px
+                // padding inside a 14 px corner.
+                Item {
                     id: menu
                     z: 60
                     readonly property bool dk: root.darkMode
                     readonly property color ink: dk ? "#F5F5F7" : "#1D1D1F"
                     visible: opacity > 0
                     opacity: ui.menuOpen ? 1 : 0
-                    scale: ui.menuOpen ? 1 : 0.94
+                    scale: ui.menuOpen ? 1 : 0.97
                     transformOrigin: Item.Bottom
-                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                    Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
-
-                    backdrop: glassBackdrop.item
-                    live: root.liquidActive && glassBackdrop.item !== null
-                    dark: dk
-                    tinted: root.accentUi
-                    accent: root.accent
-                    radius: 14
-                    tailW: 24
-                    tailH: 8
-                    tailTipR: 3.6
+                    Behavior on opacity { NumberAnimation { duration: 90 } }
+                    Behavior on scale { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
                     width: 224
-                    bodyH: menuCol.height + 12
+                    height: menuCol.height + 12
                     x: Math.round(Math.max(8, Math.min(ui.width - width - 8, ui.menuCx - width / 2)))
-                    y: Math.round(ui.height - root.margin - root.bgHeight - root.iconSize * (root.effMag - 1) - 8 - height)
-                    tailX: ui.menuCx - x
+                    y: Math.round(ui.height - root.margin - root.bgHeight - root.iconSize * (root.effMag - 1) - 12 - height)
+                    // where the menu lies in the backdrop (screen coordinates)
+                    readonly property point bpos: glassBackdrop.item ? glassBackdrop.item.mapFromItem(ui, x, y) : Qt.point(x, y)
+
+                    LiquidPane {
+                        anchors.fill: parent
+                        backdrop: glassBackdrop.item
+                        shaderUrl: root.glassShaderUrl
+                        liquid: root.liquidActive && glassBackdrop.item !== null
+                        dark: menu.dk
+                        bx: menu.bpos.x; by: menu.bpos.y
+                        shadowAmt: 0
+                        flatInner: 1
+                        rimTint: 1
+                        ringW: 0
+                        cornerR: 14
+                        tint: root.glassOpacity
+                        thickness: 22
+                        strength: root.glassLiquid
+                        rim: root.glassRim
+                        grain: root.glassGrain
+                        blur: root.glassBlur
+                        accentTint: root.accentTintVec
+                        onShaderError: root.glassState = "failed"
+                    }
+                    MenuBorder {
+                        z: 2
+                        anchors.fill: parent
+                        cornerR: 14
+                        dark: menu.dk
+                        tint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
+                    }
 
                     Column {
                         id: menuCol
