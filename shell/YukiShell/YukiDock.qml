@@ -307,7 +307,7 @@ Scope {
     // macOS toggle switch: capsule knob, draggable, fluid slide, the knob turns into Liquid Glass while held (see GlassSwitch.qml)
     component SSwitch: GlassSwitch {
         required property var t
-        accentColor: "#30D158"
+        accentColor: t.accent
         offColor: t.switchOff
         knobColor: t.dark ? "#DCDDDA" : "white"
         dark: t.dark
@@ -570,8 +570,8 @@ Scope {
         // The size is set once when the window opens and again only when the UI scale itself changes (see below).
         width: 800
         height: 880
-        // below this the panes no longer fit their widest controls (the sidebar alone takes 232px)
-        minimumWidth: 720
+        // below this the panes no longer fit their widest controls: 480 px of page next to the narrowest sidebar
+        minimumWidth: Math.max(640, sidebar.minW + 480)
         minimumHeight: 480
         visible: false
         color: "transparent"
@@ -1060,7 +1060,20 @@ Scope {
                 // the sidebar is the normal flat one, attached to the window edge (set floating to true for the inset glass card)
                 readonly property bool floating: false
                 x: sidebar.floating ? 8 : 1; y: sidebar.floating ? 8 : 1
-                width: sidebar.floating ? 224 : 240
+                // grows and shrinks with the window (30% of it, at most 280 px), but never so narrow that a pane name in the list
+                // (semibold, as when selected) would need a second line: the widest name + the row's 72 px of icon and padding
+                FontMetrics {
+                    id: navFm
+                    font.family: root.fontForWeight(Font.DemiBold, pal.fam)
+                    font.weight: Font.DemiBold
+                    font.pixelSize: pal.fs.title
+                }
+                readonly property real minW: {
+                    var m = 0, ps = prefsWindow.panes;
+                    for (var i = 0; i < ps.length; i++) m = Math.max(m, navFm.advanceWidth(I18n.tr(ps[i].name)));
+                    return Math.ceil(m) + 72;
+                }
+                width: Math.round(Math.max(minW, Math.min(280, prefsWindow.width * 0.30))) - (sidebar.floating ? 16 : 0)
                 height: parent.height - (sidebar.floating ? 16 : 2)
                 radius: sidebar.floating ? 18 : 11
                 // frosted: a translucent pane over Hyprland's blur of what's behind the window (no Liquid Glass shader)
@@ -3013,25 +3026,11 @@ Scope {
                 property var info: ({})                 // GENERAL.* / IP4.* / IP6.* of the main device, plus a few extras
                 property var others: []                 // the other devices (VPN, Tailscale, a second card...)
                 property string dev: ""
-                property real rxRate: 0                 // bytes per second
-                property real txRate: 0
-                property var rxHist: []                 // last 60 seconds, for the graphs
-                property var txHist: []
-                property real rxTotal: 0
-                property real txTotal: 0
-                property real lastRx: -1
-                property real lastTx: -1
-                property real lastAt: 0
                 property string publicIp: ""
                 property bool publicBusy: false
                 readonly property bool up: info.state !== undefined && info.state.indexOf("connected") === 0
                 readonly property string kind: info.type || ""
                 function v(k) { return info[k] !== undefined ? info[k] : ""; }
-                function human(b, perSec) {
-                    var u = perSec ? ["B/s", "KB/s", "MB/s", "GB/s"] : ["B", "KB", "MB", "GB", "TB"], i = 0;
-                    while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
-                    return (i === 0 ? Math.round(b) : b.toFixed(b < 10 ? 1 : 0)) + " " + u[i];
-                }
                 function mask(prefix) {
                     var n = parseInt(prefix); if (isNaN(n)) return "";
                     var out = [];
@@ -3084,28 +3083,6 @@ Scope {
                         }
                     }
                 }
-                // traffic: the interface's byte counters once a second while Settings is open
-                Timer { interval: 1000; repeat: true; triggeredOnStart: true; running: prefsWindow.visible && netPane.dev !== ""; onTriggered: if (!rateProc.running) rateProc.running = true }
-                Process {
-                    id: rateProc
-                    command: ["sh", "-c", "cat /sys/class/net/\"$1\"/statistics/rx_bytes /sys/class/net/\"$1\"/statistics/tx_bytes 2>/dev/null", "sh", netPane.dev]
-                    stdout: StdioCollector {
-                        onStreamFinished: {
-                            var f = text.trim().split("\n"); if (f.length < 2) return;
-                            var rx = parseFloat(f[0]), tx = parseFloat(f[1]), now = Date.now();
-                            if (netPane.lastRx >= 0 && rx >= netPane.lastRx && tx >= netPane.lastTx) {
-                                var dt = Math.max(0.2, (now - netPane.lastAt) / 1000);
-                                netPane.rxRate = (rx - netPane.lastRx) / dt; netPane.txRate = (tx - netPane.lastTx) / dt;
-                                var a = netPane.rxHist.slice(-59), b = netPane.txHist.slice(-59);
-                                a.push(netPane.rxRate); b.push(netPane.txRate);
-                                netPane.rxHist = a; netPane.txHist = b;
-                            }
-                            netPane.lastRx = rx; netPane.lastTx = tx; netPane.lastAt = now;
-                            netPane.rxTotal = rx; netPane.txTotal = tx;
-                        }
-                    }
-                }
-                onDevChanged: { lastRx = -1; rxHist = []; txHist = []; rxRate = 0; txRate = 0; }
                 Process {
                     id: pubProc
                     command: ["sh", "-c", "curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null || echo ?"]
@@ -3159,55 +3136,6 @@ Scope {
                                 anchors.centerIn: parent; spacing: 6
                                 Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: netPane.up ? "#30D158" : pal.text3 }
                                 Text { id: pillText; text: netPane.up ? I18n.tr("Online") : I18n.tr("Offline"); color: netPane.up ? "#30D158" : pal.text2; font.family: root.fontForWeight(Font.DemiBold, pal.fam); font.pixelSize: pal.fs.caption; font.weight: Font.DemiBold }
-                            }
-                        }
-                    }
-                    // live traffic: two tiles with the speed right now, a 60-second graph and what went through since the link came up
-                    Item {
-                        visible: netPane.up
-                        width: parent.width; height: visible ? 128 : 0
-                        Rectangle { x: 14; width: parent.width - 14; height: 1; color: pal.sep }
-                        Row {
-                            x: 14; y: 14; spacing: 10
-                            Repeater {
-                                model: [{ down: true }, { down: false }]
-                                delegate: Rectangle {
-                                    id: tile
-                                    required property var modelData
-                                    readonly property bool down: modelData.down
-                                    readonly property color tint: down ? "#30D158" : pal.accent
-                                    readonly property var hist: down ? netPane.rxHist : netPane.txHist
-                                    width: (netPane.width - 38) / 2; height: 100; radius: 10
-                                    color: Qt.rgba(tint.r, tint.g, tint.b, 0.08)
-                                    border.width: 1; border.color: Qt.rgba(tint.r, tint.g, tint.b, 0.22)
-                                    Column {
-                                        x: 12; y: 10; spacing: 1
-                                        Text { text: (tile.down ? "↓  " + I18n.tr("Download") : "↑  " + I18n.tr("Upload")); color: tile.tint; font.family: root.fontForWeight(Font.DemiBold, pal.fam); font.pixelSize: pal.fs.caption; font.weight: Font.DemiBold }
-                                        Text { text: netPane.human(tile.down ? netPane.rxRate : netPane.txRate, true); color: pal.text; font.family: root.fontForWeight(Font.DemiBold, pal.fam); font.pixelSize: pal.fs.display; font.weight: Font.DemiBold }
-                                        Text { text: (tile.down ? I18n.tr("Received ") : I18n.tr("Sent ")) + netPane.human(tile.down ? netPane.rxTotal : netPane.txTotal, false); color: pal.text3; font.family: root.fontForWeight(Font.Normal, pal.fam); font.pixelSize: pal.fs.caption }
-                                    }
-                                    Canvas {
-                                        id: graph
-                                        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                                        anchors.margins: 1
-                                        height: 34
-                                        onPaint: {
-                                            var c = getContext("2d"), h = tile.hist, w = width, ht = height;
-                                            c.reset();
-                                            if (h.length < 2) return;
-                                            var mx = 1; for (var i = 0; i < h.length; i++) mx = Math.max(mx, h[i]);
-                                            var step = w / 59, x0 = w - (h.length - 1) * step;
-                                            c.beginPath(); c.moveTo(x0, ht);
-                                            for (var j = 0; j < h.length; j++) c.lineTo(x0 + j * step, ht - 2 - (ht - 6) * h[j] / mx);
-                                            c.lineTo(w, ht); c.closePath();
-                                            c.fillStyle = Qt.rgba(tile.tint.r, tile.tint.g, tile.tint.b, 0.18); c.fill();
-                                            c.beginPath();
-                                            for (var k = 0; k < h.length; k++) { var y = ht - 2 - (ht - 6) * h[k] / mx; if (k === 0) c.moveTo(x0, y); else c.lineTo(x0 + k * step, y); }
-                                            c.strokeStyle = tile.tint; c.lineWidth = 1.5; c.stroke();
-                                        }
-                                        Connections { target: tile; function onHistChanged() { graph.requestPaint(); } }
-                                    }
-                                }
                             }
                         }
                     }
@@ -5178,11 +5106,25 @@ Scope {
                 }
 
                 Item {
-                    width: parent.width; height: 30
-                    SLabel { t: pal; header: true; width: 200; anchors.verticalCenter: parent.verticalCenter; text: I18n.tr("Wallpapers"); topPadding: 0 }
+                    id: wpHead
+                    width: parent.width
+                    readonly property bool stack: wpHeadLbl.implicitWidth + wpFilter.width + 8 > width
+                    height: stack ? wpHeadLbl.height + 8 + wpFilter.height : Math.max(30, wpFilter.height)
+                    SLabel {
+                        id: wpHeadLbl
+                        t: pal; header: true; topPadding: 0
+                        width: implicitWidth
+                        y: wpHead.stack ? 0 : Math.round((wpHead.height - height) / 2)
+                        text: I18n.tr("Wallpapers")
+                    }
                     SSegmented {
+                        id: wpFilter
                         t: pal
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: parent.right
+                        y: wpHead.stack ? wpHeadLbl.height + 8 : Math.round((wpHead.height - height) / 2)
+                        // never wider than the page: shrinks to fit a narrow window instead of spilling out on the left
+                        scale: width > 0 ? Math.min(1, wpHead.width / width) : 1
+                        transformOrigin: Item.TopRight
                         model: ["All", "Pictures", "Animated", "★ Favourites"]
                         current: wpPane.filter
                         onPicked: i => wpPane.filter = i

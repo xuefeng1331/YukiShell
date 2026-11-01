@@ -1913,7 +1913,7 @@ Scope {
     }
     component PSwitch: GlassSwitch {
         required property var t
-        accentColor: "#30D158"
+        accentColor: root.accent
         offColor: t.switchOff
         dark: t.dark
         baseColor: t.dark ? "#2B2B2D" : "#FFFFFF"

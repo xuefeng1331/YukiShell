@@ -87,7 +87,7 @@ hl.window_rule({
     float = true,
     center = true,
     size = "800 880",
-    min_size = "720 480",    -- below this the panes no longer fit their widest controls (the sidebar alone is 232px)
+    min_size = "640 480",    -- below this the panes no longer fit; Settings also sets its own exact minimum (sidebar + 480 px of page)
 })
 
 -- Super+Shift+W (hypr/bin/float-chromium): a floating Chromium window, born floating. The rule is off by default; the script

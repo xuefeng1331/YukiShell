@@ -987,7 +987,7 @@ Scope {
         id: csw
         property bool on: false
         checked: on
-        accentColor: "#30D158"
+        accentColor: root.accent
         offColor: root.darkMode ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(0, 0, 0, 0.14)
         dark: root.darkMode
         baseColor: root.darkMode ? "#2C2C2E" : "#FFFFFF"
