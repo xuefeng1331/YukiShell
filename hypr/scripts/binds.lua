@@ -2,7 +2,7 @@ local mod = "SUPER"
 
 local bind = require("scripts.keys").bind
 
-bind(mod .. " + Return",         hl.dsp.exec_cmd("kitty"), "Open Terminal")
+bind(mod .. " + Return",         hl.dsp.exec_cmd("kitty", { tile = true }), "Open Terminal")
 bind(mod .. " + E",              hl.dsp.exec_cmd("dolphin", { tile = true }), "Open Files")
 bind(mod .. " + W",              hl.dsp.exec_cmd("chromium"), "Open Browser")
 bind(mod .. " + SHIFT + Return", hl.dsp.exec_cmd("kitty", { float = true, center = true, size = "900 560" }), "Open a Floating Terminal")
