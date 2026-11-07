@@ -80,6 +80,8 @@ hl.window_rule({
     tile = true,
 })
 
+hl.layer_rule({ name = "yukishell-clock-alert", match = { namespace = "^yukishell-clock-alert$" }, blur = true, ignore_alpha = 0.45 })
+
 -- games keep out of the 900x560 floating size: they tile and can still go fullscreen
 hl.window_rule({
     name  = "tile-games",

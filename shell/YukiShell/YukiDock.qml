@@ -502,6 +502,7 @@ Scope {
     readonly property var filePicker: filePickerWin
     FilePicker {
         id: filePickerWin
+        frost: root.bar ? root.bar.barStyle !== "normal" : true
         dark: root.darkMode
         fam: root.fontFamily
         accent: root.accent
@@ -909,7 +910,8 @@ Scope {
                                                    : Qt.color(dark ? "#1E1E1E" : "#F5F5F7"), 0.30, dark)
             readonly property color sidebar: root.accentWash(dark ? Qt.color("#292929") : Qt.color("#E9E9EC"), 0.30, dark)
             readonly property color contentSolid: root.accentWash(dark ? Qt.color("#1E1E1E") : Qt.color("#F5F5F7"), 0.30, dark)
-            readonly property color sidebarGlass: root.accentWash(dark ? Qt.rgba(0.17, 0.17, 0.18, 0.55) : Qt.rgba(0.94, 0.94, 0.96, 0.60), 0.35, dark)
+            readonly property bool solidWin: root.bar ? root.bar.barStyle === "normal" : false
+            readonly property color sidebarGlass: root.accentWash(dark ? Qt.rgba(0.17, 0.17, 0.18, solidWin ? 0.97 : 0.55) : Qt.rgba(0.94, 0.94, 0.96, solidWin ? 0.97 : 0.60), 0.35, dark)
             readonly property color card: root.accentWash(dark ? Qt.color("#2B2B2D") : Qt.color("#FFFFFF"), 0.30, dark)
             readonly property color cardBorder: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.12)
             readonly property color windowBorder: dark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.22)
@@ -1910,20 +1912,20 @@ Scope {
                     SRow {
                         t: pal
                         title: I18n.tr("Menu Bar style")
-                        subtitle: (root.bar && root.bar.barStyle === "liquid" && root.bar.glassState === "failed")
+                        subtitle: (root.bar && root.bar.barStyle !== "normal" && root.bar.glassState === "failed")
                                   ? I18n.tr("Liquid Glass couldn't start (details in the shell's log)")
                                   : I18n.tr("Style of the menus and popovers")
                         SSegmented {
                             t: pal
-                            model: ["Normal Blur", "Liquid Glass"]
-                            current: (root.bar && root.bar.barStyle === "liquid") ? 1 : 0
-                            onPicked: i => { if (root.bar) root.bar.barStyle = (i === 1 ? "liquid" : "blur"); }
+                            model: ["Normal", "Acrylic", "Liquid Glass"]
+                            current: root.bar ? Math.max(0, ["normal", "blur", "liquid"].indexOf(root.bar.barStyle)) : 2
+                            onPicked: i => { if (root.bar) root.bar.barStyle = ["normal", "blur", "liquid"][i]; }
                         }
                     }
                     SRow {
                         t: pal
                         title: I18n.tr("Liquid Glass bar")
-                        subtitle: I18n.tr("The bar refracts what's under it. Needs the Liquid Glass style.")
+                        subtitle: I18n.tr("The bar itself is glass too. Needs the Acrylic or Liquid Glass style.")
                         SSwitch {
                             t: pal
                             checked: root.bar ? root.bar.barGlass : true
@@ -2567,21 +2569,21 @@ Scope {
                     SRow {
                         t: pal
                         title: I18n.tr("Dock style")
-                        subtitle: root.dockStyle === "liquid" && root.glassState === "failed"
-                                  ? I18n.tr("Liquid Glass couldn't start (details in the shell's log) – using Normal Blur")
-                                  : (root.dockStyle === "liquid" && root.glassState === "building"
+                        subtitle: root.dockStyle !== "normal" && root.glassState === "failed"
+                                  ? I18n.tr("Liquid Glass couldn't start (details in the shell's log)")
+                                  : (root.dockStyle !== "normal" && root.glassState === "building"
                                      ? I18n.tr("Preparing the Liquid Glass shader…")
-                                     : I18n.tr("Blur of the desktop, or refracting Liquid Glass"))
+                                     : I18n.tr("A plain panel, frosted Acrylic, or refracting Liquid Glass"))
                         SSegmented {
                             t: pal
-                            model: ["Normal Blur", "Liquid Glass"]
-                            current: root.dockStyle === "liquid" ? 1 : 0
-                            onPicked: i => root.dockStyle = (i === 1 ? "liquid" : "blur")
+                            model: ["Normal", "Acrylic", "Liquid Glass"]
+                            current: Math.max(0, ["normal", "blur", "liquid"].indexOf(root.dockStyle))
+                            onPicked: i => root.dockStyle = ["normal", "blur", "liquid"][i]
                         }
                     }
                     SRow {
                         t: pal
-                        visible: root.dockStyle === "liquid"
+                        visible: root.dockStyle !== "normal"
                         title: I18n.tr("Blur")
                         subtitle: I18n.tr("How strongly the glass blurs what's behind it")
                         SSlider {
@@ -2609,15 +2611,13 @@ Scope {
                     }
                     SRow {
                         t: pal
-                        visible: root.dockStyle === "liquid"
+                        visible: root.dockStyle !== "normal"
                         title: I18n.tr("Real-time glass")
                         subtitle: I18n.tr("Windows behind the Dock show through live.")
                         SSwitch { t: pal; checked: root.glassLive; onToggled: v => root.glassLive = v }
                     }
                 }
-                SLabel { t: pal; text: root.dockStyle === "liquid"
-                                       ? I18n.tr("Corner radius in Desktop & Dock also shapes the glass.")
-                                       : I18n.tr("The blur behind the Dock comes from your Hyprland layer rule.") }
+                SLabel { t: pal; visible: root.dockStyle !== "normal"; text: I18n.tr("Corner radius in Desktop & Dock also shapes the glass.") }
             }
         }
 
@@ -5477,7 +5477,7 @@ Scope {
         onLoaded: {
             try { root.applySettings(JSON.parse(text())); } catch (err) { }
             root.settingsReady = true;
-            if (root.dockStyle === "liquid") root.startGlass();
+            if (root.dockStyle !== "normal") root.startGlass();
         }
         onLoadFailed: root.settingsReady = true
     }
@@ -5782,7 +5782,12 @@ Scope {
     }
 
     property string glassState: "idle"
-    readonly property bool liquidBase: dockStyle === "liquid" && glassState === "ready" && !(bar && bar.gaming)
+    // dockStyle "blur" is Acrylic: the Liquid Glass pipeline without refraction or rim, blurred 24 more; "normal" is a plain dock
+    readonly property bool acrylic: dockStyle === "blur"
+    readonly property real glassLiquidEff: acrylic ? 0 : glassLiquid
+    readonly property real glassRimEff: acrylic ? 0 : glassRim
+    readonly property real glassBlurEff: acrylic ? glassBlur + 24 : glassBlur
+    readonly property bool liquidBase: dockStyle !== "normal" && glassState === "ready" && !(bar && bar.gaming)
     property bool glassWarm: false
     readonly property bool glassWarmWanted: liquidBase && (!hub || hub.wallpaperReady)
     onGlassWarmWantedChanged: { if (glassWarmWanted) glassWarmT.restart(); else { glassWarmT.stop(); glassWarm = false; } }
@@ -5793,7 +5798,7 @@ Scope {
     readonly property string glassShaderOut: configDir + "/liquidglass.frag.qsb"
     readonly property url glassShaderUrl: "file://" + glassShaderOut
 
-    onDockStyleChanged: if (dockStyle === "liquid") startGlass()
+    onDockStyleChanged: if (dockStyle !== "normal") startGlass()
     onGlassStateChanged: console.log("[yukidock-glass] state:", glassState)
     function startGlass() {
         if (dockGlassState === "idle" || dockGlassState === "failed") {
@@ -6425,7 +6430,7 @@ Scope {
                             id: dg
                             property color edgeCol: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
                             Behavior on edgeCol { ColorAnimation { duration: 450; easing.type: Easing.OutCubic } }
-                            readonly property real eb: root.glassBlur + root.dockBlurBoost
+                            readonly property real eb: root.glassBlurEff + root.dockBlurBoost
                             readonly property real ds: eb >= 8 ? 0.5 : 1.0
                             readonly property real bn: eb * 1.5 * ds / 64.0
                             readonly property real margin: 72
@@ -6498,10 +6503,10 @@ Scope {
                                 property real pad: padPx
                                 property real radius: root.cornerRadius
                                 property real bezel: Math.min(dock.height * 0.36, 26)
-                                property real thickness: 30 * root.glassLiquid
-                                property real dispersion: 0.06 * root.glassLiquid
-                                property real magnify: 0.08 * root.glassLiquid
-                                property real rim: root.glassRim * 0.20
+                                property real thickness: 30 * root.glassLiquidEff
+                                property real dispersion: 0.06 * root.glassLiquidEff
+                                property real magnify: 0.08 * root.glassLiquidEff
+                                property real rim: root.glassRimEff * 0.20
                                 property real grain: root.glassGrain * 0.3
                                 property real blurPx: 1.5
                                 property real tintMix: root.glassOpacity * 0.55
@@ -6983,10 +6988,10 @@ Scope {
                         cornerR: 14
                         tint: root.glassOpacity
                         thickness: 22
-                        strength: root.glassLiquid
-                        rim: root.glassRim
+                        strength: root.glassLiquidEff
+                        rim: root.glassRimEff
                         grain: root.glassGrain
-                        blur: root.glassBlur
+                        blur: root.glassBlurEff
                         accentTint: root.accentTintVec
                         onShaderError: root.glassState = "failed"
                     }

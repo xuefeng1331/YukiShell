@@ -281,7 +281,8 @@ Scope {
             opacity: on ? 1 : 0
             transform: Translate { x: bannerCard.on ? 0 : 60; Behavior on x { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } } }
             Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-            color: root.darkMode ? Qt.rgba(0.17, 0.17, 0.18, 0.92) : Qt.rgba(0.97, 0.97, 0.98, 0.94)
+            readonly property real bgA: (root.bar && root.bar.barStyle === "normal") ? 0.94 : 0.82
+            color: root.darkMode ? Qt.rgba(0.17, 0.17, 0.18, bgA) : Qt.rgba(0.97, 0.97, 0.98, bgA)
             border.width: 1; border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.10)
             layer.enabled: true
             layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.8; shadowOpacity: 0.35; shadowVerticalOffset: 6 }
@@ -335,7 +336,8 @@ Scope {
         QtObject {
             id: pal
             readonly property bool dark: root.darkMode
-            readonly property color bg: dark ? "#1C1C1E" : "#F2F2F7"
+            readonly property real bgA: (root.bar && root.bar.barStyle === "normal") ? 1 : 0.86
+            readonly property color bg: dark ? Qt.rgba(0.110, 0.110, 0.118, bgA) : Qt.rgba(0.949, 0.949, 0.969, bgA)
             readonly property color bar: dark ? "#2A2A2C" : "#E8E8ED"
             readonly property color card: dark ? "#2C2C2E" : "#FFFFFF"
             readonly property color text: dark ? "#F5F5F7" : "#1D1D1F"

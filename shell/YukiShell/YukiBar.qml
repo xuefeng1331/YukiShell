@@ -146,6 +146,11 @@ Scope {
     property real glassGrain: 0.015
     property real glassLiquid: 1.5
     property real glassBlur: 5
+    // menuStyle "blur" is Acrylic: the Liquid Glass pipeline without refraction or rim, blurred 24 more; "normal" is a plain panel
+    readonly property bool acrylic: barStyle === "blur"
+    readonly property real glassLiquidEff: acrylic ? 0 : glassLiquid
+    readonly property real glassRimEff: acrylic ? 0 : glassRim
+    readonly property real glassBlurEff: acrylic ? glassBlur + 24 : glassBlur
     property int kbRepeatRate: 35
     property int kbRepeatDelay: 250
     property real mouseSens: 0
@@ -1166,7 +1171,7 @@ Scope {
         property real fullW: pop.width
         property real fullH: pop.height
         property bool fromCC: false
-        readonly property real topBarBlur: root.glassBlur
+        readonly property real topBarBlur: root.glassBlurEff
         property alias ctx: pgc
         readonly property real m: 64 * root.barPopupScale
         ShaderEffectSource {
@@ -1202,15 +1207,15 @@ Scope {
             shaderUrl: root.glassShaderUrl
             dark: root.effDark
             tint: root.glassOpacity
-            strength: root.glassLiquid
-            rim: root.glassRim
+            strength: root.glassLiquidEff
+            rim: root.glassRimEff
             rimTint: 1
             ringW: 0
             borderTint: root.menuBorderColor
             borderAmount: 1
             whiteEdge: false
             grain: root.glassGrain
-            blur: pg.fromCC ? root.glassBlur : pg.topBarBlur
+            blur: pg.fromCC ? root.glassBlurEff : pg.topBarBlur
             debug: root.glassDebug
             onFailed: root.glassState = "failed"
         }
@@ -1767,8 +1772,8 @@ Scope {
         baseColor: t.dark ? "#2B2B2D" : "#FFFFFF"
         glass: root.liquidActive
         shaderUrl: root.glassShaderUrl
-        glassLiquid: root.glassLiquid
-        glassRim: root.glassRim
+        glassLiquid: root.glassLiquidEff
+        glassRim: root.glassRimEff
         glassGrain: root.glassGrain
         glassTint: root.glassOpacity
         borderTint: root.menuBorderColor
@@ -1786,8 +1791,8 @@ Scope {
         baseColor: t.dark ? "#2B2B2D" : "#FFFFFF"
         glass: root.liquidActive
         shaderUrl: root.glassShaderUrl
-        glassLiquid: root.glassLiquid
-        glassRim: root.glassRim
+        glassLiquid: root.glassLiquidEff
+        glassRim: root.glassRimEff
         glassGrain: root.glassGrain
         glassTint: root.glassOpacity
         borderTint: root.menuBorderColor
@@ -3521,6 +3526,8 @@ Scope {
                 }
 
                 Image { id: frozen; anchors.fill: parent; source: shw.snap; fillMode: Image.Stretch; smooth: true }
+                // the glass pills sample (and so hide) their backdrop: give them a copy of the frozen screen
+                Image { id: frozenGlass; anchors.fill: parent; source: shw.snap; fillMode: Image.Stretch; opacity: 0 }
                 Rectangle { anchors.fill: parent; color: "black"; opacity: 0.42 }
 
                 Item {
@@ -3543,7 +3550,14 @@ Scope {
                     x: Math.max(8, Math.min(shw.width - width - 8, shw.px + 14))
                     y: Math.max(8, Math.min(shw.height - height - 8, shw.py + 18))
                     width: sizeTxt.implicitWidth + 18; height: 24; radius: 12
-                    color: Qt.rgba(0, 0, 0, 0.72)
+                    color: "transparent"
+                    LGlass {
+                        anchors.fill: parent; z: -1
+                        backdrop: frozenGlass; shaderUrl: root.glassShaderUrl; liquid: root.liquidActive; dark: true
+                        bx: parent.x; by: parent.y; cornerR: height / 2
+                        tint: root.glassOpacity; thickness: 14; strength: root.glassLiquidEff; rim: root.glassRimEff
+                        grain: root.glassGrain; blur: root.glassBlurEff; shadowAmt: 0; flatInner: 1
+                    }
                     Text {
                         id: sizeTxt
                         anchors.centerIn: parent
@@ -3557,7 +3571,14 @@ Scope {
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: 56
                     width: hintTxt.implicitWidth + 28; height: 32; radius: 16
-                    color: Qt.rgba(0, 0, 0, 0.72)
+                    color: "transparent"
+                    LGlass {
+                        anchors.fill: parent; z: -1
+                        backdrop: frozenGlass; shaderUrl: root.glassShaderUrl; liquid: root.liquidActive; dark: true
+                        bx: parent.x; by: parent.y; cornerR: height / 2
+                        tint: root.glassOpacity; thickness: 14; strength: root.glassLiquidEff; rim: root.glassRimEff
+                        grain: root.glassGrain; blur: root.glassBlurEff; shadowAmt: 0; flatInner: 1
+                    }
                     Text {
                         id: hintTxt
                         anchors.centerIn: parent
@@ -3855,13 +3876,13 @@ Scope {
             inputApplyT.restart();
             cursorApplyT.restart();
             borderApplyT.restart();
-            if (root.barStyle === "liquid") root.startGlass();
+            if (root.barStyle !== "normal") root.startGlass();
         }
-        onLoadFailed: { root.ccMigRec = true; root.ccMigGame = true; root.settingsReady = true; if (root.barStyle === "liquid") root.startGlass(); }
+        onLoadFailed: { root.ccMigRec = true; root.ccMigGame = true; root.settingsReady = true; if (root.barStyle !== "normal") root.startGlass(); }
     }
 
     property string glassState: "idle"
-    readonly property bool liquidBase: barStyle === "liquid" && glassState === "ready" && !gaming
+    readonly property bool liquidBase: barStyle !== "normal" && glassState === "ready" && !gaming
     property bool glassWarm: false
     readonly property bool glassWarmWanted: liquidBase && (!hub || hub.wallpaperReady)
     onGlassWarmWantedChanged: { if (glassWarmWanted) glassWarmT.restart(); else { glassWarmT.stop(); glassWarm = false; } }
@@ -3871,7 +3892,7 @@ Scope {
     readonly property string glassShaderOut: configDir + "/liquidglass.frag.qsb"
     readonly property url glassShaderUrl: "file://" + glassShaderOut
 
-    onBarStyleChanged: if (barStyle === "liquid") startGlass()
+    onBarStyleChanged: if (barStyle !== "normal") startGlass()
     onGlassStateChanged: console.log("[yukibar-glass] state:", glassState)
     function startGlass() {
         if (glassState === "ready" || glassState === "building") return;
@@ -5301,7 +5322,7 @@ Scope {
                     width: bhSrc.sourceRect.width; height: bhSrc.sourceRect.height
                     blurEnabled: true
                     blurMax: 64
-                    blur: Math.min(1.0, root.glassBlur * 1.4 / 64.0)
+                    blur: Math.min(1.0, root.glassBlurEff * 1.4 / 64.0)
                     autoPaddingEnabled: false
                     visible: false
                 }
@@ -5315,9 +5336,9 @@ Scope {
                     shaderUrl: root.glassShaderUrl
                     dark: !root.barTextDark
                     tint: root.glassOpacity * 0.6
-                    strength: root.glassLiquid
-                    blur: root.glassBlur
-                    rim: root.glassRim
+                    strength: root.glassLiquidEff
+                    blur: root.glassBlurEff
+                    rim: root.glassRimEff
                     grain: root.glassGrain
                     debug: root.glassDebug
                     onFailed: root.glassState = "failed"
@@ -6028,10 +6049,10 @@ Scope {
                         cornerR: 22
                         tint: root.glassOpacity
                         thickness: 22
-                        strength: root.glassLiquid
-                        rim: root.glassRim
+                        strength: root.glassLiquidEff
+                        rim: root.glassRimEff
                         grain: root.glassGrain
-                        blur: root.glassBlur
+                        blur: root.glassBlurEff
                         debug: root.glassDebug
                         onShaderError: root.glassState = "failed"
                         rimTint: 1
@@ -6178,8 +6199,8 @@ Scope {
                                     cornerR: Math.min(24 + (1 - toast.tc) * 40, height / 2)
                                     tint: root.glassOpacity
                                     thickness: 22
-                                    strength: 0.7 * root.glassLiquid
-                                    rim: root.glassRim
+                                    strength: 0.7 * root.glassLiquidEff
+                                    rim: root.glassRimEff
                                     grain: root.glassGrain
                                     blur: root.notifBlur
                                     debug: root.glassDebug
@@ -6536,10 +6557,10 @@ Scope {
                         cornerR: 14
                         tint: root.glassOpacity
                         thickness: 22
-                        strength: root.glassLiquid
-                        rim: root.glassRim
+                        strength: root.glassLiquidEff
+                        rim: root.glassRimEff
                         grain: root.glassGrain
-                        blur: root.glassBlur
+                        blur: root.glassBlurEff
                         debug: root.glassDebug
                         onShaderError: root.glassState = "failed"
                     }
@@ -6695,10 +6716,10 @@ Scope {
                         cornerR: 14
                         tint: root.glassOpacity
                         thickness: 22
-                        strength: root.glassLiquid
-                        rim: root.glassRim
+                        strength: root.glassLiquidEff
+                        rim: root.glassRimEff
                         grain: root.glassGrain
-                        blur: root.glassBlur
+                        blur: root.glassBlurEff
                         debug: root.glassDebug
                         onShaderError: root.glassState = "failed"
                     }
@@ -7698,15 +7719,15 @@ Scope {
                         shaderUrl: root.glassShaderUrl
                         dark: root.ccDark
                         tint: root.ccStyle === "macos" ? root.glassOpacity * 0.30 : root.glassOpacity
-                        strength: root.ccStyle === "macos" ? root.glassLiquid * 0.30 : root.glassLiquid
-                        rim: root.ccStyle === "macos" ? root.glassRim * 0.4 : root.glassRim
+                        strength: root.ccStyle === "macos" ? root.glassLiquidEff * 0.30 : root.glassLiquidEff
+                        rim: root.ccStyle === "macos" ? root.glassRimEff * 0.4 : root.glassRimEff
                         rimTint: 1
                         ringW: 0
                         borderTint: root.menuBorderColor
                         borderAmount: 1
                         whiteEdge: false
                         grain: root.glassGrain
-                        blur: root.glassBlur
+                        blur: root.glassBlurEff
                         debug: root.glassDebug
                         onFailed: root.glassState = "failed"
                     }
@@ -8663,8 +8684,8 @@ Scope {
                         cornerR: 26
                         tint: swPanel.style === "frosted" ? Math.max(0.5, root.glassOpacity) : root.glassOpacity
                         thickness: swPanel.style === "frosted" ? 6 : 20
-                        strength: swPanel.style === "frosted" ? 0.0 : 0.75 * root.glassLiquid
-                        rim: swPanel.style === "frosted" ? 0.15 : root.glassRim
+                        strength: swPanel.style === "frosted" ? 0.0 : 0.75 * root.glassLiquidEff
+                        rim: swPanel.style === "frosted" ? 0.15 : root.glassRimEff
                         grain: root.glassGrain
                         blur: swPanel.style === "frosted" ? 30 : root.switcherBlur
                         debug: root.glassDebug
@@ -8815,8 +8836,8 @@ Scope {
                         cornerR: 28
                         tint: root.glassOpacity
                         thickness: 22
-                        strength: 0.75 * root.glassLiquid
-                        rim: root.glassRim
+                        strength: 0.75 * root.glassLiquidEff
+                        rim: root.glassRimEff
                         grain: root.glassGrain
                         blur: root.wpBlur
                         debug: root.glassDebug
@@ -9306,13 +9327,13 @@ Scope {
                     shaderUrl: root.glassShaderUrl
                     dark: spotPal.dark
                     tint: root.glassOpacity
-                    strength: root.glassLiquid
-                    rim: root.glassRim
+                    strength: root.glassLiquidEff
+                    rim: root.glassRimEff
                     rimTint: 1
                     ringW: 0.9
                     whiteEdge: false
                     grain: root.glassGrain
-                    blur: root.glassBlur
+                    blur: root.glassBlurEff
                     blurMul: 2.0
                     debug: root.glassDebug
                     onFailed: root.glassState = "failed"

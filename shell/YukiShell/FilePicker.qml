@@ -33,7 +33,8 @@ Window {
     readonly property bool folderMode: mode === "folder"
     readonly property string home: Quickshell.env("HOME")
 
-    readonly property color cBg: dark ? "#1E1E20" : "#F5F5F7"
+    property bool frost: true
+    readonly property color cBg: dark ? Qt.rgba(0.118, 0.118, 0.125, frost ? 0.86 : 1) : Qt.rgba(0.961, 0.961, 0.969, frost ? 0.88 : 1)
     readonly property color cSide: dark ? "#29292B" : "#E9E9EC"
     readonly property color cText: dark ? "#F5F5F7" : "#1D1D1F"
     readonly property color cText2: dark ? Qt.rgba(1, 1, 1, 0.58) : Qt.rgba(0, 0, 0, 0.54)

@@ -95,7 +95,8 @@ Scope {
         QtObject {
             id: pal
             readonly property bool dark: root.darkMode
-            readonly property color bg: dark ? Qt.rgba(0.17, 0.17, 0.18, 0.97) : Qt.rgba(0.88, 0.87, 0.86, 0.97)
+            readonly property real bgA: (root.hub && root.hub.bar && root.hub.bar.barStyle === "normal") ? 0.97 : 0.86
+            readonly property color bg: dark ? Qt.rgba(0.17, 0.17, 0.18, bgA) : Qt.rgba(0.88, 0.87, 0.86, bgA)
             readonly property color text: dark ? "#F5F5F7" : "#1D1D1F"
             readonly property color text2: dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.5)
             readonly property color text3: dark ? Qt.rgba(1, 1, 1, 0.38) : Qt.rgba(0, 0, 0, 0.42)
