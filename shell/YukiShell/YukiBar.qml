@@ -6476,20 +6476,51 @@ Scope {
                 Item {
                     id: menuPop
                     z: 10
-                    width: {
+                    // grows out of the menu title like the right-hand popups (volPop, wifiPop)
+                    readonly property real ps: root.barPopupScale
+                    readonly property real fullW: {
                         var w = 248;
                         for (var i = 0; i < menuRep.count; i++) { var c = menuRep.itemAt(i); if (c) w = Math.max(w, c.need); }
                         return Math.min(Math.ceil(w), 428) + 12;
                     }
-                    height: menuCol.height + 14
-                    x: Math.max(6, Math.min(ui.width - width * root.barPopupScale - 6, ui.menuX - 4))
-                    y: root.barH + 3
-                    opacity: ui.isMenu ? 1 : 0
-                    visible: opacity > 0
-                    scale: root.barPopupScale * (ui.isMenu ? 1 : 0.97)
+                    readonly property real fullH: menuCol.height + 14
+                    readonly property real srcW: 26
+                    readonly property real srcH: 22
+                    readonly property real srcX: ui.menuX + 1
+                    readonly property real srcY: Math.max(0, (root.barH - srcH) / 2)
+                    readonly property real dstX: Math.max(6, Math.min(ui.width - fullW * ps - 6, ui.menuX - 4))
+                    readonly property real dstY: root.barH + 3
+
+                    property real openT: ui.isMenu ? 1 : 0
+                    Behavior on openT {
+                        id: menuPopOpenB
+                        NumberAnimation {
+                            duration: menuPopOpenB.targetValue > 0.5 ? 520 : 220
+                            easing.type: menuPopOpenB.targetValue > 0.5 ? Easing.OutBack : Easing.InOutCubic
+                            easing.overshoot: 0.7
+                        }
+                    }
+                    readonly property real t: Math.max(0, Math.min(1, openT))
+                    readonly property real contentT: Math.max(0, Math.min(1, (openT - 0.28) / 0.55))
+
+                    width: (srcW + (fullW * ps - srcW) * openT) / ps
+                    height: (srcH + (fullH * ps - srcH) * openT) / ps
+                    x: srcX + (dstX - srcX) * openT
+                    y: srcY + (dstY - srcY) * openT
+                    opacity: Math.min(1, t * 4)
+                    visible: openT > 0.002
+                    scale: ps
                     transformOrigin: Item.TopLeft
-                    Behavior on opacity { NumberAnimation { duration: 90 } }
-                    Behavior on scale { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+
+                    readonly property bool morphing: openT > 0.002 && Math.abs(openT - 1) > 0.002
+                    layer.enabled: morphing
+                    layer.smooth: true
+                    layer.effect: MultiEffect {
+                        blurEnabled: true
+                        blurMax: 48
+                        blur: Math.pow(1 - menuPop.t, 1.3) * 0.9
+                        autoPaddingEnabled: true
+                    }
 
                     LGlass {
                         anchors.fill: parent
@@ -6520,6 +6551,13 @@ Scope {
                         dark: root.panelDarkMode
                         tint: root.menuBorderColor
                     }
+                    Item {
+                        anchors.fill: parent
+                        clip: true
+                    Item {
+                        width: menuPop.fullW; height: menuPop.fullH
+                        y: 8 * (1 - menuPop.contentT)
+                        opacity: menuPop.contentT
                     Column {
                         id: menuCol
                         x: 6; y: 7
@@ -6610,6 +6648,8 @@ Scope {
                                 }
                             }
                         }
+                    }
+                    }
                     }
                 }
 
