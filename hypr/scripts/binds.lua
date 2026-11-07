@@ -64,8 +64,8 @@ bind(mod .. " + C",              hl.dsp.window.center(), "Center Window")
 local drag = {}
 local function windowAt(c)
     local best
-    for _, w in ipairs(hl.get_windows()) do
-        if w.mapped and w.visible and not w.hidden and c.x >= w.at.x and c.y >= w.at.y and c.x < w.at.x + w.size.x and c.y < w.at.y + w.size.y
+    for _, w in ipairs(hl.get_windows()) do   -- w.visible is also true for windows on hidden workspaces
+        if w.mapped and not w.hidden and w.workspace and w.workspace.visible and c.x >= w.at.x and c.y >= w.at.y and c.x < w.at.x + w.size.x and c.y < w.at.y + w.size.y
             and (not best or (w.floating and not best.floating)
                  or (w.floating == best.floating and w.focus_history_id < best.focus_history_id)) then
             best = w

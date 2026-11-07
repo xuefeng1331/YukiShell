@@ -32,8 +32,10 @@ ShellRoot {
             }
             return m;
         }
+        property string dragHidden: ""   // a window the bar turned into its icon (YukiBar dragHide): out of the glass captures too
         function winAlpha(addr) {
-            var e = winAlphaMap[String(addr).replace(/^0x/, "")];
+            var a = String(addr).replace(/^0x/, ""), e = winAlphaMap[a];
+            if (a === dragHidden) return { bg: 1, win: 0 };
             return e ? e : { bg: 1, win: 1 };
         }
         FileView {

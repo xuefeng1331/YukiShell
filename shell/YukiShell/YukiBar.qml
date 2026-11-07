@@ -2566,6 +2566,7 @@ Scope {
     function dragHide(on) {
         if (on === drag.hidden) return;
         drag.hidden = on;
+        if (root.hub) root.hub.dragHidden = on ? drag.addr.replace(/^0x/, "") : "";
         var op = on ? ["0", "0", "true"] : drag.op;
         if (on) Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "no_anim", value = "true", ' + dragSel() + ' })');   // no fade under the snapshot
         Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity", value = "' + op[0] + '", ' + dragSel() + ' })');
