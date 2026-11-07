@@ -2538,6 +2538,55 @@ Scope {
                 root.kbSetActive(lay, undefined);
                 kbEventRefresh.restart();
             } else if (event.name === "configreloaded") { root.refreshKeyboardLayout(); if (root.settingsReady) borderApplyT.restart(); }
+            else if (event.name === "custom" && event.data.indexOf("yukidrag ") === 0) root.dragEvent(event.data.split(" "));
+        }
+    }
+
+    // Super-dragging a window (binds.lua reports it as "yukidrag" events) onto a workspace number turns it into its app icon,
+    // letting go there sends it to that workspace
+    property var drag: null              // { addr, x, y, floating, ws, hidden, op: [opacity, opacity_inactive] }
+    property string dragIcon: ""
+    property real dragX: -1
+    property real dragY: -1
+    property var dragWs: null            // the workspace number under the cursor
+    onDragWsChanged: if (drag) dragHide(dragWs !== null)
+    function dragSel() { return 'window = "address:' + drag.addr + '"'; }
+    // Hyprland has no way to unset a window prop, so the values read at the start go back (1 means "no rule")
+    function dragHide(on) {
+        if (on === drag.hidden) return;
+        drag.hidden = on;
+        var op = on ? ["0", "0"] : drag.op;
+        Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity", value = "' + op[0] + '", ' + dragSel() + ' })');
+        Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity_inactive", value = "' + op[1] + '", ' + dragSel() + ' })');
+    }
+    function dragEvent(a) {
+        if (a[1] === "start") {
+            var cls = a.slice(7).join(" "), e = lookup(cls);
+            drag = { addr: a[2], x: +a[3], y: +a[4], floating: a[5] === "1", ws: +a[6], hidden: false, op: ["1", "1"] };
+            dragIcon = Quickshell.iconPath(e && e.icon ? e.icon : cls.toLowerCase(), true) || Quickshell.iconPath("application-x-executable", true) || "";
+            dragOpProc.command = ["sh", "-c", 'hyprctl getprop "address:$1" opacity; hyprctl getprop "address:$1" opacity_inactive', "sh", a[2]];
+            dragOpProc.running = true;
+        } else if (!drag) {
+            return;
+        } else if (a[1] === "move") {
+            dragX = +a[2]; dragY = +a[3];
+        } else if (a[1] === "end") {
+            var d = drag, ws = dragWs, sel = dragSel();
+            if (ws !== null) {
+                if (ws !== d.ws) Hyprland.dispatch('hl.dsp.window.move({ workspace = "' + ws + '", follow = false, ' + sel + ' })');
+                if (d.floating) Hyprland.dispatch('hl.dsp.window.move({ x = ' + d.x + ', y = ' + d.y + ', "exact", ' + sel + ' })');
+            }
+            dragHide(false);
+            drag = null; dragWs = null;
+        }
+    }
+    Process {
+        id: dragOpProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var v = text.trim().split(/\s+/);
+                if (root.drag && !root.drag.hidden && v.length === 2 && !isNaN(+v[0]) && !isNaN(+v[1])) root.drag.op = v;
+            }
         }
     }
 
@@ -5370,6 +5419,23 @@ Scope {
                     onPressed: ui.pop = ""
                 }
 
+                // the dragged window as its app icon, under the cursor while it is over a workspace number
+                Image {
+                    readonly property bool shown: root.dragWs !== null && root.dragX >= perScreen.modelData.x && root.dragX < perScreen.modelData.x + ui.width
+                    z: 1001
+                    width: 48; height: 48
+                    x: root.dragX - perScreen.modelData.x - width / 2
+                    y: root.dragY - perScreen.modelData.y + 12
+                    source: root.dragIcon
+                    sourceSize: Qt.size(96, 96)
+                    smooth: true; mipmap: true
+                    visible: opacity > 0
+                    opacity: shown ? 1 : 0
+                    scale: shown ? 1 : 0.4
+                    Behavior on opacity { NumberAnimation { duration: 160 } }
+                    Behavior on scale { NumberAnimation { duration: 240; easing.type: Easing.OutBack } }
+                }
+
                 Item {
                     id: levelOsd
                     z: 1000
@@ -5552,6 +5618,13 @@ Scope {
                                 readonly property bool cur: wsRow.activeId === modelData
                                 readonly property bool busy: root.wsOccupied(modelData)
                                 readonly property int run: { root.wsCounts; root.wsIds; return wsRow.runAt(index); }
+                                // a dragged window is over this number (from the screen's top edge down to just under the bar)
+                                readonly property bool dropHot: {
+                                    if (!root.drag || !wsRow.visible) return false;
+                                    var a = wsi.mapToItem(null, 0, 0), b = wsi.mapToItem(null, wsi.width, 0), s = perScreen.modelData;
+                                    return root.dragX >= s.x + a.x && root.dragX < s.x + b.x && root.dragY >= s.y && root.dragY < s.y + root.barH + 6;
+                                }
+                                onDropHotChanged: if (dropHot) root.dragWs = modelData; else if (root.dragWs === modelData) root.dragWs = null;
                                 width: root.wsCellW(modelData); height: 28
                                 GlassHover {
                                     id: wsRun
@@ -5568,7 +5641,7 @@ Scope {
                                     filled: wsi.run > 0
                                     glass: ui.barTileGlass
                                 }
-                                BarHover { glass: ui.barTileGlass; id: wsHl; dark: bpal.dark; area: wsMa; hot: wsMa.containsMouse; pressed: wsMa.pressed; open: wsi.cur }
+                                BarHover { glass: ui.barTileGlass; id: wsHl; dark: bpal.dark; area: wsMa; hot: wsMa.containsMouse || wsi.dropHot; pressed: wsMa.pressed; open: wsi.cur }
                                 Text {
                                     anchors.centerIn: parent
                                     scale: wsi.cur ? 1 : wsHl.lift

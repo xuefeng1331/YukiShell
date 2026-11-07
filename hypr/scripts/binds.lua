@@ -59,6 +59,43 @@ bind(mod .. " + ALT + S",        hl.dsp.exec_cmd("~/.config/hypr/bin/hide-window
 bind(mod .. " + SHIFT + F",      hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }), "Maximize Window")
 bind(mod .. " + SHIFT + P",      hl.dsp.window.pin({ action = "toggle" }), "Pin Window to All Workspaces")
 bind(mod .. " + C",              hl.dsp.window.center(), "Center Window")
+-- Dragging a window (Super + left button) onto a workspace number in the menu bar sends it there:
+-- Lua reports the drag to YukiShell as "yukidrag" events, the shell owns the drop targets and the drop
+local drag = {}
+local function windowAt(c)
+    local best
+    for _, w in ipairs(hl.get_windows()) do
+        if w.mapped and w.visible and not w.hidden and c.x >= w.at.x and c.y >= w.at.y and c.x < w.at.x + w.size.x and c.y < w.at.y + w.size.y
+            and (not best or (w.floating and not best.floating)
+                 or (w.floating == best.floating and w.focus_history_id < best.focus_history_id)) then
+            best = w
+        end
+    end
+    return best
+end
+local function dragTick()
+    local c = hl.get_cursor_pos()
+    if drag.addr and c then hl.dispatch(hl.dsp.event(string.format("yukidrag move %d %d", math.floor(c.x), math.floor(c.y)))) end
+end
+local function dragStart()
+    local c = hl.get_cursor_pos()
+    local w = c and windowAt(c)
+    if not w then return end
+    drag.addr = w.address
+    hl.dispatch(hl.dsp.event(string.format("yukidrag start %s %d %d %d %d %s", w.address, math.floor(w.at.x), math.floor(w.at.y),
+        w.floating and 1 or 0, w.workspace and w.workspace.id or 0, w.class)))
+    if drag.timer then drag.timer:set_enabled(true) else drag.timer = hl.timer(dragTick, { timeout = 33, type = "repeat" }) end
+end
+local function dragEnd()
+    if not drag.addr then return end
+    drag.addr = nil
+    if drag.timer then drag.timer:set_enabled(false) end
+    hl.dispatch(hl.dsp.event("yukidrag end"))
+end
+hl.bind(mod .. " + mouse:272", dragStart, { non_consuming = true })
+hl.bind(mod .. " + mouse:272", dragEnd, { release = true, non_consuming = true })
+hl.bind("mouse:272", dragEnd, { release = true, non_consuming = true })   -- Super let go before the button
+
 bind(mod .. " + mouse:272",  hl.dsp.window.drag(),   "Move Window with the Mouse", { mouse = true, fixed = true })
 bind(mod .. " + mouse:273",  hl.dsp.window.resize(), "Resize Window with the Mouse", { mouse = true, fixed = true })
 
