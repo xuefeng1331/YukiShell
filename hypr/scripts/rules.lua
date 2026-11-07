@@ -80,6 +80,13 @@ hl.window_rule({
     tile = true,
 })
 
+-- games keep out of the 900x560 floating size: they tile and can still go fullscreen
+hl.window_rule({
+    name  = "tile-games",
+    match = { class = "^(steam_app_[0-9]+|gamescope)$" },
+    tile = true,
+})
+
 FLOAT_CHROMIUM_RULE = hl.window_rule({
     name  = "float-chromium-once",
     enabled = false,

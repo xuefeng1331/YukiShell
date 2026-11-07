@@ -5488,7 +5488,7 @@ Scope {
 
     function lookup(appId) {
         if (!appId) return null;
-        var e = DesktopEntries.byId(appId);
+        var e = (root.hub && root.hub.steamEntry(appId)) || DesktopEntries.byId(appId);
         if (!e && DesktopEntries.heuristicLookup) e = DesktopEntries.heuristicLookup(appId);
         return e;
     }

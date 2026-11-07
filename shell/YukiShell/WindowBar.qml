@@ -137,7 +137,7 @@ Scope {
                         source: {
                             var cl = w.c;
                             if (!cl) return "";
-                            var e = cl.class ? DesktopEntries.heuristicLookup(cl.class) : null;
+                            var e = cl.class ? ((hub && hub.steamEntry(cl.class)) || DesktopEntries.heuristicLookup(cl.class)) : null;
                             return e && e.icon ? Quickshell.iconPath(e.icon, true) : "";
                         }
                     }
@@ -146,7 +146,7 @@ Scope {
                         text: {
                             var cl = w.c;
                             if (!cl) return "";
-                            var e = cl.class ? DesktopEntries.heuristicLookup(cl.class) : null;
+                            var e = cl.class ? ((hub && hub.steamEntry(cl.class)) || DesktopEntries.heuristicLookup(cl.class)) : null;
                             return e && e.name ? e.name : (cl.class || "");
                         }
                         duration: 260

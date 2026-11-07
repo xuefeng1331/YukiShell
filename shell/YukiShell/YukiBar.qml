@@ -1837,7 +1837,7 @@ Scope {
 
     function lookup(appId) {
         if (!appId) return null;
-        var e = DesktopEntries.byId(appId);
+        var e = (root.hub && root.hub.steamEntry(appId)) || DesktopEntries.byId(appId);
         if (!e && DesktopEntries.heuristicLookup) e = DesktopEntries.heuristicLookup(appId);
         return e;
     }
@@ -3776,7 +3776,7 @@ Scope {
                 var w = {};
                 try { w = JSON.parse(text || "{}"); } catch (e) { w = {}; }
                 var cls = (w["class"] || w.initialClass || "");
-                root.gamingAutoActive = root.gamingAuto && (w.fullscreen > 0 || w.fullscreen === true) && root.gameClassRe.test(cls);
+                root.gamingAutoActive = root.gamingAuto && ((w.fullscreen & 2) !== 0 || w.fullscreen === true) && root.gameClassRe.test(cls);
             }
         }
     }

@@ -136,6 +136,14 @@ ShellRoot {
                 }
             }
         }
+        // Steam games have no StartupWMClass; Steam's desktop entry for one runs steam://rungameid/<id>
+        function steamEntry(appId) {
+            var m = /^steam_app_(\d+)$/.exec(appId || "");
+            if (!m) return null;
+            var re = new RegExp("rungameid/" + m[1] + "(\\D|$)"), apps = DesktopEntries.applications.values;
+            for (var i = 0; i < apps.length; i++) if (re.test(apps[i].execString || "")) return apps[i];
+            return null;
+        }
         property bool geoHot: true
         property string lastActive: ""
         property string geoLast: ""
