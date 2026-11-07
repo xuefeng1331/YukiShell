@@ -82,8 +82,9 @@ local function dragStart()
     local w = c and windowAt(c)
     if not w then return end
     drag.addr = w.address
-    hl.dispatch(hl.dsp.event(string.format("yukidrag start %s %d %d %d %d %s", w.address, math.floor(w.at.x), math.floor(w.at.y),
-        w.floating and 1 or 0, w.workspace and w.workspace.id or 0, w.class)))
+    hl.dispatch(hl.dsp.event(string.format("yukidrag start %s %d %d %d %d %d %d %d %d %s", w.address, math.floor(w.at.x), math.floor(w.at.y),
+        w.floating and 1 or 0, w.workspace and w.workspace.id or 0, math.floor(w.size.x), math.floor(w.size.y),
+        math.floor(c.x), math.floor(c.y), w.class)))
     if drag.timer then drag.timer:set_enabled(true) else drag.timer = hl.timer(dragTick, { timeout = 33, type = "repeat" }) end
 end
 local function dragEnd()

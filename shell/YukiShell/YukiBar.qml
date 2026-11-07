@@ -2544,27 +2544,44 @@ Scope {
 
     // Super-dragging a window (binds.lua reports it as "yukidrag" events) onto a workspace number turns it into its app icon,
     // letting go there sends it to that workspace
-    property var drag: null              // { addr, x, y, floating, ws, hidden, op: [opacity, opacity_inactive] }
+    property var drag: null              // { addr, x, y, w, h, cx, cy (cursor at the start), floating, ws, hidden, op: [opacity, opacity_inactive, no_anim] }
     property string dragIcon: ""
+    property var dragTl: null            // the window, for the snapshot that morphs into the icon
     property real dragX: -1
     property real dragY: -1
     property var dragWs: null            // the workspace number under the cursor
-    onDragWsChanged: if (drag) dragHide(dragWs !== null)
+    property real dragWsX: 0             // its centre, where the icon drops into
+    property real dragT: 0               // 0 = the window, 1 = its icon
+    Behavior on dragT { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
+    property real dropT: 0               // the icon falling into the number after letting go
+    property point dropFrom
+    property point dropTo
+    NumberAnimation on dropT { id: dropAnim; running: false; from: 0; to: 1; duration: 320; easing.type: Easing.OutCubic }
+    // the window vanishes as the snapshot covers it, and comes back once the snapshot has grown back to its size
+    onDragWsChanged: if (drag) { if (dragWs !== null) dragHideT.restart(); else dragHideT.stop(); dragT = dragWs !== null ? 1 : 0; }
+    Timer { id: dragHideT; interval: 50; onTriggered: if (root.drag && root.dragWs !== null) root.dragHide(true) }   // after the snapshot is on screen
+    onDragTChanged: if (drag && drag.hidden && dragWs === null && dragT < 0.02) dragHide(false)
     function dragSel() { return 'window = "address:' + drag.addr + '"'; }
     // Hyprland has no way to unset a window prop, so the values read at the start go back (1 means "no rule")
     function dragHide(on) {
         if (on === drag.hidden) return;
         drag.hidden = on;
-        var op = on ? ["0", "0"] : drag.op;
+        var op = on ? ["0", "0", "true"] : drag.op;
+        if (on) Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "no_anim", value = "true", ' + dragSel() + ' })');   // no fade under the snapshot
         Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity", value = "' + op[0] + '", ' + dragSel() + ' })');
         Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity_inactive", value = "' + op[1] + '", ' + dragSel() + ' })');
+        if (!on) Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "no_anim", value = "' + op[2] + '", ' + dragSel() + ' })');
     }
     function dragEvent(a) {
         if (a[1] === "start") {
-            var cls = a.slice(7).join(" "), e = lookup(cls);
-            drag = { addr: a[2], x: +a[3], y: +a[4], floating: a[5] === "1", ws: +a[6], hidden: false, op: ["1", "1"] };
+            var cls = a.slice(11).join(" "), e = lookup(cls), ts = Hyprland.toplevels.values, ad = a[2].replace(/^0x/, "");
+            drag = { addr: a[2], x: +a[3], y: +a[4], floating: a[5] === "1", ws: +a[6], w: +a[7], h: +a[8], cx: +a[9], cy: +a[10],
+                     hidden: false, op: ["1", "1", "false"] };
+            dragX = drag.cx; dragY = drag.cy; dragT = 0;
+            dragTl = null;
+            for (var i = 0; i < ts.length; i++) if (ts[i].address === ad) { dragTl = ts[i].wayland; break; }
             dragIcon = Quickshell.iconPath(e && e.icon ? e.icon : cls.toLowerCase(), true) || Quickshell.iconPath("application-x-executable", true) || "";
-            dragOpProc.command = ["sh", "-c", 'hyprctl getprop "address:$1" opacity; hyprctl getprop "address:$1" opacity_inactive', "sh", a[2]];
+            dragOpProc.command = ["sh", "-c", 'hyprctl getprop "address:$1" opacity; hyprctl getprop "address:$1" opacity_inactive; hyprctl getprop "address:$1" no_anim', "sh", a[2]];
             dragOpProc.running = true;
         } else if (!drag) {
             return;
@@ -2573,11 +2590,12 @@ Scope {
         } else if (a[1] === "end") {
             var d = drag, ws = dragWs, sel = dragSel();
             if (ws !== null) {
+                dropFrom = Qt.point(dragX, dragY + 36); dropTo = Qt.point(dragWsX, root.barH / 2); dropAnim.restart();
                 if (ws !== d.ws) Hyprland.dispatch('hl.dsp.window.move({ workspace = "' + ws + '", follow = false, ' + sel + ' })');
                 if (d.floating) Hyprland.dispatch('hl.dsp.window.move({ x = ' + d.x + ', y = ' + d.y + ', "exact", ' + sel + ' })');
             }
             dragHide(false);
-            drag = null; dragWs = null;
+            drag = null; dragWs = null; dragTl = null;
         }
     }
     Process {
@@ -2585,7 +2603,7 @@ Scope {
         stdout: StdioCollector {
             onStreamFinished: {
                 var v = text.trim().split(/\s+/);
-                if (root.drag && !root.drag.hidden && v.length === 2 && !isNaN(+v[0]) && !isNaN(+v[1])) root.drag.op = v;
+                if (root.drag && !root.drag.hidden && v.length === 3 && !isNaN(+v[0]) && !isNaN(+v[1]) && /^(true|false)$/.test(v[2])) root.drag.op = v;
             }
         }
     }
@@ -5419,21 +5437,51 @@ Scope {
                     onPressed: ui.pop = ""
                 }
 
-                // the dragged window as its app icon, under the cursor while it is over a workspace number
-                Image {
-                    readonly property bool shown: root.dragWs !== null && root.dragX >= perScreen.modelData.x && root.dragX < perScreen.modelData.x + ui.width
+                // the dragged window morphing into its app icon under the cursor while it is over a workspace number, and back;
+                // after letting go the icon drops into the number
+                Item {
+                    id: dragGhost
+                    readonly property var scr: perScreen.modelData
+                    readonly property bool dropping: dropAnim.running
+                    readonly property real t: dropping ? 1 : root.dragT
+                    function mix(a, b, k) { return a + (b - a) * k; }
+                    function ease(a, b, k) { k = Math.max(0, Math.min(1, (k - a) / (b - a))); return k * k * (3 - 2 * k); }
+                    // the window's rect follows the cursor, the icon sits just under it
+                    readonly property real wx: root.drag ? root.drag.x + root.dragX - root.drag.cx - scr.x : 0
+                    readonly property real wy: root.drag ? root.drag.y + root.dragY - root.drag.cy - scr.y : 0
+                    readonly property real ww: root.drag ? root.drag.w : 48
+                    readonly property real wh: root.drag ? root.drag.h : 48
+                    readonly property real ds: mix(48, 12, root.dropT)
                     z: 1001
-                    width: 48; height: 48
-                    x: root.dragX - perScreen.modelData.x - width / 2
-                    y: root.dragY - perScreen.modelData.y + 12
-                    source: root.dragIcon
-                    sourceSize: Qt.size(96, 96)
-                    smooth: true; mipmap: true
-                    visible: opacity > 0
-                    opacity: shown ? 1 : 0
-                    scale: shown ? 1 : 0.4
-                    Behavior on opacity { NumberAnimation { duration: 160 } }
-                    Behavior on scale { NumberAnimation { duration: 240; easing.type: Easing.OutBack } }
+                    visible: dropping || (root.drag !== null && root.dragT > 0.002)
+                    x: dropping ? mix(root.dropFrom.x, root.dropTo.x, root.dropT) - scr.x - ds / 2 : mix(wx, root.dragX - scr.x - 24, t)
+                    y: dropping ? mix(root.dropFrom.y, root.dropTo.y, root.dropT) - scr.y - ds / 2 : mix(wy, root.dragY - scr.y + 12, t)
+                    width: dropping ? ds : mix(ww, 48, t)
+                    height: dropping ? ds : mix(wh, 48, t)
+                    opacity: dropping ? 1 - ease(0.55, 1, root.dropT) : 1
+                    RectangularShadow {
+                        anchors.fill: parent; radius: ghostSnap.radius; blur: dragGhost.mix(30, 14, dragGhost.t); offset.y: dragGhost.mix(10, 4, dragGhost.t)
+                        color: Qt.rgba(0, 0, 0, 0.32 * (1 - dragGhost.ease(0.3, 0.9, dragGhost.t)))
+                    }
+                    Item {
+                        id: ghostSnap
+                        readonly property real radius: dragGhost.mix(16, 12, dragGhost.t)
+                        anchors.fill: parent
+                        opacity: 1 - dragGhost.ease(0.3, 0.8, dragGhost.t)
+                        visible: opacity > 0
+                        layer.enabled: true
+                        layer.effect: MultiEffect { maskEnabled: true; maskSource: ghostMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
+                        ScreencopyView { anchors.fill: parent; live: false; captureSource: root.dragTl }
+                    }
+                    Item { id: ghostMask; anchors.fill: parent; visible: false; layer.enabled: true; Rectangle { anchors.fill: parent; radius: ghostSnap.radius; color: "black" } }
+                    Image {
+                        anchors.fill: parent
+                        source: root.dragIcon
+                        sourceSize: Qt.size(96, 96)
+                        smooth: true; mipmap: true
+                        opacity: dragGhost.ease(0.35, 0.85, dragGhost.t)
+                        visible: opacity > 0
+                    }
                 }
 
                 Item {
@@ -5624,7 +5672,10 @@ Scope {
                                     var a = wsi.mapToItem(null, 0, 0), b = wsi.mapToItem(null, wsi.width, 0), s = perScreen.modelData;
                                     return root.dragX >= s.x + a.x && root.dragX < s.x + b.x && root.dragY >= s.y && root.dragY < s.y + root.barH + 6;
                                 }
-                                onDropHotChanged: if (dropHot) root.dragWs = modelData; else if (root.dragWs === modelData) root.dragWs = null;
+                                onDropHotChanged: {
+                                    if (dropHot) { root.dragWsX = perScreen.modelData.x + wsi.mapToItem(null, wsi.width / 2, 0).x; root.dragWs = modelData; }
+                                    else if (root.dragWs === modelData) root.dragWs = null;
+                                }
                                 width: root.wsCellW(modelData); height: 28
                                 GlassHover {
                                     id: wsRun
