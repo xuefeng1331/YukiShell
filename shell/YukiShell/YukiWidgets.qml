@@ -70,6 +70,7 @@ Scope {
     }
     property real playerScale: 0.8
     readonly property var visSrc: hub ? hub.vis : null
+    readonly property bool visPaused: !!(hub && hub.bar) && Quickshell.screens.length > 0 && hub.bar.screenCovered[Quickshell.screens[0].name] === true
     readonly property bool visOn: (hub && hub.bar) ? hub.bar.visOn : false
     readonly property string visStyle: (hub && hub.bar) ? hub.bar.visStyle : "bars"
     readonly property string visColor: (hub && hub.bar) ? hub.bar.visColor : "white"

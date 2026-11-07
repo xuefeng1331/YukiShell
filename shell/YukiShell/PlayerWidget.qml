@@ -35,6 +35,7 @@ Item {
     property bool canSeek: false
 
     property var visSrc: null
+    property bool visPaused: false
     property bool visOn: false
     property string visStyle: "bars"
     property string visColor: "white"
@@ -356,7 +357,7 @@ Item {
             soft: true
             src: w.visSrc
             active: w.visOn && w.visMode === "ambient" && w.hasPlayer && (w.playing || w.paused || w.preview) && !w.editing
-            hold: !w.playing && !w.preview
+            hold: (!w.playing && !w.preview) || (w.visPaused && !w.preview)
             demo: w.preview
             style: w.visStyle
             gain: w.visGain
@@ -377,7 +378,7 @@ Item {
         height: (w.isSmall ? w.artY + w.artS - 77 : 46) * w.k
         src: w.visSrc
         active: w.visOn && w.visMode === "strip" && w.hasPlayer && (w.playing || w.paused || w.preview) && !w.editing
-        hold: !w.playing && !w.preview
+        hold: (!w.playing && !w.preview) || (w.visPaused && !w.preview)
         demo: w.preview
         style: w.visStyle
         gain: w.visGain

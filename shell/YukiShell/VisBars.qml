@@ -19,6 +19,7 @@ Item {
     property var held: []
     property var lastLoud: []
     onLvChanged: {
+        if (live) snap = lv;
         if (hold || !lv || lv.length === 0) return;
         var sum = 0;
         for (var i = 0; i < lv.length; i++) sum += lv[i];
@@ -43,7 +44,9 @@ Item {
     readonly property bool live: active && visible && !hold
     readonly property string key: "vb" + Math.random().toString(36).slice(2)
     property var fake: []
-    readonly property var lv: (hold || waking) ? held : (demo ? fake : (src ? src.bars : []))
+    property var snap: []
+    // only a live visualizer follows the audio; a hidden one (closed panel, the other layout, the desktop behind windows) keeps its last bars
+    readonly property var lv: (hold || waking) ? held : (demo ? fake : (src && live ? src.bars : snap))
     opacity: active ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 

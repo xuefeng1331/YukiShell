@@ -139,7 +139,14 @@ ShellRoot {
         property bool geoHot: true
         property string lastActive: ""
         property string geoLast: ""
+        property string geoClientsLast: ""
         Timer { id: geoCool; interval: 1500; onTriggered: sharedHub.geoHot = false }
+        Timer {
+            id: geoNudge; interval: 50; repeat: true
+            property int pass: 0
+            onRunningChanged: if (running) pass = 0
+            onTriggered: { if (sharedHub.ipcOk && !sharedHub.ipcBroken) sharedHub.ipcPoll(); if (++pass >= 3) stop(); }
+        }
         Connections {
             target: Hyprland
             function onRawEvent(event) {
@@ -161,7 +168,11 @@ ShellRoot {
                     if (en.indexOf("workspace") >= 0 || en.indexOf("focusedmon") === 0) wpKick.restart();
                 }
                 if (en === "activewindowv2") { if (event.data === sharedHub.lastActive) return; sharedHub.lastActive = event.data; }
-                sharedHub.geoHot = true; geoCool.restart(); tlDebounce.restart();
+                if (en === "workspace" || en === "workspacev2" || en === "focusedmon" || en === "focusedmonv2" || en === "activewindowv2"
+                    || en === "activespecial" || en === "activespecialv2" || en === "createworkspace" || en === "createworkspacev2"
+                    || en === "destroyworkspace" || en === "destroyworkspacev2" || en === "activelayout" || en === "submap" || en === "urgent") geoNudge.restart();
+                else { sharedHub.geoHot = true; geoCool.restart(); }
+                tlDebounce.restart();
             }
         }
 
@@ -237,10 +248,10 @@ ShellRoot {
             }
             var mk = [];
             for (j = 0; j < mo.length; j++) mk.push([mo[j].name, mo[j].x, mo[j].y, mo[j].width, mo[j].height, mo[j].scale, mo[j].activeWorkspace ? mo[j].activeWorkspace.id : 0, mo[j].specialWorkspace ? mo[j].specialWorkspace.id : 0]);
-            var key = JSON.stringify([mk, gk]);
+            var key = JSON.stringify([mk, gk]), gKey = JSON.stringify(gk);
             if (key === geoLast) return;
             geoLast = key;
-            geoHot = true; geoCool.restart();
+            if (gKey !== geoClientsLast) { geoClientsLast = gKey; geoHot = true; geoCool.restart(); }
             monData = mo;
             glassClients = cl;
         }

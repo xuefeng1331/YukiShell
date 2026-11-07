@@ -151,6 +151,7 @@ Item {
                 length: (host.player && host.player.lengthSupported) ? host.player.length : 0
                 canSeek: host.player !== null && host.player.canSeek && host.player.positionSupported && host.player.lengthSupported
                 visSrc: host.visSrc
+                visPaused: host.visPaused
                 visOn: host.visOn
                 visStyle: host.visStyle
                 visColor: host.visColor
