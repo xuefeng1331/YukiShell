@@ -1,6 +1,15 @@
 .pragma library
 
 var strings = {
+    "Previous Workspace": "이전 작업 공간",
+    "Lock automatically": "자동으로 잠금",
+    "Turn display off": "디스플레이 끄기",
+    "After this long without input": "입력이 없는 시간",
+    "min": "분",
+    "Update YukiShell": "YukiShell 업데이트",
+    "Downloads the latest version and restarts the shell": "최신 버전을 내려받고 셸을 다시 시작합니다",
+    "Welcome to YukiShell": "YukiShell에 오신 것을 환영합니다",
+    "Super+Space searches, Super+Z opens Settings and Super+/ lists every shortcut.": "Super+Space로 검색하고, Super+Z로 설정을 열고, Super+/로 모든 단축키를 봅니다.",
     " Connected": " 개 연결됨",
     " Hz · Scale ": " Hz · 배율 ",
     " Mb/s": " Mb/s",

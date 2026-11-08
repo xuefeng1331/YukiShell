@@ -34,6 +34,8 @@ function M.bind(keys, dispatcher, description, opts)
     if keys ~= "" then hl.bind(keys, dispatcher, opts) end
 end
 
+function M.overridden(description) return overrides[description] ~= nil end
+
 function M.flush()
     pcall(os.execute, "mkdir -p '" .. cache:match("^(.*)/[^/]*$") .. "'")
     local out = io.open(cache, "w")

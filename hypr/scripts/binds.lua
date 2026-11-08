@@ -49,6 +49,7 @@ end
 bind(mod .. " + SHIFT + Page_Down", hl.dsp.window.move({ workspace = "+1" }), "Move Window to Next Workspace")
 bind(mod .. " + SHIFT + Page_Up",   hl.dsp.window.move({ workspace = "-1" }), "Move Window to Previous Workspace")
 bind(mod .. " + SHIFT + O",      hl.dsp.window.move({ monitor = "+1" }), "Move Window to Next Monitor")
+bind(mod .. " + Tab", toWorkspace("previous"), "Previous Workspace")
 bind(mod .. " + mouse_down", toWorkspace("e+1"), "Switch Workspace with the Scroll Wheel", { fixed = true })
 bind(mod .. " + mouse_up",   toWorkspace("e-1"), "Switch Workspace with the Scroll Wheel", { fixed = true })
 

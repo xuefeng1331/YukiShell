@@ -136,16 +136,13 @@ That's all. It asks for your password once and does the rest:
 
 It's safe to run again whenever you pull new changes, and it only asks for your password when something is missing. Only want to see what's missing without touching anything? `./install.sh --doctor`.
 
-To undo it, delete the symlinks and rename the `*.pre-rice` files back.
+To undo it, run `./install.sh --uninstall`: it removes the links and puts your `*.pre-rice` files back (packages and settings stay).
 
 ### Updating
 
-```sh
-cd ~/hypr-yukishell && git pull && hyprctl reload && yuki-restart
-```
+Run `yukishell update`, or press *Update* in *Settings → About*. It downloads the latest version, installs anything new and restarts the shell.
 
-`hyprctl reload` picks up new shortcuts and the cursor settings, `yuki-restart` the shell. If a release adds new files to link,
-run `./install.sh` again too (the release notes say so). After a Qt update, run `tools/build-plugins` again.
+After a Qt update, run `tools/build-plugins` again.
 
 Coming from v1.5 or older? Run `./install.sh` once: the Lua folder moved from `hypr/rice` to `hypr/scripts`, and the installer
 updates the `require` line in your `hyprland.lua` and the old link for you.
@@ -192,6 +189,7 @@ menu bar show each item's shortcut next to it.
 | `Super+Shift+PgDn` / `PgUp` | move the window to the next / previous workspace |
 | `Super+Shift+O` | move the window to the next monitor |
 | `Super+Scroll` | next / previous workspace |
+| `Super+Tab` | back to the previous workspace |
 | `Super+Arrows` (or `H` `K` `N`) | move focus |
 | `Super+Shift+Arrows` | swap with the neighbouring window |
 | `Super+Ctrl+Arrows` | resize from the keyboard (hold it) |
@@ -206,9 +204,10 @@ menu bar show each item's shortcut next to it.
 | `Super+A` | Control Center |
 | `Super+,` | notifications |
 | `Super+Z` | System Settings |
+| `Super+/` | every keyboard shortcut (Settings → Keyboard) |
 | `Alt+Tab` | window switcher |
 | `Ctrl+Alt+W` | wallpaper picker |
-| `Print` / `Shift+Print` / `Ctrl+Print` | screenshot a region / the screen / a window |
+| `Print` (or `Super+Shift+S`) / `Shift+Print` / `Ctrl+Print` | screenshot a region / the screen / a window |
 | `Super+Alt+R` | start / stop screen recording |
 | `Super+Alt+C` | colour picker |
 | `Super+G` | Game Mode (the shell drops its effects while you play) |

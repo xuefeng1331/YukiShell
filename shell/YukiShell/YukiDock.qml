@@ -4263,6 +4263,22 @@ Scope {
                             }
                         }
                     }
+                    Repeater {
+                        model: [{ t: "Lock automatically", k: "idleLockMins" }, { t: "Turn display off", k: "idleScreenMins" }]
+                        SRow {
+                            id: idleRow
+                            required property var modelData
+                            t: pal; title: I18n.tr(modelData.t)
+                            subtitle: I18n.tr("After this long without input")
+                            readonly property var mins: [0, 1, 2, 5, 10, 15, 30, 60]
+                            SPopUp {
+                                t: pal; width: 130
+                                model: idleRow.mins.map(function (m) { return m === 0 ? I18n.tr("Never") : m + " " + I18n.tr("min"); })
+                                current: Math.max(0, idleRow.mins.indexOf(root.bar ? root.bar[idleRow.modelData.k] : 0))
+                                onPicked: i => { if (root.bar) root.bar[idleRow.modelData.k] = idleRow.mins[i]; }
+                            }
+                        }
+                    }
                     SRow {
                         t: pal; title: I18n.tr("Album background when the cover is enlarged")
                         SSwitch { t: pal; checked: root.bar ? root.bar.lockArtBackground : true; onToggled: v => { if (root.bar) root.bar.lockArtBackground = v; } }
@@ -4449,7 +4465,20 @@ Scope {
                         SSlider { t: pal; resetValue: 0.846; leftLabel: I18n.tr("Long"); rightLabel: I18n.tr("Short"); from: 0; to: 1; valueText: v => Math.round(150 + (1 - v) * 650) + " ms"; value: root.bar ? 1 - (root.bar.kbRepeatDelay - 150) / 650 : 0.6; onMoved: v => { if (root.bar) root.bar.kbRepeatDelay = Math.round(150 + (1 - v) * 650); } }
                     }
                 }
-                SLabel { t: pal; text: I18n.tr("Layout: ") + "us" + ". Changes apply right away." }
+                SCard {
+                    t: pal
+                    SRow {
+                        id: kbLayoutRow
+                        t: pal; title: I18n.tr("Keyboard layout")
+                        readonly property var codes: root.bar ? Object.keys(root.bar.kbNames).sort(function (a, b) { return root.bar.kbNames[a].localeCompare(root.bar.kbNames[b]); }) : []
+                        SPopUp {
+                            t: pal
+                            model: kbLayoutRow.codes.map(function (c) { return root.bar.kbNames[c]; })
+                            current: Math.max(0, kbLayoutRow.codes.indexOf(root.bar ? (root.bar.kbLayout || "us") : "us"))
+                            onPicked: i => { if (root.bar) root.bar.kbLayout = kbLayoutRow.codes[i]; }
+                        }
+                    }
+                }
                 Repeater {
                     model: prefsWindow.shortcutGroups
                     Column {
@@ -5261,6 +5290,16 @@ Scope {
                             t: pal
                             text: I18n.tr("Open")
                             onClicked: root.openUrl(aboutCol.repoUrl)
+                        }
+                    }
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Update YukiShell")
+                        subtitle: I18n.tr("Downloads the latest version and restarts the shell")
+                        SButton {
+                            t: pal
+                            text: I18n.tr("Update")
+                            onClicked: Quickshell.execDetached(["sh", "-c", 'exec "$1" -e sh -c "yukishell update; echo; read -p \'Press Enter\' _"', "sh", root.bar ? root.bar.terminal : "kitty"])
                         }
                     }
                     SRow {

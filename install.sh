@@ -22,6 +22,16 @@ cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 [ "${1:-}" = "--doctor" ] && exec "$here/tools/doctor"
 
+if [ "${1:-}" = "--uninstall" ]; then
+    # only links that point into this checkout are removed; packages and your settings stay
+    find "$cfg" "$HOME/.local/bin" "$HOME/.local/share/color-schemes" -maxdepth 4 -type l -lname "$here/*" -delete 2>/dev/null || true
+    find "$cfg" -maxdepth 4 -name '*.pre-rice' 2>/dev/null | while read -r f; do
+        if [ -s "$f" ] || [ -d "$f" ]; then mv -f "$f" "${f%.pre-rice}"; else rm -f "$f" "${f%.pre-rice}"; fi
+    done
+    echo "YukiShell's links are gone and your old files are back. Log out to leave the session."
+    exit 0
+fi
+
 pkgs=(
     # the desktop
     hyprland quickshell kitty fish xdg-desktop-portal-hyprland polkit-kde-agent libnotify hypridle

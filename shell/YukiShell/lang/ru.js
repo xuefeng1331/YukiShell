@@ -1,6 +1,15 @@
 .pragma library
 
 var strings = {
+    "Previous Workspace": "Предыдущий рабочий стол",
+    "Lock automatically": "Блокировать автоматически",
+    "Turn display off": "Выключать экран",
+    "After this long without input": "Через это время без действий",
+    "min": "мин",
+    "Update YukiShell": "Обновить YukiShell",
+    "Downloads the latest version and restarts the shell": "Загружает последнюю версию и перезапускает оболочку",
+    "Welcome to YukiShell": "Добро пожаловать в YukiShell",
+    "Super+Space searches, Super+Z opens Settings and Super+/ lists every shortcut.": "Super+Space — поиск, Super+Z — настройки, Super+/ — все сочетания клавиш.",
     "On Your Desktop": "На рабочем столе",
     "No widgets yet": "Виджетов пока нет",
     "Add one above and it appears on the desktop.": "Добавьте виджет выше, и он появится на рабочем столе.",

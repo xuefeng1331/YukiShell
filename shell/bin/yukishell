@@ -11,6 +11,7 @@
   yukishell sc --keep-id 387      also keep snapshot 387 (repeat it for more)
   yukishell sc --limit 10         and from now on let snapper keep at most 10 (its NUMBER_LIMIT)
   yukishell sc -y                 don't ask
+  yukishell update                download the latest version, install what it needs, restart the shell
   yukishell version               the installed YukiShell version
   yukishell help                  this text
 
@@ -706,6 +707,21 @@ def cmd_stats(args):
     except KeyboardInterrupt:
         print()
 
+def cmd_update():
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    head = lambda: subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout
+    before = head()
+    if subprocess.run(["git", "-C", repo, "pull", "--ff-only"]).returncode != 0:
+        print("yukishell update: git could not update", repo, "(local changes?). Nothing was changed.", file=sys.stderr)
+        return 1
+    if head() == before:
+        print("YukiShell is up to date.")
+        return 0
+    rc = subprocess.run(["bash", os.path.join(repo, "install.sh")]).returncode
+    subprocess.run(["sh", os.path.expanduser("~/.local/bin/yuki-restart")])
+    return rc
+
+
 def main(argv):
     if not argv or argv[0] in ("help", "-h", "--help"):
         print(__doc__.strip())
@@ -713,6 +729,8 @@ def main(argv):
     cmd, rest = argv[0], argv[1:]
     if cmd == "stats":
         cmd_stats(rest)
+    elif cmd == "update":
+        sys.exit(cmd_update())
     elif cmd in ("sc", "snapshots"):
         cmd_sc(rest)
     elif cmd in ("version", "--version", "-v"):

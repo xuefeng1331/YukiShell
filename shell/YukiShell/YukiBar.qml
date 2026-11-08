@@ -160,7 +160,8 @@ Scope {
     property bool tpTap: true
     property bool tpDwt: true
     property real tpScroll: 0.7
-    readonly property string inputSig: [kbRepeatRate, kbRepeatDelay, mouseSens, mouseNatural, mouseAccel, tpNatural, tpTap, tpDwt, tpScroll].join("|")
+    property string kbLayout: ""   // empty: whatever input.lua says
+    readonly property string inputSig: [kbLayout, kbRepeatRate, kbRepeatDelay, mouseSens, mouseNatural, mouseAccel, tpNatural, tpTap, tpDwt, tpScroll].join("|")
     onInputSigChanged: if (settingsReady) inputApplyT.restart()
     Timer { id: inputApplyT; interval: 150; onTriggered: root.applyInput() }
     property string cursorTheme: "Bibata-Modern-Classic"
@@ -201,7 +202,7 @@ Scope {
     }
     function applyInput() {
         function b(v) { return v ? "true" : "false"; }
-        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ input = { repeat_rate = " + Math.round(kbRepeatRate) + ", repeat_delay = " + Math.round(kbRepeatDelay)
+        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ input = { " + (/^[a-z,]+$/.test(kbLayout) ? "kb_layout = \"" + kbLayout + "\", " : "") + "repeat_rate = " + Math.round(kbRepeatRate) + ", repeat_delay = " + Math.round(kbRepeatDelay)
             + ", sensitivity = " + mouseSens.toFixed(2) + ", accel_profile = \"" + (mouseAccel ? "adaptive" : "flat") + "\", natural_scroll = " + b(mouseNatural)
             + ", touchpad = { natural_scroll = " + b(tpNatural) + ", tap_to_click = " + b(tpTap) + ", disable_while_typing = " + b(tpDwt)
             + ", scroll_factor = " + tpScroll.toFixed(2) + " } } })"]);
@@ -391,7 +392,7 @@ Scope {
         "spotlightEnabled", "reduceMotion", "ccEnabled", "notificationsEnabled", "clockAppEnabled", "ccStyle", "barLogoMode", "barCustomLogoPath", "barWidgets", "weekStartsMonday", "terminal", "launcher",
         "filesCmd", "clipboardCmd", "appUsage", "clipHistory", "clipAutoPaste", "emojiRecent", "screenshotDir", "screenshotSave", "screenshotClipboard", "screenshotNotify", "nightTemp", "ccControls", "ccSizes", "ccPos", "ccRowH", "ccGapPx", "ccOnColor", "ccMigRec", "visOn", "visStyle", "visColor", "visGain", "visCount", "visWidth", "visInCC", "mwGlow", "mwMotion", "mwBar", "mwVisMode", "wallpaperDir", "wallpaperDirs", "wallpaperFavs", "wallpaperCmd", "wallpaperVideo", "wpRestorePath", "uiSounds", "gamingMode", "gamingAuto", "ccMigGame", "lockArtBackground",
         "lockClockStyle", "switcherStyle", "lockClockFont", "lockClockWeight", "lockClockMaterial", "lockClockIntensity", "lockClockTint", "lockClockDate", "autoContrast", "wallpaperAppearance", "wpPairLight", "wpPairDark",
-        "notifDnd", "dnd", "nightOn", "keepAwake", "notifBannerSecs", "notifMutedApps", "notifAppsSeen", "focusSchedule", "focusFrom", "focusTo",
+        "idleLockMins", "idleScreenMins", "kbLayout", "notifDnd", "dnd", "nightOn", "keepAwake", "notifBannerSecs", "notifMutedApps", "notifAppsSeen", "focusSchedule", "focusFrom", "focusTo",
         "focusFullscreen", "focusAllowUrgent", "lockShowNotifs", "lockWallpaper", "uiSoundVolume", "alertSound",
         "kbRepeatRate", "kbRepeatDelay", "mouseSens", "mouseNatural", "mouseAccel", "tpNatural", "tpTap", "tpDwt", "tpScroll",
         "cursorTheme", "cursorSize", "cursorHideTyping", "cursorHideIdle", "cursorFollowFocus", "cursorWarpWs", "cursorZoom", "windowBorder", "floatNewWindows",
@@ -2821,6 +2822,18 @@ Scope {
     property bool nightOn: false
     OwnedProcess { id: nightProc; cmd: ["hyprsunset", "-t", String(root.nightTemp)]; running: root.nightOn }
     property bool keepAwake: false
+    property int idleLockMins: 0
+    property int idleScreenMins: 0
+    IdleMonitor {
+        enabled: root.settingsReady && root.idleLockMins > 0 && !root.keepAwake && !root.gaming
+        timeout: root.idleLockMins * 60
+        onIsIdleChanged: if (isIdle) Quickshell.execDetached(["sh", "-c", 'sh "$HOME/.config/quickshell/YukiLock/lock-via-ipc.sh"'])
+    }
+    IdleMonitor {
+        enabled: root.settingsReady && root.idleScreenMins > 0 && !root.keepAwake && !root.gaming
+        timeout: root.idleScreenMins * 60
+        onIsIdleChanged: Hyprland.dispatch('hl.dsp.dpms({ action = "' + (isIdle ? "off" : "on") + '" })')
+    }
     OwnedProcess {
         id: awakeProc
         cmd: ["systemd-inhibit", "--what=idle:sleep", "--who=yukibar", "--why=Keep Awake", "setpriv", "--pdeathsig", "TERM", "--", "sleep", "infinity"]
@@ -4619,8 +4632,11 @@ Scope {
     // first run: nothing has ever set a wallpaper, so the desktop would stay blank behind glass with nothing to refract
     Timer {
         interval: 6000; running: true
-        onTriggered: if (root.wallpaperPath === "" && root.wallpaperVideo === "" && Object.keys(root.hub.wallpaperMap).length === 0)
+        onTriggered: {
+            if (root.wallpaperPath !== "" || root.wallpaperVideo !== "" || Object.keys(root.hub.wallpaperMap).length > 0) return;
             root.wpApply(decodeURIComponent(Qt.resolvedUrl("assets/default-wallpaper.jpg").toString().replace("file://", "")));
+            Quickshell.execDetached(["notify-send", "-a", "yukishell", I18n.tr("Welcome to YukiShell"), I18n.tr("Super+Space searches, Super+Z opens Settings and Super+/ lists every shortcut.")]);
+        }
     }
     Connections { target: Quickshell; function onScreensChanged() { wpHotplug.restart(); } }   // a monitor plugged in later has no wallpaper yet
     Timer { id: wpHotplug; interval: 1500; onTriggered: root.wpRestore() }
