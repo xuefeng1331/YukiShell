@@ -9,14 +9,7 @@ if f then
     f:close()
 end
 
-local pinned = {
-    { output = "HDMI-A-1", mode = "1920x1080@100", position = "0x0", scale = 1 },
-}
-local seen = {}
-for _, m in ipairs(pinned) do
-    seen[m.output] = true
-    hl.monitor({ output = m.output, mode = picked[m.output] or m.mode, position = m.position, scale = m.scale })
-end
+-- no rule means Hyprland uses each monitor's preferred mode; Settings -> Displays saves a chosen one here
 for out, mode in pairs(picked) do
-    if not seen[out] then hl.monitor({ output = out, mode = mode, position = "auto", scale = 1 }) end
+    hl.monitor({ output = out, mode = mode, position = "auto", scale = 1 })
 end

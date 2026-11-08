@@ -8,7 +8,7 @@ row() {
 }
 found=0
 echo "Checking commands…"
-row required hyprctl        hyprland             "the compositor (the Lua config API; written and tested on 0.56.2)"
+row required hyprctl        hyprland             "the compositor (the Lua config API; tested on 0.57)"
 row required qs             quickshell           "runs YukiShell and YukiLock"
 row required kitty          kitty                "terminal, Super+Enter"
 row required fish           fish                 "shell config"
@@ -39,6 +39,13 @@ row optional fcitx5         fcitx5               "Vietnamese / Chinese typing (p
 row optional dolphin        dolphin              "Super+E file manager"
 row optional chromium       chromium             "Super+W browser"
 row optional qt6ct          qt6ct                "the theme of Qt apps such as Dolphin (with breeze)"
+row optional wf-recorder    wf-recorder          "screen recording"
+row optional hyprpicker     hyprpicker           "the color picker"
+row optional notify-send    libnotify            "messages from the shell's own helpers"
+row optional pactl          libpulse             "switching audio devices"
+row optional fastfetch      fastfetch            "the dashboard, the ff command"
+row optional btop           btop                 "the task manager"
+row optional tty-clock      tty-clock            "the dashboard's clock"
 row optional python3        python               "UI sound generator, installer helpers"
 if command -v mpv >/dev/null 2>&1 && ! ls /etc/mpv/scripts/mpris.so /usr/share/mpv/scripts/mpris.so "${XDG_CONFIG_HOME:-$HOME/.config}"/mpv/scripts/mpris.so >/dev/null 2>&1; then
     printf '  %-8s %-16s pacman -S %-18s %s\n' missing mpv-mpris mpv-mpris "mpv in the Now Playing widget and on the media keys"

@@ -59,7 +59,7 @@ for every part of the desktop, every Settings pane, every command, and troublesh
 
 - [Requirements](#requirements)
 - [Installing](#installing)
-- [Before you log in](#before-you-log-in)
+- [After you log in](#after-you-log-in)
 - [Keybinds](#keybinds)
 - [What's in it](#whats-in-it)
 - [Configuring it](#configuring-it)
@@ -72,7 +72,8 @@ for every part of the desktop, every Settings pane, every command, and troublesh
 ## Requirements
 
 I built and test this on **CachyOS** with **Hyprland 0.57**, **Quickshell 0.3.2** (Qt 6) and an **NVIDIA** card. Other Arch-based
-distros should be fine. Package names below are the Arch ones.
+distros should be fine. Package names below are the Arch ones, and **the installer installs all of them for you**. They're listed so you
+know what each one is for.
 
 **You need these, nothing works without them:**
 
@@ -112,22 +113,29 @@ Don't feel like reading the table? Run `tools/doctor`. It checks your machine an
 
 ## Installing
 
+Two steps, on any Arch-based system:
+
 ```sh
-git clone https://github.com/xuefeng1331/YukiShell.git ~/hypr-yukishell
-cd ~/hypr-yukishell && ./install.sh
+curl -LO https://github.com/xuefeng1331/YukiShell/raw/main/install.sh
+bash install.sh
 ```
 
-What `install.sh` does:
+That's all. It asks for your password once and does the rest:
 
-1. **Symlinks** the configs into `~/.config` (and the `yuki-*` commands into `~/.local/bin`). If you already have a file there, it gets moved to
-   `<name>.pre-rice` once, so nothing of yours is deleted.
-2. Adds **one `require` line** to `~/.config/hypr/hyprland.lua` (a backup goes to `hyprland.lua.pre-rice`).
-3. Sets the GTK, Qt and btop themes and generates the UI sounds.
-4. Builds the small **YukiVideo** plugin (`tools/build-plugins`), so the animated wallpaper inside all the glass runs on one video
-   decoder instead of one per window. It needs `cmake` and the Qt 6 development files; without it the shell still works.
-5. Runs `tools/doctor` at the end.
+1. **Downloads YukiShell** to `~/hypr-yukishell`.
+2. **Updates the system and installs every package** in the tables above, from the official repositories and, for what's only in the
+   AUR, through `paru` or `yay` (it builds `yay` if you have neither). A package that can't be installed (say, it conflicts with
+   something you have) is skipped and listed at the end.
+3. **Symlinks** the configs into `~/.config` (and the `yuki-*` commands into `~/.local/bin`). If you already have a file there, it gets
+   moved to `<name>.pre-rice`, so nothing of yours is deleted.
+4. Creates `~/.config/hypr/hyprland.lua`, or adds **one `require` block** to yours (a backup goes to `hyprland.lua.pre-rice`).
+5. Sets the GTK, Qt and btop themes, generates the UI sounds and builds the small **YukiVideo** plugin (`tools/build-plugins`), so the
+   animated wallpaper inside all the glass runs on one video decoder instead of one per window.
+6. Turns on Bluetooth and the power-mode service if it just installed them, and sets fish as your shell on a first install if you
+   were still on bash.
+7. Runs `tools/doctor` at the end. If you're in Hyprland already, the shell starts straight away.
 
-It's safe to run again whenever you pull new changes. Only want to see what's missing without touching anything? `./install.sh --doctor`.
+It's safe to run again whenever you pull new changes, and it only asks for your password when something is missing. Only want to see what's missing without touching anything? `./install.sh --doctor`.
 
 To undo it, delete the symlinks and rename the `*.pre-rice` files back.
 
@@ -143,14 +151,12 @@ run `./install.sh` again too (the release notes say so). After a Qt update, run 
 Coming from v1.5 or older? Run `./install.sh` once: the Lua folder moved from `hypr/rice` to `hypr/scripts`, and the installer
 updates the `require` line in your `hyprland.lua` and the old link for you.
 
-## Before you log in
+## After you log in
 
-Two things are personal to my machine and you'll probably want to change them:
+Pick Hyprland at your login screen (or type `start-hyprland` on a text console). The shell starts by itself: `yuki-start` keeps it
+running and restarts it if it crashes.
 
-- **`hypr/scripts/monitor.lua`**: my monitor is pinned to `HDMI-A-1` at 1920x1080@100. Put your own output name in (run `hyprctl monitors`).
-- **`fastfetch/config.jsonc`**: `logo.source` points at a picture that isn't in this repo. Change it or delete the line.
-
-Then log out and back into Hyprland. The shell starts by itself (`yuki-start` keeps it running and restarts it if it crashes).
+Your monitor runs at its preferred mode. To change it, go to *Settings → Displays*.
 
 ## Keybinds
 
@@ -279,7 +285,8 @@ Most things are in **System Settings** (`Super+Z`). Here are the bits that live 
 
 ### Your monitor
 
-`hypr/scripts/monitor.lua`:
+*Settings → Displays* picks the resolution and refresh rate and saves them in `~/.config/yukishell/monitor-modes.tsv`, one line per
+monitor (`HDMI-A-1`, a tab, `1920x1080@100`). For anything more, add your own rule to `hypr/scripts/monitor.lua`:
 
 ```lua
 hl.monitor({
@@ -424,11 +431,11 @@ If something's autostarting one of these (an old `exec-once`, a systemd user ser
 
 ```
 hypr-yukishell/
-├── install.sh                 symlinks everything into place
+├── install.sh                 installs the packages, symlinks everything into place
 ├── hypr/
 │   ├── scripts/               Hyprland, in Lua
 │   │   ├── theme.lua          palette
-│   │   ├── monitor.lua        your screen (change this)
+│   │   ├── monitor.lua        applies the modes chosen in Settings
 │   │   ├── look.lua           gaps, borders, blur, animations
 │   │   ├── input.lua          keyboard, mouse, touchpad
 │   │   ├── ime.lua            fcitx5

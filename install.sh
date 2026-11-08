@@ -1,15 +1,121 @@
 #!/usr/bin/env bash
+# YukiShell installer. Two steps, on any Arch-based system:
+#   curl -LO https://github.com/xuefeng1331/YukiShell/raw/main/install.sh
+#   bash install.sh
+# It installs every package, links the configs and sets the themes. Safe to run again; it only asks for your password when it has something to install.
 set -euo pipefail
-here="$(cd "$(dirname "$0")" && pwd)"
+
+[ "$(id -u)" != 0 ] || { echo "Run this as your normal user, not root (it asks for your password when it needs it)." >&2; exit 1; }
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+if [ ! -d "$here/shell/YukiShell" ]; then
+    # downloaded on its own: fetch the rest and carry on from there
+    repo="$HOME/hypr-yukishell"
+    command -v git >/dev/null || sudo pacman -S --needed --noconfirm git
+    if [ -d "$repo/.git" ]; then git -C "$repo" pull --ff-only || true
+    elif [ -e "$repo" ]; then echo "$repo exists and is not a YukiShell checkout. Move it away and run this again." >&2; exit 1
+    else git clone https://github.com/xuefeng1331/YukiShell.git "$repo"
+    fi
+    exec bash "$repo/install.sh" "$@"
+fi
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 [ "${1:-}" = "--doctor" ] && exec "$here/tools/doctor"
 
+pkgs=(
+    # the desktop
+    hyprland quickshell kitty fish xdg-desktop-portal-hyprland polkit-kde-agent libnotify
+    # the look
+    adw-gtk-theme papirus-icon-theme qt6ct breeze bibata-cursor-theme ttf-jetbrains-mono-nerd noto-fonts noto-fonts-cjk noto-fonts-emoji
+    # Qt modules, the video plugin and the helpers
+    qt6-multimedia qt6-multimedia-ffmpeg cmake git curl python python-numpy python-gobject
+    # one feature each: Settings and the menu bar switch off what is missing
+    grim slurp wf-recorder hyprpicker imagemagick awww mpvpaper ffmpeg jq wl-clipboard cliphist
+    playerctl cava mpv mpv-mpris swayimg networkmanager bluez bluez-utils wireplumber pipewire libpulse
+    brightnessctl ddcutil hyprsunset power-profiles-daemon upower inotify-tools wtype
+    fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-bamboo fcitx5-chinese-addons
+    dolphin chromium fastfetch btop tty-clock
+)
+failed=()
+
+aur_install() {
+    local helper="" tmp
+    if command -v paru >/dev/null; then helper=paru
+    elif command -v yay >/dev/null; then helper=yay
+    else
+        echo "Building yay to install the packages that are only in the AUR…"
+        sudo pacman -S --needed --noconfirm base-devel git || true
+        tmp="$(mktemp -d)"
+        git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$tmp/yay-bin" \
+            && (cd "$tmp/yay-bin" && makepkg -si --noconfirm) || true
+        rm -rf "$tmp"
+        command -v yay >/dev/null && helper=yay
+    fi
+    [ -n "$helper" ] || { failed+=("$@"); return; }
+    local p name
+    for p in "$@"; do
+        name="$p"; [ "$p" = bibata-cursor-theme ] && name=bibata-cursor-theme-bin   # prebuilt, the source package takes minutes to render
+        case "$helper" in
+            paru) paru -S --needed --noconfirm --skipreview --sudoloop "$name" || failed+=("$p") ;;
+            yay)  yay -S --needed --noconfirm --answerclean None --answerdiff None --removemake --sudoloop "$name" || failed+=("$p") ;;
+        esac
+    done
+}
+
+install_packages() {
+    if ! command -v pacman >/dev/null; then
+        echo "No pacman here, so the packages are up to you: tools/doctor lists what is missing."
+        return
+    fi
+    local missing=() repo=() aur=() p
+    mapfile -t missing < <(pacman -T "${pkgs[@]}" || true)
+    if [ "${#missing[@]}" = 0 ]; then echo "All packages are installed."; return; fi
+
+    echo "Installing ${#missing[@]} packages: ${missing[*]}"
+    if ! sudo -v; then
+        echo "No sudo access, skipping the packages. tools/doctor lists what is missing." >&2
+        return
+    fi
+    # Arch only supports installing on an up-to-date system
+    sudo pacman -Syu --noconfirm || echo "The system update failed, trying the packages anyway." >&2
+    for p in "${missing[@]}"; do
+        if pacman -Si "$p" >/dev/null 2>&1; then repo+=("$p"); else aur+=("$p"); fi
+    done
+    if [ "${#repo[@]}" -gt 0 ] && ! sudo pacman -S --needed --noconfirm "${repo[@]}"; then
+        # one conflict (tlp and power-profiles-daemon, say) fails the whole batch
+        for p in "${repo[@]}"; do sudo pacman -S --needed --noconfirm "$p" || failed+=("$p"); done
+    fi
+    if [ "${#aur[@]}" -gt 0 ]; then aur_install "${aur[@]}"; fi
+
+    local svc
+    for svc in bluez:bluetooth power-profiles-daemon:power-profiles-daemon; do
+        if printf '%s\n' "${missing[@]}" | grep -qx "${svc%:*}"; then sudo systemctl enable --now "${svc#*:}" || true; fi
+    done
+    # NetworkManager only when nothing else runs the network, or this could cut off the connection
+    if printf '%s\n' "${missing[@]}" | grep -qx networkmanager && ! systemctl is-active -q systemd-networkd dhcpcd iwd netctl 2>/dev/null; then
+        sudo systemctl enable --now NetworkManager || true
+    fi
+    # external monitor brightness needs the i2c-dev module
+    if command -v ddcutil >/dev/null && [ ! -e /etc/modules-load.d/i2c-dev.conf ] && printf '%s\n' "${missing[@]}" | grep -qx ddcutil; then
+        echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf >/dev/null || true
+        sudo modprobe i2c-dev || true
+    fi
+}
+
 link() {
     mkdir -p "$(dirname "$2")"
-    if [ -e "$2" ] && [ ! -L "$2" ]; then mv "$2" "$2.pre-rice"; fi
+    if [ -e "$2" ] && [ ! -L "$2" ]; then
+        local keep="$2.pre-rice"
+        [ ! -e "$keep" ] || keep="$keep.$(date +%s)"
+        mv "$2" "$keep"
+    fi
     ln -sfn "$1" "$2"
 }
+
+install_packages
+
+first=0
+[ -f "$cfg/hypr-yukishell/env" ] || first=1
 
 link "$here/hypr/scripts"                       "$cfg/hypr/scripts"
 link "$here/hypr/bin"                           "$cfg/hypr/bin"
@@ -38,6 +144,8 @@ link "$here/chromium/chromium-flags.conf" "$cfg/chromium-flags.conf"
 link "$here/xdg/menus/applications.menu" "$cfg/menus/applications.menu"
 link "$here/swayimg/init.lua"              "$cfg/swayimg/init.lua"
 
+[ -e "$cfg/fastfetch/logo.png" ] || cp "$here/shell/YukiShell/assets/yukishell-logo.png" "$cfg/fastfetch/logo.png"
+
 "$here/tools/build-plugins" >/dev/null 2>&1 || echo "note: YukiVideo plugin not built (install cmake and the Qt 6 dev packages, then run tools/build-plugins)."
 
 if [ ! -d "$HOME/.local/share/sounds/yukishell" ]; then
@@ -49,6 +157,7 @@ if [ -f "$lua" ] && grep -q '"rice\.' "$lua"; then
     cp "$lua" "$lua.pre-scripts"
     sed -i 's/"rice\." \.\. m/"scripts." .. m/; s/'"'"'rice\." \.\. m/'"'"'scripts." .. m/' "$lua"
 fi
+[ -f "$lua" ] || { mkdir -p "$cfg/hypr"; : > "$lua"; }
 [ -L "$cfg/hypr/rice" ] && case "$(readlink "$cfg/hypr/rice")" in "$here"/*) rm -f "$cfg/hypr/rice" ;; esac
 if [ -f "$lua" ] && ! grep -q '"scripts\.' "$lua"; then
     cp "$lua" "$lua.pre-rice"
@@ -120,7 +229,27 @@ if command -v gsettings >/dev/null; then
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 fi
 command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
-command -v hyprctl >/dev/null && hyprctl reload || true
-echo "Rice installed. Needs: adw-gtk-theme, papirus-icon-theme, bibata cursor, JetBrainsMono Nerd Font, qt6ct, breeze."
+# a new install gets fish as its shell; someone already on zsh or another shell chose it, so it stays
+if [ "$first" = 1 ] && command -v fish >/dev/null; then
+    case "$(getent passwd "$(id -un)" | cut -d: -f7)" in
+        */bash|*/sh|"") sudo chsh -s "$(command -v fish)" "$(id -un)" || true ;;
+    esac
+fi
+
 echo
-"$here/tools/doctor" || echo "Install the MISSING packages above, then re-run ./install.sh."
+doctor=0
+"$here/tools/doctor" || doctor=1
+if [ "${#failed[@]}" -gt 0 ]; then
+    echo
+    echo "These packages could not be installed: ${failed[*]}"
+    echo "Install them by hand if you want those features, then run this again."
+fi
+echo
+if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    hyprctl reload >/dev/null 2>&1 || true
+    setsid -f "$HOME/.local/bin/yuki-start" >/dev/null 2>&1 </dev/null || true
+    echo "YukiShell is installed and starting. Log out and back in once so the lock screen and wallpaper start too."
+else
+    echo "YukiShell is installed. Choose Hyprland at your login screen, or type start-hyprland on a text console."
+fi
+exit "$doctor"
