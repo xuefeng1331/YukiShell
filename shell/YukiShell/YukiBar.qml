@@ -4616,6 +4616,12 @@ Scope {
         wpApplyProc.running = true;
     }
     Timer { interval: 1000; running: true; onTriggered: root.wpRestore() }
+    // first run: nothing has ever set a wallpaper, so the desktop would stay blank behind glass with nothing to refract
+    Timer {
+        interval: 6000; running: true
+        onTriggered: if (root.wallpaperPath === "" && root.wallpaperVideo === "" && Object.keys(root.hub.wallpaperMap).length === 0)
+            root.wpApply(decodeURIComponent(Qt.resolvedUrl("assets/default-wallpaper.jpg").toString().replace("file://", "")));
+    }
     Connections { target: Quickshell; function onScreensChanged() { wpHotplug.restart(); } }   // a monitor plugged in later has no wallpaper yet
     Timer { id: wpHotplug; interval: 1500; onTriggered: root.wpRestore() }
     Process {

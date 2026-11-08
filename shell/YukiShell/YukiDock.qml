@@ -152,7 +152,7 @@ Scope {
         { name: "White",    c: "#ffffff" }, { name: "Black",  c: "#1c1c1e" }
     ]
     readonly property var defaultPinned: [
-        "org.gnome.Nautilus", "thunar", "firefox", "zen", "google-chrome",
+        "org.kde.dolphin", "chromium", "kitty", "org.gnome.Nautilus", "thunar", "firefox", "zen", "google-chrome",
         "com.mitchellh.ghostty", "foot", "code", "spotify", "obsidian",
         "com.spotify.Client", "com.microsoft.VSCode", "org.polymc.PolyMC", "com.obsproject.Studio"
     ]
@@ -2046,7 +2046,6 @@ Scope {
                     SRow {
                         t: pal
                         title: I18n.tr("Bar background")
-                        subtitle: I18n.tr("Needs the Hyprland rule: layerrule = blur, yukibarbg")
                         SSlider {
                             t: pal
                             from: 0; to: 0.6; stepSize: 0.01

@@ -311,6 +311,7 @@ ShellRoot {
                 + "    [ -f \"$f\" ] && p=$(grep -E '^[[:space:]]*(path|wallpaper)[[:space:]]*=' \"$f\" | head -n1 | sed -E 's/^[^=]*=[[:space:]]*//; s/^[^,\\/]*,//')\n"
                 + "  fi\n"
                 + "  p=$(printf %s \"$p\" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')\n"
+                + "  case \"$p\" in /*) ;; *) p=\"\" ;; esac\n"
                 + "  [ -n \"$p\" ] && out=\"wallpaper.default$(printf '\\t')$p\"\n"
                 + "fi\n"
                 + "printf '%s' \"$out\"\n"
