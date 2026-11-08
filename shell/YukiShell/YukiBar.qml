@@ -2543,69 +2543,147 @@ Scope {
     }
 
     // Super-dragging a window (binds.lua reports it as "yukidrag" events) onto a workspace number turns it into its app icon,
-    // letting go there sends it to that workspace
-    property var drag: null              // { addr, x, y, w, h, cx, cy (cursor at the start), floating, ws, hidden, op: [opacity, opacity_inactive, no_anim] }
+    // letting go there sends it to that workspace. Over a number: a live snapshot covers the window, the window is hidden
+    // (opacity 0), the snapshot shrinks into the icon. Off the number it grows back and the window returns.
+    property var drag: null              // { addr, x, y (rect at the start), floating, ws, fs (fullscreen mode), hidden, op (props to give back), opReady }
     property string dragIcon: ""
-    property var dragTl: null            // the window, for the snapshot that morphs into the icon
-    property real dragX: -1
+    property var dragTl: null            // the window, for the snapshot
+    property bool dragSnapReady: false   // the snapshot has a frame
+    property real dragX: -1              // pointer
     property real dragY: -1
-    property var dragWs: null            // the workspace number under the cursor
+    property real dragWinX: 0            // the window's rect right now
+    property real dragWinY: 0
+    property real dragWinW: 0
+    property real dragWinH: 0
+    property var dragWs: null            // the workspace number under the pointer
     property real dragWsX: 0             // its centre, where the icon drops into
+    property bool dragCover: false       // the snapshot is up (at t = 0 it sits exactly on the window)
     property real dragT: 0               // 0 = the window, 1 = its icon
     Behavior on dragT { NumberAnimation { duration: 460; easing.type: Easing.OutQuint } }
     property real dropT: 0               // the icon falling into the number after letting go
     property point dropFrom
     property point dropTo
     NumberAnimation on dropT { id: dropAnim; running: false; from: 0; to: 1; duration: 320; easing.type: Easing.OutCubic }
-    // the window vanishes as the snapshot covers it, and comes back once the snapshot has grown back to its size
-    onDragWsChanged: if (drag) { if (dragWs !== null) dragHideT.restart(); else dragHideT.stop(); dragT = dragWs !== null ? 1 : 0; }
-    Timer { id: dragHideT; interval: 50; onTriggered: if (root.drag && root.dragWs !== null) root.dragHide(true) }   // after the snapshot is on screen
-    onDragTChanged: if (drag && drag.hidden && dragWs === null && dragT < 0.02) dragHide(false)
-    function dragSel() { return 'window = "address:' + drag.addr + '"'; }
-    // Hyprland has no way to unset a window prop, so the values read at the start go back (1 means "no rule")
+    readonly property var dragProps: ["opacity", "opacity_inactive", "opacity_fullscreen", "no_anim"]
+    onDragWsChanged: {
+        if (!drag) return;
+        if (dragWs !== null) { dragCover = true; dragHideT.tries = 0; dragHideT.restart(); }
+        else { dragHideT.stop(); dragT = 0; if (!drag.hidden) dragCover = false; }
+    }
+    // hide once the snapshot has a frame on screen and the window's own props are known (or give up waiting after 300 ms)
+    Timer {
+        id: dragHideT
+        property int tries: 0
+        interval: 50
+        onTriggered: {
+            if (!root.drag || root.dragWs === null) return;
+            if ((!root.dragSnapReady || !root.drag.opReady) && ++tries < 6) { restart(); return; }
+            if (!root.drag.opReady) return;   // never hide what can't be given back exactly
+            root.dragHide(true);
+            root.dragT = 1;
+        }
+    }
+    onDragTChanged: if (drag && drag.hidden && dragWs === null && dragT < 0.02) { dragHide(false); dragUncoverT.restart(); }
+    Timer { id: dragUncoverT; interval: 60; onTriggered: if (root.drag && !root.drag.hidden) root.dragCover = false }   // the window is drawn again first
+    // the drag events stop without an "end" (Hyprland reloaded its config mid-drag): put everything back
+    Timer { id: dragWatch; interval: 600; onTriggered: root.dragFinish(false) }
+    function dragSetProps(addr, vals) {
+        for (var i = 0; i < dragProps.length; i++)
+            Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "' + dragProps[i] + '", value = "' + vals[i] + '", window = "address:' + addr + '" })');
+    }
+    // Hyprland has no way to unset a window prop, so the values read at the start go back; a file remembers them for a shell
+    // restarted while the window is hidden
     function dragHide(on) {
         if (on === drag.hidden) return;
         drag.hidden = on;
         if (root.hub) root.hub.dragHidden = on ? drag.addr.replace(/^0x/, "") : "";
-        var op = on ? ["0", "0", "true"] : drag.op;
-        if (on) Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "no_anim", value = "true", ' + dragSel() + ' })');   // no fade under the snapshot
-        Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity", value = "' + op[0] + '", ' + dragSel() + ' })');
-        Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "opacity_inactive", value = "' + op[1] + '", ' + dragSel() + ' })');
-        if (!on) Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "no_anim", value = "' + op[2] + '", ' + dragSel() + ' })');
+        if (on) {
+            dragAnimBack.flush();
+            dragSetProps(drag.addr, ["0", "0", "0", "true"]);
+            dragFile.setText(drag.addr + " " + drag.op.join(" "));
+        } else {
+            // the window comes back at once; its animations only once it is drawn, or Hyprland fades it in from 0
+            dragSetProps(drag.addr, drag.op.slice(0, 3).concat(["true"]));
+            dragAnimBack.addr = drag.addr; dragAnimBack.val = drag.op[3]; dragAnimBack.restart();
+        }
+    }
+    Timer {
+        id: dragAnimBack
+        property string addr: ""
+        property string val: "false"
+        interval: 400
+        onTriggered: flush()
+        function flush() {
+            stop();
+            if (addr === "") return;
+            Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "no_anim", value = "' + val + '", window = "address:' + addr + '" })');
+            addr = "";
+            dragFile.setText("");
+        }
+    }
+    function dragFinish(drop) {
+        dragWatch.stop(); dragHideT.stop();
+        if (!drag) return;
+        var d = drag, ws = drop ? dragWs : null, sel = 'window = "address:' + d.addr + '"';
+        if (ws !== null) {
+            dropFrom = Qt.point(dragX, dragY + 36); dropTo = Qt.point(dragWsX, root.barH / 2); dropAnim.restart();
+            if (ws !== d.ws) Hyprland.dispatch('hl.dsp.window.move({ workspace = "' + ws + '", follow = false, ' + sel + ' })');
+            // Hyprland lets go of fullscreen and maximized to drag: the window arrives the way it was
+            if (d.fs > 0) Hyprland.dispatch('hl.dsp.window.fullscreen({ mode = "' + (d.fs === 1 ? "maximized" : "fullscreen") + '", action = "set", ' + sel + ' })');
+            else if (d.floating) Hyprland.dispatch('hl.dsp.window.move({ x = ' + d.x + ', y = ' + d.y + ', "exact", ' + sel + ' })');
+        }
+        dragHide(false);
+        drag = null; dragWs = null; dragTl = null; dragCover = false; dragT = 0;
     }
     function dragEvent(a) {
         if (a[1] === "start") {
-            var cls = a.slice(11).join(" "), e = lookup(cls), ts = Hyprland.toplevels.values, ad = a[2].replace(/^0x/, "");
-            drag = { addr: a[2], x: +a[3], y: +a[4], floating: a[5] === "1", ws: +a[6], w: +a[7], h: +a[8], cx: +a[9], cy: +a[10],
-                     hidden: false, op: ["1", "1", "false"] };
-            dragX = drag.cx; dragY = drag.cy; dragT = 0;
-            dragTl = null;
+            if (drag) dragFinish(false);
+            dragAnimBack.flush();
+            var cls = a.slice(12).join(" "), e = lookup(cls), ts = Hyprland.toplevels.values, ad = a[2].replace(/^0x/, "");
+            drag = { addr: a[2], x: +a[3], y: +a[4], floating: a[5] === "1", ws: +a[6], fs: +a[11], hidden: false, op: [], opReady: false };
+            dragX = +a[9]; dragY = +a[10];
+            dragWinX = +a[3]; dragWinY = +a[4]; dragWinW = +a[7]; dragWinH = +a[8];
+            dragTl = null; dragSnapReady = false;
             for (var i = 0; i < ts.length; i++) if (ts[i].address === ad) { dragTl = ts[i].wayland; break; }
-            dragIcon = Quickshell.iconPath(e && e.icon ? e.icon : cls.toLowerCase(), true) || Quickshell.iconPath("application-x-executable", true) || "";
-            dragOpProc.command = ["sh", "-c", 'hyprctl getprop "address:$1" opacity; hyprctl getprop "address:$1" opacity_inactive; hyprctl getprop "address:$1" no_anim', "sh", a[2]];
+            dragIcon = cls === "org.quickshell" ? Qt.resolvedUrl("assets/yukishell-logo.png")
+                     : (Quickshell.iconPath(e && e.icon ? e.icon : cls.toLowerCase(), true) || Quickshell.iconPath("application-x-executable", true) || "");
+            dragOpProc.running = false;
+            dragOpProc.command = ["sh", "-c", 'echo "$1"; for p in ' + dragProps.join(" ") + '; do hyprctl getprop "address:$1" "$p"; done', "sh", a[2]];
             dragOpProc.running = true;
+            dragWatch.restart();
         } else if (!drag) {
             return;
         } else if (a[1] === "move") {
+            dragWatch.restart();
             dragX = +a[2]; dragY = +a[3];
+            if (a.length < 8) { dragFinish(false); return; }   // the window closed: nothing left to send
+            dragWinX = +a[4]; dragWinY = +a[5]; dragWinW = +a[6]; dragWinH = +a[7];
         } else if (a[1] === "end") {
-            var d = drag, ws = dragWs, sel = dragSel();
-            if (ws !== null) {
-                dropFrom = Qt.point(dragX, dragY + 36); dropTo = Qt.point(dragWsX, root.barH / 2); dropAnim.restart();
-                if (ws !== d.ws) Hyprland.dispatch('hl.dsp.window.move({ workspace = "' + ws + '", follow = false, ' + sel + ' })');
-                if (d.floating) Hyprland.dispatch('hl.dsp.window.move({ x = ' + d.x + ', y = ' + d.y + ', "exact", ' + sel + ' })');
-            }
-            dragHide(false);
-            drag = null; dragWs = null; dragTl = null;
+            dragFinish(true);
         }
     }
     Process {
         id: dragOpProc
         stdout: StdioCollector {
             onStreamFinished: {
-                var v = text.trim().split(/\s+/);
-                if (root.drag && !root.drag.hidden && v.length === 3 && !isNaN(+v[0]) && !isNaN(+v[1]) && /^(true|false)$/.test(v[2])) root.drag.op = v;
+                var v = text.trim().split(/\s+/), d = root.drag;
+                // the reply belongs to this drag, and every value parses (a window that closed gives errors: it is never hidden)
+                if (!d || d.hidden || v.length !== 5 || v[0] !== d.addr) return;
+                if (isNaN(+v[1]) || isNaN(+v[2]) || isNaN(+v[3]) || !/^(true|false)$/.test(v[4])) return;
+                d.op = v.slice(1); d.opReady = true;
             }
+        }
+    }
+    FileView {
+        id: dragFile
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/yukishell-drag-hidden"
+        blockWrites: true
+        printErrors: false
+        // a window hidden by a shell that is gone: give its props back
+        onLoaded: {
+            var v = text().trim().split(/\s+/);
+            if (v.length === 5 && /^0x[0-9a-f]+$/.test(v[0])) root.dragSetProps(v[0], v.slice(1));
+            if (text() !== "") setText("");
         }
     }
 
@@ -5447,22 +5525,19 @@ Scope {
                     readonly property real t: dropping ? 1 : root.dragT
                     function mix(a, b, k) { return a + (b - a) * k; }
                     function ease(a, b, k) { k = Math.max(0, Math.min(1, (k - a) / (b - a))); return k * k * (3 - 2 * k); }
-                    // the window's rect follows the cursor, the icon sits just under it
-                    readonly property real wx: root.drag ? root.drag.x + root.dragX - root.drag.cx - scr.x : 0
-                    readonly property real wy: root.drag ? root.drag.y + root.dragY - root.drag.cy - scr.y : 0
-                    readonly property real ww: root.drag ? root.drag.w : 48
-                    readonly property real wh: root.drag ? root.drag.h : 48
+                    readonly property bool here: root.dragX >= scr.x && root.dragX < scr.x + scr.width && root.dragY >= scr.y && root.dragY < scr.y + scr.height
                     readonly property real ds: mix(48, 12, root.dropT)
                     z: 1001
-                    visible: dropping || (root.drag !== null && root.dragT > 0.002)
-                    x: dropping ? mix(root.dropFrom.x, root.dropTo.x, root.dropT) - scr.x - ds / 2 : mix(wx, root.dragX - scr.x - 24, t)
-                    y: dropping ? mix(root.dropFrom.y, root.dropTo.y, root.dropT) - scr.y - ds / 2 : mix(wy, root.dragY - scr.y + 12, t)
-                    width: dropping ? ds : mix(ww, 48, t)
-                    height: dropping ? ds : mix(wh, 48, t)
+                    visible: dropping || (root.drag !== null && here && (root.dragCover || root.dragT > 0.002))
+                    x: dropping ? mix(root.dropFrom.x, root.dropTo.x, root.dropT) - scr.x - ds / 2 : mix(root.dragWinX - scr.x, root.dragX - scr.x - 24, t)
+                    y: dropping ? mix(root.dropFrom.y, root.dropTo.y, root.dropT) - scr.y - ds / 2 : mix(root.dragWinY - scr.y, root.dragY - scr.y + 12, t)
+                    width: dropping ? ds : mix(root.dragWinW, 48, t)
+                    height: dropping ? ds : mix(root.dragWinH, 48, t)
                     opacity: dropping ? 1 - ease(0.55, 1, root.dropT) : 1
                     RectangularShadow {
                         anchors.fill: parent; radius: ghostSnap.radius; blur: dragGhost.mix(30, 14, dragGhost.t); offset.y: dragGhost.mix(10, 4, dragGhost.t)
-                        color: Qt.rgba(0, 0, 0, 0.32 * (1 - dragGhost.ease(0.3, 0.9, dragGhost.t)))
+                        // Hyprland draws the window's own shadow until it is hidden
+                        color: Qt.rgba(0, 0, 0, 0.32 * dragGhost.ease(0, 0.15, dragGhost.t) * (1 - dragGhost.ease(0.3, 0.9, dragGhost.t)))
                     }
                     Item {
                         id: ghostSnap
@@ -5472,7 +5547,14 @@ Scope {
                         visible: opacity > 0
                         layer.enabled: true
                         layer.effect: MultiEffect { maskEnabled: true; maskSource: ghostMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
-                        ScreencopyView { anchors.fill: parent; live: false; captureSource: root.dragTl }
+                        // live: a capture ignores the window's opacity, so it keeps showing the window's content while it is hidden;
+                        // started over the number, as a capture breaks when Hyprland resizes the window (fullscreen let go to drag)
+                        ScreencopyView {
+                            anchors.fill: parent
+                            captureSource: dragGhost.here && dragGhost.visible && !dragGhost.dropping ? root.dragTl : null
+                            live: dragGhost.visible && !dragGhost.dropping
+                            onHasContentChanged: if (dragGhost.here) root.dragSnapReady = hasContent
+                        }
                     }
                     Item { id: ghostMask; anchors.fill: parent; visible: false; layer.enabled: true; Rectangle { anchors.fill: parent; radius: ghostSnap.radius; color: "black" } }
                     Image {

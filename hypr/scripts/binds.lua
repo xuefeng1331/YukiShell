@@ -60,32 +60,45 @@ bind(mod .. " + SHIFT + F",      hl.dsp.window.fullscreen({ mode = "maximized", 
 bind(mod .. " + SHIFT + P",      hl.dsp.window.pin({ action = "toggle" }), "Pin Window to All Workspaces")
 bind(mod .. " + C",              hl.dsp.window.center(), "Center Window")
 -- Dragging a window (Super + left button) onto a workspace number in the menu bar sends it there:
--- Lua reports the drag to YukiShell as "yukidrag" events, the shell owns the drop targets and the drop
+-- Lua reports the drag to YukiShell as "yukidrag" events (start, then the pointer and the window's rect at 60 Hz, then end),
+-- the shell owns the drop targets and the drop
 local drag = {}
+local function inside(w, c) return c.x >= w.at.x and c.y >= w.at.y and c.x < w.at.x + w.size.x and c.y < w.at.y + w.size.y end
+-- the window Hyprland grabs: the focused one when the pointer is on it (focus follows the mouse), else the topmost one there
 local function windowAt(c)
-    local best
+    local act, best, bestRank = hl.get_active_window(), nil, -1
     for _, w in ipairs(hl.get_windows()) do   -- w.visible is also true for windows on hidden workspaces
-        if w.mapped and not w.hidden and w.workspace and w.workspace.visible and c.x >= w.at.x and c.y >= w.at.y and c.x < w.at.x + w.size.x and c.y < w.at.y + w.size.y
-            and (not best or (w.floating and not best.floating)
-                 or (w.floating == best.floating and w.focus_history_id < best.focus_history_id)) then
-            best = w
+        if w.mapped and not w.hidden and w.workspace and w.workspace.visible and inside(w, c) then
+            local ws = w.workspace
+            local rank = (act and w.address == act.address) and 5
+                or (ws.special and 4)
+                or (ws.has_fullscreen and ws.fullscreen_window and ws.fullscreen_window.address == w.address and 3)
+                or (w.floating and 2) or 1
+            if rank >= bestRank then best, bestRank = w, rank end   -- ties: later in the list is drawn on top
         end
     end
     return best
 end
 local function dragTick()
     local c = hl.get_cursor_pos()
-    if drag.addr and c then hl.dispatch(hl.dsp.event(string.format("yukidrag move %d %d", math.floor(c.x), math.floor(c.y)))) end
+    if not (drag.addr and c) then return end
+    local w = hl.get_window("address:" .. drag.addr)
+    if w then
+        hl.dispatch(hl.dsp.event(string.format("yukidrag move %d %d %d %d %d %d", math.floor(c.x), math.floor(c.y),
+            math.floor(w.at.x), math.floor(w.at.y), math.floor(w.size.x), math.floor(w.size.y))))
+    else
+        hl.dispatch(hl.dsp.event(string.format("yukidrag move %d %d", math.floor(c.x), math.floor(c.y))))
+    end
 end
 local function dragStart()
     local c = hl.get_cursor_pos()
     local w = c and windowAt(c)
-    if not w then return end
+    if not w or w.pinned then return end   -- a pinned window is on every workspace: a plain drag
     drag.addr = w.address
-    hl.dispatch(hl.dsp.event(string.format("yukidrag start %s %d %d %d %d %d %d %d %d %s", w.address, math.floor(w.at.x), math.floor(w.at.y),
-        w.floating and 1 or 0, w.workspace and w.workspace.id or 0, math.floor(w.size.x), math.floor(w.size.y),
-        math.floor(c.x), math.floor(c.y), w.class)))
-    if drag.timer then drag.timer:set_enabled(true) else drag.timer = hl.timer(dragTick, { timeout = 33, type = "repeat" }) end
+    hl.dispatch(hl.dsp.event(string.format("yukidrag start %s %d %d %d %d %d %d %d %d %d %s", w.address, math.floor(w.at.x), math.floor(w.at.y),
+        w.floating and 1 or 0, w.workspace.id or 0, math.floor(w.size.x), math.floor(w.size.y),
+        math.floor(c.x), math.floor(c.y), w.fullscreen or 0, w.class)))
+    if drag.timer then drag.timer:set_enabled(true) else drag.timer = hl.timer(dragTick, { timeout = 16, type = "repeat" }) end
 end
 local function dragEnd()
     if not drag.addr then return end
