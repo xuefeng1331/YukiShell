@@ -888,6 +888,7 @@ Scope {
                 Hyprland.dispatch('hl.dsp.window.set_prop({ prop = "rounding", value = "' + Math.round(frame.radius * root.uiS) + '", ' + sel + ' })');
                 if (prefsWindow.floatTries >= 2) {
                     Hyprland.dispatch('hl.dsp.window.resize({ x = ' + prefsWindow.preferredWidth + ', y = ' + prefsWindow.preferredHeight + ', "exact", ' + sel + ' })');
+                    if (prefsWindow.floatTries === 2) Hyprland.dispatch('hl.dsp.window.center({ ' + sel + ' })');   // the rule centred it at the unscaled size
                 }
                 if (++prefsWindow.floatTries >= 12) stop();
             }
@@ -5957,7 +5958,7 @@ Scope {
                     transformOrigin: Item.Center
                     RectangularShadow { anchors.fill: parent; radius: 10; blur: 30; offset.y: 8; color: Qt.rgba(0, 0, 0, 0.30) }
                     Rectangle { anchors.fill: parent; radius: 10; color: Qt.rgba(0.09, 0.08, 0.09, 0.88) }
-                    ScreencopyView {
+                    Capture {
                         id: oldSv
                         anchors.fill: parent
                         live: false
@@ -6009,11 +6010,11 @@ Scope {
                         anchors.fill: parent; radius: 10
                         color: Qt.rgba(0.09, 0.08, 0.09, 0.88)
                     }
-                    ScreencopyView {
+                    Capture {
                         id: gsv
                         visible: tearGhost.isWin
                         anchors.fill: parent
-                        captureSource: tearGhost.isWin && tearWin.visible ? ui.tearItem.tl : null
+                        source: tearGhost.isWin && tearWin.visible ? ui.tearItem.tl : null
                         Timer {
                             interval: 33; repeat: true; triggeredOnStart: true
                             running: tearGhost.isWin && tearWin.visible && tearGhost.visible && gsv.captureSource !== null
@@ -6336,9 +6337,9 @@ Scope {
                                 Loader {
                                     anchors.fill: parent
                                     active: gw.near && !gw.released
-                                    sourceComponent: ScreencopyView {
+                                    sourceComponent: Capture {
                                         id: sc
-                                        captureSource: gw.tl
+                                        source: gw.tl
                                         readonly property var wa: root.hub ? root.hub.winAlpha(gw.addr) : ({ bg: 1, win: 1 })
                                         opacity: wa.win
                                         layer.enabled: wa.bg < 0.999
@@ -6738,10 +6739,10 @@ Scope {
                                             radius: 5
                                             color: Qt.rgba(0, 0, 0, 0.32)
                                         }
-                                        ScreencopyView {
+                                        Capture {
                                             id: sv
                                             anchors.centerIn: parent
-                                            captureSource: (root.hub && !root.hub.windowCapture) ? null : cell.heldTl
+                                            source: (root.hub && !root.hub.windowCapture) ? null : cell.heldTl
                                             Timer {
                                                 interval: hh.hovered ? 100 : 6000; repeat: true
                                                 running: !ui.tucked && !root.previewHold && !cell.closingWin && sv.captureSource !== null

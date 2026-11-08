@@ -96,7 +96,7 @@ def kitty_shortcut(target_state):
 
 if w["class"] == "kitty" or w["class"].startswith("dash-"):
     if 0 < window_opacity() < 1:
-        set_window_opacity("-1")
+        set_window_opacity("1")  # -1 would draw the window invisible
         record(win=1.0)
         sys.exit(0)
     lvl = kitty_level(w["pid"])

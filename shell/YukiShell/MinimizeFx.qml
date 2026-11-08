@@ -101,11 +101,11 @@ Scope {
             readonly property real ox: modelData.x
             readonly property real oy: modelData.y
 
-            ScreencopyView {
+            Capture {
                 id: cap
                 width: Math.max(1, ow.w.width)
                 height: Math.max(1, ow.w.height)
-                captureSource: ow.mine ? fx.job.tl : null
+                source: ow.mine ? fx.job.tl : null
                 live: false
                 visible: false
                 onHasContentChanged: {

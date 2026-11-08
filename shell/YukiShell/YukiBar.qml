@@ -4611,11 +4611,13 @@ Scope {
         if (p === "") return;
         var cmd = (wallpaperCmd || "").trim();
         var script = cmd !== "" ? '[ -f "$1" ] || exit 0\n' + root.stopVideoScript + "\n" + cmd.split("{}").join('"$1"')
-                                : '[ -f "$1" ] || exit 0\nif command -v awww >/dev/null 2>&1 && awww query 2>/dev/null | grep -qF -- "$1"; then exit 0; fi\n' + root.awwwScript;
+                                : '[ -f "$1" ] || exit 0\nif command -v awww >/dev/null 2>&1 && q=$(awww query 2>/dev/null) && [ -n "$q" ] && ! printf "%s\\n" "$q" | grep -vqF -- "$1"; then exit 0; fi\n' + root.awwwScript;
         wpApplyProc.command = ["sh", "-c", script, "sh", p];
         wpApplyProc.running = true;
     }
     Timer { interval: 1000; running: true; onTriggered: root.wpRestore() }
+    Connections { target: Quickshell; function onScreensChanged() { wpHotplug.restart(); } }   // a monitor plugged in later has no wallpaper yet
+    Timer { id: wpHotplug; interval: 1500; onTriggered: root.wpRestore() }
     Process {
         id: setwallProc
         stdout: StdioCollector {
@@ -5221,12 +5223,12 @@ Scope {
                     sourceComponent: backdropComp
                     onLoaded: item.region = Qt.binding(function () { return ui.glassRect; })
                 }
-                ScreencopyView {
+                Capture {
                     id: screenSnap
                     x: 0; y: 0
                     width: win.modelData.width; height: win.modelData.height
                     opacity: 0
-                    captureSource: root.liquidActive && !root.captureQuiet && !glassBackdrop.item ? win.modelData : null
+                    source: root.liquidActive && !root.captureQuiet && !glassBackdrop.item ? win.modelData : null
                     live: false
                     paintCursor: false
                     property real takenAt: 0
@@ -5361,10 +5363,10 @@ Scope {
                                 readonly property bool folderTerm: root.wpTermAddr !== "" && String(addr).replace(/^0x/, "") === root.wpTermAddr
                                 readonly property bool onGlass: bd.region.width > 0 && x < bd.region.x + bd.region.width && x + width > bd.region.x
                                                                 && y < bd.region.y + bd.region.height && y + height > bd.region.y
-                                ScreencopyView {
+                                Capture {
                                     id: sv
                                     anchors.fill: parent
-                                    captureSource: gw.tl
+                                    source: gw.tl
                                     readonly property var wa: root.hub ? root.hub.winAlpha(gw.addr) : ({ bg: 1, win: 1 })
                                     opacity: wa.win
                                     layer.enabled: wa.bg < 0.999
@@ -5549,9 +5551,9 @@ Scope {
                         layer.effect: MultiEffect { maskEnabled: true; maskSource: ghostMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
                         // live: a capture ignores the window's opacity, so it keeps showing the window's content while it is hidden;
                         // started over the number, as a capture breaks when Hyprland resizes the window (fullscreen let go to drag)
-                        ScreencopyView {
+                        Capture {
                             anchors.fill: parent
-                            captureSource: dragGhost.here && dragGhost.visible && !dragGhost.dropping ? root.dragTl : null
+                            source: dragGhost.here && dragGhost.visible && !dragGhost.dropping ? root.dragTl : null
                             live: dragGhost.visible && !dragGhost.dropping
                             onHasContentChanged: if (dragGhost.here) root.dragSnapReady = hasContent
                         }

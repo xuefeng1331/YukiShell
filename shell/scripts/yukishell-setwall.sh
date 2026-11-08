@@ -110,6 +110,9 @@ stop_video() {
 
 video_running() {
     [ "$(cat "$state" 2>/dev/null)" = "$1" ] && [ -f "$supfile" ] || return 1
+    for o in $(hyprctl -j monitors 2>/dev/null | jq -r '.[].name' 2>/dev/null); do   # a monitor plugged in later has no player yet
+        [ -S "${XDG_RUNTIME_DIR:-/tmp}/yukishell-mpv-$o.sock" ] || return 1
+    done
     while read -r g; do
         [ -n "$g" ] && tr '\0' ' ' < "/proc/$g/cmdline" 2>/dev/null | grep -q ' wallsup ' && pgrep -x mpvpaper >/dev/null && return 0
     done < "$supfile"
