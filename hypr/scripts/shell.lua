@@ -53,6 +53,7 @@ end
 
 section("System")
 
-bind("SUPER + L",       hl.dsp.exec_cmd("sh ~/.config/quickshell/YukiLock/lock-via-ipc.sh"), "Lock Screen")
+-- locked: works while the session is locked too, so a crashed lock screen can be brought back (allow_session_lock_restore)
+bind("SUPER + L",       hl.dsp.exec_cmd("sh ~/.config/quickshell/YukiLock/lock-via-ipc.sh"), "Lock Screen", { locked = true })
 
 keys.flush()

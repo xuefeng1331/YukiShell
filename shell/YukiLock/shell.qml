@@ -135,7 +135,7 @@ ShellRoot {
     PamContext {
         id: pam
         configDirectory: "/etc/pam.d"
-        config: "hyprlock"
+        config: "login"   // what /etc/pam.d/hyprlock includes, and that file only exists with hyprlock installed
         onPamMessage: {
             if (this.responseRequired) this.respond(lockState.pass);
         }

@@ -24,7 +24,7 @@ cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 pkgs=(
     # the desktop
-    hyprland quickshell kitty fish xdg-desktop-portal-hyprland polkit-kde-agent libnotify
+    hyprland quickshell kitty fish xdg-desktop-portal-hyprland polkit-kde-agent libnotify hypridle
     # the look
     adw-gtk-theme papirus-icon-theme qt6ct breeze bibata-cursor-theme ttf-jetbrains-mono-nerd noto-fonts noto-fonts-cjk noto-fonts-emoji
     # Qt modules, the video plugin and the helpers
