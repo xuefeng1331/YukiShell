@@ -47,9 +47,8 @@ What you get:
 
 Mauve and pink accents, a lot of glass, and an animated wallpaper if you want one.
 
-The current version is **v1.9**: a two-step installer that sets up everything for you, Normal, Acrylic and Liquid Glass styles, dragging a
-window onto a workspace number, and a long list of fixes for fresh installs, the lock screen and multiple monitors. See
-[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.9).
+The current version is **v2.0**, the quality-of-life update: lock and display-off timers, a keyboard layout picker, one-click updates,
+a clean uninstall and a few new shortcuts. See [what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v2.0).
 
 ## Contents
 

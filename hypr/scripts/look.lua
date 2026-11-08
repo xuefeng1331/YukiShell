@@ -69,6 +69,8 @@ hl.config({
     misc = {
         force_default_wallpaper = 0,
         allow_session_lock_restore = true,
+        key_press_enables_dpms = true,   -- the display-off timer must never leave a dark screen
+        mouse_move_enables_dpms = true,
         disable_hyprland_logo   = true,
         disable_splash_rendering = true,
     },
