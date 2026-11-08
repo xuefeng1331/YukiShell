@@ -47,10 +47,9 @@ What you get:
 
 Mauve and pink accents, a lot of glass, and an animated wallpaper if you want one.
 
-The current version is **v1.8**: desktop widgets that fit every size with even margins, a music note for tracks without a cover,
-every keyboard shortcut listed in Settings in groups with aligned keys, scrolling the menu bar for brightness and volume, floating
-windows at 900×560 with Shift to open apps floating from the Dock and Spotlight, and focus that follows the pointer more reliably. See
-[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.8).
+The current version is **v1.9**: a two-step installer that sets up everything for you, Normal, Acrylic and Liquid Glass styles, dragging a
+window onto a workspace number, and a long list of fixes for fresh installs, the lock screen and multiple monitors. See
+[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v1.9).
 
 ## Contents
 

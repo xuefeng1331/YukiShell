@@ -5283,8 +5283,8 @@ Scope {
                         property bool onDemand: false
                         property rect region: Qt.rect(0, 0, 0, 0)
                         x: 0; y: 0
-                        width: win.modelData.width
-                        height: win.modelData.height
+                        width: win.modelData ? win.modelData.width : 0
+                        height: win.modelData ? win.modelData.height : 0
 
                         Rectangle {
                             z: -3
@@ -5302,7 +5302,7 @@ Scope {
                             z: -2
                             anchors.fill: parent
                             visible: status === Image.Ready
-                            source: root.fileUrl(root.wallpaperFor(win.modelData.name))
+                            source: root.fileUrl(root.wallpaperFor(win.modelData?.name))
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             sourceSize.width: bd.width
@@ -5314,13 +5314,13 @@ Scope {
                             anchors.fill: parent
                             video: root.glassVideo
                             live: true
-                            paused: root.wallIdle(win.modelData.name) || !bd.hostShown
+                            paused: root.wallIdle(win.modelData?.name) || !bd.hostShown
                             startDelay: bd.onDemand ? 250 : -1
                             clock: root.wallClock
                         }
 
                         Repeater {
-                            model: (root.hub && root.hub.widgets && Quickshell.screens.length > 0 && win.modelData.name === Quickshell.screens[0].name)
+                            model: (root.hub && root.hub.widgets && Quickshell.screens.length > 0 && win.modelData?.name === Quickshell.screens[0].name)
                                    ? root.hub.widgets.model : null
                             delegate: Item {
                                 id: mw
