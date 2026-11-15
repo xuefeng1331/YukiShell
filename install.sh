@@ -2,7 +2,8 @@
 # YukiShell installer. Two steps, on any Arch-based system:
 #   curl -LO https://github.com/xuefeng1331/YukiShell/raw/main/install.sh
 #   bash install.sh
-# It installs every package, links the configs and sets the themes. Safe to run again; it only asks for your password when it has something to install.
+# It asks a couple of questions, then installs every package, links the configs, sets the themes and offers to restart.
+# Safe to run again. --yes answers every question with the default and never restarts; --uninstall undoes the links.
 set -euo pipefail
 
 [ "$(id -u)" != 0 ] || { echo "Run this as your normal user, not root (it asks for your password when it needs it)." >&2; exit 1; }
@@ -24,6 +25,8 @@ cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 if [ "${1:-}" = "--uninstall" ]; then
     # only links that point into this checkout are removed; packages and your settings stay
+    rm -f "$cfg/fish/conf.d/yukishell-autostart.fish"
+    for f in "$HOME/.bash_profile" "$HOME/.zprofile"; do [ -f "$f" ] && sed -i '/# YukiShell autostart$/d' "$f"; done
     find "$cfg" "$HOME/.local/bin" "$HOME/.local/share/color-schemes" -maxdepth 4 -type l -lname "$here/*" -delete 2>/dev/null || true
     find "$cfg" -maxdepth 4 -name '*.pre-rice' 2>/dev/null | while read -r f; do
         if [ -s "$f" ] || [ -d "$f" ]; then mv -f "$f" "${f%.pre-rice}"; else rm -f "$f" "${f%.pre-rice}"; fi
@@ -47,6 +50,17 @@ pkgs=(
     dolphin chromium fastfetch btop tty-clock
 )
 failed=()
+
+yes_all=0
+case "${1:-}" in -y|--yes) yes_all=1 ;; esac
+# answers come from the terminal, so this still works as `curl ... | bash`; without one the default is taken
+interactive=0
+[ "$yes_all" = 1 ] || { (exec </dev/tty) 2>/dev/null && interactive=1; }
+ask() {   # ask "question" y|n
+    local a=""
+    [ "$interactive" = 1 ] && { read -r -p "$1 " a </dev/tty || a=""; }
+    case "${a:-$2}" in [Yy]*) return 0 ;; *) return 1 ;; esac
+}
 
 aur_install() {
     local helper="" tmp
@@ -86,6 +100,8 @@ install_packages() {
         echo "No sudo access, skipping the packages. tools/doctor lists what is missing." >&2
         return
     fi
+    # keep sudo alive so a long AUR build never stops to ask for the password again
+    while kill -0 $$ 2>/dev/null; do sudo -n true; sleep 50; done >/dev/null 2>&1 &
     # Arch only supports installing on an up-to-date system
     sudo pacman -Syu --noconfirm || echo "The system update failed, trying the packages anyway." >&2
     for p in "${missing[@]}"; do
@@ -122,7 +138,49 @@ link() {
     ln -sfn "$1" "$2"
 }
 
+cat <<'EOF'
+
+  YukiShell installer
+
+  This sets YukiShell up for your user. Here's what it'll do:
+
+    - install the packages it needs (and update the system first, Arch wants that)
+    - put the configs in ~/.config. Anything of yours that's in the way gets
+      renamed to *.pre-rice, nothing gets deleted
+    - set up the themes, icons, fonts and cursor
+
+  You'll type your password once near the start. After that it runs on its own,
+  so go grab a drink. It takes a few minutes, longer on a slow connection.
+
+EOF
+ask "Ready to go? [Y/n]" y || { echo "No worries, nothing was changed."; exit 0; }
+
+# how you get into YukiShell after a restart: asked now so the rest runs without you
+login=""
+# without a terminal (or with --yes) the boot setup is left alone
+if [ ! -e /etc/systemd/system/display-manager.service ] && command -v systemctl >/dev/null; then
+    if [ "$interactive" = 1 ]; then
+        cat <<'EOF'
+
+  You don't have a login screen, so after a restart you'd land on a text console.
+  How do you want to get into YukiShell?
+
+    1) a login screen (installs SDDM)
+    2) log in on the text console and Hyprland starts by itself
+    3) leave it, I'll start it myself
+
+EOF
+        read -r -p "Pick one [1]: " a </dev/tty || a=""
+        case "$a" in 2) login=console ;; 3) login="" ;; *) login=sddm ;; esac
+    fi
+fi
+echo
+
 install_packages
+if [ "$login" = sddm ]; then
+    # enabled, not started: starting it now would take the screen away from this install
+    { sudo pacman -S --needed --noconfirm sddm && sudo systemctl enable sddm; } || { failed+=(sddm); login=""; }
+fi
 
 first=0
 [ -f "$cfg/hypr-yukishell/env" ] || first=1
@@ -246,6 +304,18 @@ if [ "$first" = 1 ] && command -v fish >/dev/null; then
     esac
 fi
 
+if [ "$login" = console ]; then
+    hypr="$(command -v start-hyprland || command -v Hyprland || echo start-hyprland)"
+    mkdir -p "$cfg/fish/conf.d"
+    printf '# start YukiShell when you log in on the first text console (install.sh)\nif status is-login; and test -z "$WAYLAND_DISPLAY"; and test "$XDG_VTNR" = 1\n    exec %s\nend\n' "$hypr" \
+        > "$cfg/fish/conf.d/yukishell-autostart.fish"
+    line='[ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = 1 ] && exec '"$hypr"'   # YukiShell autostart'
+    case "$(getent passwd "$(id -un)" | cut -d: -f7)" in
+        */bash) grep -q '# YukiShell autostart$' "$HOME/.bash_profile" 2>/dev/null || echo "$line" >> "$HOME/.bash_profile" ;;
+        */zsh)  grep -q '# YukiShell autostart$' "$HOME/.zprofile" 2>/dev/null || echo "$line" >> "$HOME/.zprofile" ;;
+    esac
+fi
+
 echo
 doctor=0
 "$here/tools/doctor" || doctor=1
@@ -258,8 +328,19 @@ echo
 if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
     hyprctl reload >/dev/null 2>&1 || true
     setsid -f "$HOME/.local/bin/yuki-start" >/dev/null 2>&1 </dev/null || true
-    echo "YukiShell is installed and starting. Log out and back in once so the lock screen and wallpaper start too."
-else
-    echo "YukiShell is installed. Choose Hyprland at your login screen, or type start-hyprland on a text console."
 fi
+echo "All done, YukiShell is installed."
+case "$login" in
+    sddm)    echo "After the restart, log in on the new login screen and you're in." ;;
+    console) echo "After the restart, log in on the text console and Hyprland starts by itself." ;;
+    *) if [ -e /etc/systemd/system/display-manager.service ]; then
+           echo "After the restart, pick Hyprland in your login screen's session menu (it remembers it after that)."
+       else
+           echo "After the restart, log in and type start-hyprland."
+       fi ;;
+esac
+if [ "$interactive" = 1 ] && ask "Restart now? [Y/n]" y; then
+    systemctl reboot && exit 0
+fi
+echo "Restart whenever you're ready."
 exit "$doctor"

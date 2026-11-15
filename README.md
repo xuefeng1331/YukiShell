@@ -118,7 +118,8 @@ curl -LO https://github.com/xuefeng1331/YukiShell/raw/main/install.sh
 bash install.sh
 ```
 
-That's all. It asks for your password once and does the rest:
+Say yes, pick how you want to log in, type your password once, and wait a few minutes. When it's done it offers to restart,
+and after the restart YukiShell is ready. Along the way it:
 
 1. **Downloads YukiShell** to `~/hypr-yukishell`.
 2. **Updates the system and installs every package** in the tables above, from the official repositories and, for what's only in the
@@ -131,11 +132,15 @@ That's all. It asks for your password once and does the rest:
    animated wallpaper inside all the glass runs on one video decoder instead of one per window.
 6. Turns on Bluetooth and the power-mode service if it just installed them, and sets fish as your shell on a first install if you
    were still on bash.
-7. Runs `tools/doctor` at the end. If you're in Hyprland already, the shell starts straight away.
+7. If you have no login screen, asks how you want to get in: **SDDM** (installed and turned on), or **Hyprland starting by itself**
+   when you log in on the first text console, or neither. With a login screen you already have, pick Hyprland in its session menu once.
+8. Runs `tools/doctor` and offers to restart. If you're in Hyprland already, the shell starts straight away.
 
-It's safe to run again whenever you pull new changes, and it only asks for your password when something is missing. Only want to see what's missing without touching anything? `./install.sh --doctor`.
+It's safe to run again whenever you pull new changes, and it only asks for your password when something is missing.
+`./install.sh --yes` asks nothing (no login screen changes, no restart). Only want to see what's missing without touching anything? `./install.sh --doctor`.
 
-To undo it, run `./install.sh --uninstall`: it removes the links and puts your `*.pre-rice` files back (packages and settings stay).
+To undo it, run `./install.sh --uninstall`: it removes the links and the text-console autostart and puts your `*.pre-rice` files back
+(packages and settings stay).
 
 ### Updating
 
