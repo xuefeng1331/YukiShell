@@ -2613,18 +2613,18 @@ Scope {
             dragAnimBack.addr = d.addr; dragAnimBack.val = d.op[3]; dragAnimBack.restart();
         }
     }
-    // a window dropped on another workspace stays hidden until the shell sees it there, or it flashes where it was (and in the
-    // Dock's glass) while Hyprland's move is on its way
+    // a window dropped on another workspace stays hidden until the glass's window list (hyprctl clients, refreshed after the
+    // events) has it there, or it flashes in the Dock's and the bar's glass while that list catches up
     property var dropPending: null       // { d: the drag, ws }
     Timer {
         id: dropUnhideT
         property int tries: 0
         interval: 30
         onTriggered: {
-            var p = root.dropPending, ts = Hyprland.toplevels.values, ad = p ? p.d.addr.replace(/^0x/, "") : "";
+            var p = root.dropPending, cs = root.hub ? root.hub.glassClients || [] : [];
             if (!p) return;
-            for (var i = 0; i < ts.length; i++)
-                if (ts[i].address === ad && (!ts[i].workspace || ts[i].workspace.id !== p.ws) && ++tries < 20) { restart(); return; }
+            for (var i = 0; i < cs.length; i++)   // up to 2 s: the window is on another workspace, so waiting longer shows nothing wrong
+                if (cs[i].address === p.d.addr && (!cs[i].workspace || cs[i].workspace.id !== p.ws) && ++tries < 66) { restart(); return; }
             root.dropUnhide();
         }
     }
