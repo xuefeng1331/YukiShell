@@ -2568,8 +2568,12 @@ Scope {
     readonly property var dragProps: ["opacity", "opacity_inactive", "opacity_fullscreen", "no_anim"]
     onDragWsChanged: {
         if (!drag) return;
-        if (dragWs !== null) { dragCover = true; dragHideT.tries = 0; dragHideT.restart(); }
-        else { dragHideT.stop(); dragT = 0; if (!drag.hidden) dragCover = false; }
+        if (dragWs !== null) { dragCover = true; if (drag.hidden) dragT = 1; else { dragHideT.tries = 0; dragHideT.restart(); } }
+        else Qt.callLater(dragLeftWs);   // gliding to the next number clears this one first: only a real exit grows the window back
+    }
+    function dragLeftWs() {
+        if (!drag || dragWs !== null) return;
+        dragHideT.stop(); dragT = 0; if (!drag.hidden) dragCover = false;
     }
     // hide once the snapshot has a frame on screen and the window's own props are known (or give up waiting after 300 ms)
     Timer {
@@ -2594,19 +2598,41 @@ Scope {
     }
     // Hyprland has no way to unset a window prop, so the values read at the start go back; a file remembers them for a shell
     // restarted while the window is hidden
-    function dragHide(on) {
-        if (on === drag.hidden) return;
-        drag.hidden = on;
-        if (root.hub) root.hub.dragHidden = on ? drag.addr.replace(/^0x/, "") : "";
+    function dragHide(on, d) {
+        d = d || drag;
+        if (on === d.hidden) return;
+        d.hidden = on;
+        if (root.hub) root.hub.dragHidden = on ? d.addr.replace(/^0x/, "") : "";
         if (on) {
             dragAnimBack.flush();
-            dragSetProps(drag.addr, ["0", "0", "0", "true"]);
-            dragFile.setText(drag.addr + " " + drag.op.join(" "));
+            dragSetProps(d.addr, ["0", "0", "0", "true"]);
+            dragFile.setText(d.addr + " " + d.op.join(" "));
         } else {
             // the window comes back at once; its animations only once it is drawn, or Hyprland fades it in from 0
-            dragSetProps(drag.addr, drag.op.slice(0, 3).concat(["true"]));
-            dragAnimBack.addr = drag.addr; dragAnimBack.val = drag.op[3]; dragAnimBack.restart();
+            dragSetProps(d.addr, d.op.slice(0, 3).concat(["true"]));
+            dragAnimBack.addr = d.addr; dragAnimBack.val = d.op[3]; dragAnimBack.restart();
         }
+    }
+    // a window dropped on another workspace stays hidden until the shell sees it there, or it flashes where it was (and in the
+    // Dock's glass) while Hyprland's move is on its way
+    property var dropPending: null       // { d: the drag, ws }
+    Timer {
+        id: dropUnhideT
+        property int tries: 0
+        interval: 30
+        onTriggered: {
+            var p = root.dropPending, ts = Hyprland.toplevels.values, ad = p ? p.d.addr.replace(/^0x/, "") : "";
+            if (!p) return;
+            for (var i = 0; i < ts.length; i++)
+                if (ts[i].address === ad && (!ts[i].workspace || ts[i].workspace.id !== p.ws) && ++tries < 20) { restart(); return; }
+            root.dropUnhide();
+        }
+    }
+    function dropUnhide() {
+        dropUnhideT.stop();
+        var p = dropPending;
+        dropPending = null;
+        if (p) dragHide(false, p.d);
     }
     Timer {
         id: dragAnimBack
@@ -2633,12 +2659,14 @@ Scope {
             if (d.fs > 0) Hyprland.dispatch('hl.dsp.window.fullscreen({ mode = "' + (d.fs === 1 ? "maximized" : "fullscreen") + '", action = "set", ' + sel + ' })');
             else if (d.floating) Hyprland.dispatch('hl.dsp.window.move({ x = ' + d.x + ', y = ' + d.y + ', "exact", ' + sel + ' })');
         }
-        dragHide(false);
+        if (ws !== null && ws !== d.ws && d.hidden) { dropPending = { d: d, ws: ws }; dropUnhideT.tries = 0; dropUnhideT.restart(); }
+        else dragHide(false);
         drag = null; dragWs = null; dragTl = null; dragCover = false; dragT = 0;
     }
     function dragEvent(a) {
         if (a[1] === "start") {
             if (drag) dragFinish(false);
+            dropUnhide();
             dragAnimBack.flush();
             var cls = a.slice(12).join(" "), e = lookup(cls), ts = Hyprland.toplevels.values, ad = a[2].replace(/^0x/, "");
             drag = { addr: a[2], x: +a[3], y: +a[4], floating: a[5] === "1", ws: +a[6], fs: +a[11], hidden: false, op: [], opReady: false };
