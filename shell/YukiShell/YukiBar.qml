@@ -5450,6 +5450,17 @@ Scope {
                             }
                         }
 
+                        // the dragged window while it morphs to or from its icon: the real one is hidden then, so the glass shows the
+                        // morphing picture in its place and follows it frame by frame
+                        ShaderEffectSource {
+                            readonly property bool on: root.drag !== null && !!root.hub && root.hub.dragHidden !== "" && !dragGhost.dropping && dragGhost.here
+                            z: 200
+                            visible: on && ghostSnap.opacity > 0
+                            sourceItem: on ? ghostSnap : null
+                            live: true
+                            x: dragGhost.x; y: dragGhost.y; width: dragGhost.width; height: dragGhost.height
+                            opacity: ghostSnap.opacity
+                        }
                         function recapture() {
                             for (var q = 0; q < wrep.count; q++) {
                                 var it = wrep.itemAt(q);
