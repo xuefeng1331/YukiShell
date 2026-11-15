@@ -5409,6 +5409,7 @@ Scope {
                                 required property bool gone
                                 property alias cap: sv
                                 x: wx; y: wy; width: ww; height: wh; z: wz
+                                visible: !gone   // its last frame would stay on the glass until the sweep (a dropped window lingered 0.6 s)
                                 readonly property var tl: { if (!root.hub) return null; var t = root.hub.tlTick; return root.hub.tlFor(addr); }
                                 readonly property bool folderTerm: root.wpTermAddr !== "" && String(addr).replace(/^0x/, "") === root.wpTermAddr
                                 readonly property bool onGlass: bd.region.width > 0 && x < bd.region.x + bd.region.width && x + width > bd.region.x
