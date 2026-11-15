@@ -5587,29 +5587,41 @@ Scope {
                     width: dropping ? ds : mix(root.dragWinW, 48, t)
                     height: dropping ? ds : mix(root.dragWinH, 48, t)
                     opacity: dropping ? 1 - ease(0.55, 1, root.dropT) : 1
-                    RectangularShadow {
-                        anchors.fill: parent; radius: ghostSnap.radius; blur: dragGhost.mix(30, 14, dragGhost.t); offset.y: dragGhost.mix(10, 4, dragGhost.t)
-                        // Hyprland draws the window's own shadow until it is hidden
-                        color: Qt.rgba(0, 0, 0, 0.32 * dragGhost.ease(0, 0.15, dragGhost.t) * (1 - dragGhost.ease(0.3, 0.9, dragGhost.t)))
-                    }
+                    // the window part stays under the menu bar, as the window itself does; only the icon goes over the bar
                     Item {
-                        id: ghostSnap
-                        readonly property real radius: dragGhost.mix(16, 12, dragGhost.t)
-                        anchors.fill: parent
-                        opacity: 1 - dragGhost.ease(0.3, 0.8, dragGhost.t)
-                        visible: opacity > 0
-                        layer.enabled: true
-                        layer.effect: MultiEffect { maskEnabled: true; maskSource: ghostMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
-                        // live: a capture ignores the window's opacity, so it keeps showing the window's content while it is hidden;
-                        // started over the number, as a capture breaks when Hyprland resizes the window (fullscreen let go to drag)
-                        Capture {
-                            anchors.fill: parent
-                            source: dragGhost.here && dragGhost.visible && !dragGhost.dropping ? root.dragTl : null
-                            live: dragGhost.visible && !dragGhost.dropping
-                            onHasContentChanged: if (dragGhost.here) root.dragSnapReady = hasContent
+                        id: ghostClip
+                        readonly property real cut: root.barEnabled ? Math.max(0, Math.min(dragGhost.height, root.barH - dragGhost.y)) : 0
+                        x: -60; y: cut
+                        width: dragGhost.width + 120; height: Math.max(0, dragGhost.height - cut + 60)   // room for the shadow
+                        clip: true
+                        Item {
+                            x: 60; y: -ghostClip.cut
+                            width: dragGhost.width; height: dragGhost.height
+                            RectangularShadow {
+                                anchors.fill: parent; radius: ghostSnap.radius; blur: dragGhost.mix(30, 14, dragGhost.t); offset.y: dragGhost.mix(10, 4, dragGhost.t)
+                                // Hyprland draws the window's own shadow until it is hidden
+                                color: Qt.rgba(0, 0, 0, 0.32 * dragGhost.ease(0, 0.15, dragGhost.t) * (1 - dragGhost.ease(0.3, 0.9, dragGhost.t)))
+                            }
+                            Item {
+                                id: ghostSnap
+                                readonly property real radius: dragGhost.mix(16, 12, dragGhost.t)
+                                anchors.fill: parent
+                                opacity: 1 - dragGhost.ease(0.3, 0.8, dragGhost.t)
+                                visible: opacity > 0
+                                layer.enabled: true
+                                layer.effect: MultiEffect { maskEnabled: true; maskSource: ghostMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
+                                // live: a capture ignores the window's opacity, so it keeps showing the window's content while it is hidden;
+                                // started over the number, as a capture breaks when Hyprland resizes the window (fullscreen let go to drag)
+                                Capture {
+                                    anchors.fill: parent
+                                    source: dragGhost.here && dragGhost.visible && !dragGhost.dropping ? root.dragTl : null
+                                    live: dragGhost.visible && !dragGhost.dropping
+                                    onHasContentChanged: if (dragGhost.here) root.dragSnapReady = hasContent
+                                }
+                            }
+                            Item { id: ghostMask; anchors.fill: parent; visible: false; layer.enabled: true; Rectangle { anchors.fill: parent; radius: ghostSnap.radius; color: "black" } }
                         }
                     }
-                    Item { id: ghostMask; anchors.fill: parent; visible: false; layer.enabled: true; Rectangle { anchors.fill: parent; radius: ghostSnap.radius; color: "black" } }
                     Image {
                         anchors.fill: parent
                         source: root.dragIcon
