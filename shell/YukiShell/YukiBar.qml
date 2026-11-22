@@ -5181,7 +5181,7 @@ Scope {
                     function onActiveWinChanged() { if (ui.isMenu) ui.menuModel = root.menuModelFor(ui.pop); }
                 }
                 readonly property rect glassRect: {
-                    var items = [menuPop, cc, cal, wifiPop, btPop, trayPop, notifPop, toastArea, volPop, kbPop, levelOsd], x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, any = false;
+                    var items = [menuPop, cc, cal, wifiPop, btPop, trayPop, notifPop, toastArea, volPop, kbPop], x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, any = false;
                     for (var i = 0; i < items.length; i++) {
                         var it = items[i];
                         if (!it.visible) continue;
@@ -5640,48 +5640,6 @@ Scope {
                         smooth: true; mipmap: true
                         opacity: dragGhost.ease(0.35, 0.85, dragGhost.t)
                         visible: opacity > 0
-                    }
-                }
-
-                Item {
-                    id: levelOsd
-                    z: 1000
-                    width: 256; height: 67
-                    x: ui.width - width - 22
-                    y: root.barH + 14
-                    visible: ui.toastScreen && opacity > 0
-                    opacity: root.osdVisible ? 1 : 0
-                    scale: root.osdVisible ? 1 : 0.94
-                    transformOrigin: Item.TopRight
-                    Behavior on opacity { NumberAnimation { duration: 160 } }
-                    Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    // the same glass as the bar's popups (volume, Wi-Fi, calendar); it is drawn unscaled, hence the division
-                    PopGlassCtx { id: osdGlass; pop: levelOsd; frame: ui; source: ui.glassSrc; fullW: levelOsd.width / root.barPopupScale; fullH: levelOsd.height / root.barPopupScale }
-                    GGlass { anchors.fill: parent; gx: osdGlass.ctx; cornerR: height / 2; thickness: 22; shadowAmt: 0; flatInner: 1 }
-                    MenuBorder { z: 2; anchors.fill: parent; cornerR: height / 2; dark: osdGlass.ctx.dark; tint: osdGlass.ctx.borderTint; amount: 1 }
-                    Glyph {
-                        x: 20; anchors.verticalCenter: parent.verticalCenter
-                        width: 24; height: 24
-                        kind: root.osdKind === "brightness" ? "sun" : "speaker"
-                        level: root.osdKind === "brightness" ? 3 : (root.osdValue < 0.34 ? 1 : (root.osdValue < 0.67 ? 2 : 3))
-                        color: pal.fg
-                    }
-                    Row {
-                        id: osdBar
-                        x: 62; anchors.verticalCenter: parent.verticalCenter
-                        readonly property int n: 22
-                        readonly property real segW: (levelOsd.width - 62 - 24 - (n - 1) * 3) / n
-                        spacing: 3
-                        Repeater {
-                            model: osdBar.n
-                            Rectangle {
-                                required property int index
-                                width: osdBar.segW; height: 4; radius: 2
-                                color: pal.fg
-                                opacity: Math.max(0.28, Math.min(1, root.osdValue * osdBar.n - index) * 0.95)
-                                Behavior on opacity { NumberAnimation { duration: 90 } }
-                            }
-                        }
                     }
                 }
                 Rectangle {
@@ -8888,6 +8846,91 @@ Scope {
                             }
                         }
                     }
+                    }
+                }
+            }
+        }
+
+        // volume / brightness OSD: its own Overlay window, because the bar's Top layer sits under fullscreen windows and hid it there
+        PanelWindow {
+            id: osdWin
+            screen: perScreen.modelData
+            visible: ui.toastScreen && (root.osdVisible || levelOsd.opacity > 0)
+            onVisibleChanged: root.popCount += (visible ? 1 : -1)
+            anchors { left: true; right: true; top: true; bottom: true }
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            mask: Region { }
+            WlrLayershell.namespace: "yukiosd"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+            Item {
+                id: osdRoot
+                anchors.fill: parent
+                Loader {
+                    id: osdBackdrop
+                    active: root.liquidBase
+                    sourceComponent: backdropComp
+                    onLoaded: { item.onDemand = true; item.hostShown = Qt.binding(function () { return osdWin.visible; });
+                                item.region = Qt.binding(function () { return Qt.rect(levelOsd.x - 96, levelOsd.y - 96, levelOsd.width + 192, levelOsd.height + 192); }); }
+                }
+                Item {
+                    id: levelOsd
+                    width: 256; height: 67
+                    x: osdRoot.width - width - 22
+                    y: root.barH + 14
+                    visible: ui.toastScreen && opacity > 0
+                    opacity: root.osdVisible ? 1 : 0
+                    scale: root.osdVisible ? 1 : 0.94
+                    transformOrigin: Item.TopRight
+                    Behavior on opacity { NumberAnimation { duration: 160 } }
+                    Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    LGlass {
+                        anchors.fill: parent
+                        backdrop: osdBackdrop.item
+                        shaderUrl: root.glassShaderUrl
+                        liquid: root.liquidActive
+                        dark: root.effDark
+                        bx: levelOsd.x; by: levelOsd.y
+                        cornerR: height / 2
+                        tint: root.glassOpacity
+                        thickness: 22
+                        strength: 0.8 * root.glassLiquidEff
+                        rim: root.glassRimEff
+                        grain: root.glassGrain
+                        blur: root.glassBlurEff
+                        debug: root.glassDebug
+                        onShaderError: root.glassState = "failed"
+                        rimTint: 1
+                        ringW: 1.4
+                        shadowAmt: 0
+                        flatInner: 1
+                    }
+                    MenuBorder { z: 2; anchors.fill: parent; cornerR: height / 2; dark: root.effDark; tint: root.menuBorderColor; amount: 1 }
+                    Glyph {
+                        x: 20; anchors.verticalCenter: parent.verticalCenter
+                        width: 24; height: 24
+                        kind: root.osdKind === "brightness" ? "sun" : "speaker"
+                        level: root.osdKind === "brightness" ? 3 : (root.osdValue < 0.34 ? 1 : (root.osdValue < 0.67 ? 2 : 3))
+                        color: pal.fg
+                    }
+                    Row {
+                        id: osdBar
+                        x: 62; anchors.verticalCenter: parent.verticalCenter
+                        readonly property int n: 22
+                        readonly property real segW: (levelOsd.width - 62 - 24 - (n - 1) * 3) / n
+                        spacing: 3
+                        Repeater {
+                            model: osdBar.n
+                            Rectangle {
+                                required property int index
+                                width: osdBar.segW; height: 4; radius: 2
+                                color: pal.fg
+                                opacity: Math.max(0.28, Math.min(1, root.osdValue * osdBar.n - index) * 0.95)
+                                Behavior on opacity { NumberAnimation { duration: 90 } }
+                            }
+                        }
                     }
                 }
             }
