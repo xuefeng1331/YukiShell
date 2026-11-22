@@ -15,11 +15,11 @@ import QtQuick
 Item {
     id: ps
     property bool open: false
-    property bool warm: false               // set briefly after start-up: builds the glass once, invisibly, so the first real open is not a hitch
+    property bool ready: true               // the glass's backdrop is in: the sheet only shows (and freezes its glass) then
     property var item: null                 // { name, path, ... }
     property string source: ""
     property bool dark: true
-    property var backdrop: null             // desktop glass backdrop (frozen snapshot, not live)
+    property var backdrop: null             // the glass's backdrop: a still of the screen
     property var glass: null                // the Dock, for Liquid Glass (DockGlassPanel)
     property string fam: "Open Runde"
     property real k: 1
@@ -51,8 +51,8 @@ Item {
     Behavior on prog {
         NumberAnimation { duration: ps.open ? 180 : 120; easing.type: Easing.OutCubic }
     }
-    visible: open || warm || prog > 0.01
-    opacity: Math.max((open || warm) ? 0.01 : 0, prog)
+    visible: open || prog > 0.01
+    opacity: Math.max(open ? 0.01 : 0, prog)
 
     // Liquid glass, but frozen: one blur snapshot when the sheet opens, never re-captured afterwards. No scale animation (a scaled
     // glass re-captures every frame), the sheet only fades.
@@ -61,7 +61,7 @@ Item {
         backdrop: ps.backdrop
         glass: ps.glass
         live: true              // the blur objects stay built (shaders compiled, textures allocated); the capture itself only runs while visible
-        frozen: ps.visible
+        frozen: ps.visible && ps.ready
         dark: ps.dark
         k: ps.k
         radius: 24 * ps.k

@@ -618,7 +618,7 @@ Scope {
             WlrLayershell.namespace: "yukidesktopicons"
             WlrLayershell.layer: WlrLayer.Bottom
             // this window covers the desktop, so it also does DesktopFocus's job: the keyboard comes here when you click the desktop
-            WlrLayershell.keyboardFocus: ((renameSheet.open || linkSheet.open || emojiSheet.open) && !root.picking) || (root.df && root.df.grab) ? WlrKeyboardFocus.Exclusive
+            WlrLayershell.keyboardFocus: (root.df && root.df.grab) ? WlrKeyboardFocus.Exclusive
                                          : (root.df && root.df.enabled ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
             // The whole screen takes the pointer (empty desktop: selection rectangle, right-click menu) EXCEPT
@@ -634,15 +634,13 @@ Scope {
                 ]
             }
 
-            // any glass (right-click menu or a sheet) on screen?
-            readonly property bool glassNeeded: renameSheet.visible || previewSheet.visible || picSheet.visible || linkSheet.visible || glyphSheet.visible || emojiSheet.visible
-            // Shortly after start-up every sheet is shown once at opacity 0.01: the glass (shaders, blur and mask objects, canvases) gets
-            // built and compiled then, instead of during the first real Quick Preview.
-            property bool warm: false
-            Timer { running: true; interval: 3000; onTriggered: { w.warm = true; warmOff.start(); } }
-            Timer { id: warmOff; interval: 1500; onTriggered: w.warm = false }
+            // a sheet on screen (open, or still fading out): its window is up
+            readonly property bool sheetShown: renameSheet.open || renameSheet.prog > 0.01 || previewSheet.open || previewSheet.prog > 0.01
+                || picSheet.open || picSheet.prog > 0.01 || linkSheet.open || linkSheet.prog > 0.01 || glyphSheet.open || glyphSheet.prog > 0.01
+                || emojiSheet.open || emojiSheet.prog > 0.01
             readonly property bool sheetOpen: renameSheet.open || previewSheet.open || picSheet.open || linkSheet.open || glyphSheet.open || emojiSheet.open
-            onSheetOpenChanged: if (!sheetOpen) deskFocus.forceActiveFocus()
+            // a sheet's own window takes the keys (a text field in it takes them over right after); closed, the desktop has them again
+            onSheetOpenChanged: if (sheetOpen) sheetKeys.forceActiveFocus(); else deskFocus.forceActiveFocus()
             function closeSheets() { renameSheet.open = false; previewSheet.open = false; picSheet.open = false; linkSheet.open = false; glyphSheet.open = false; emojiSheet.open = false; }
             // puts a sheet in the middle of the band between the top bar and the Dock, off the widgets
             function placeSheet(sh) {
@@ -797,38 +795,6 @@ Scope {
                 Item { id: pr1; x: root.playerRect(w.modelData.name, 1, 0); y: root.playerRect(w.modelData.name, 1, 1); width: root.playerRect(w.modelData.name, 1, 2); height: root.playerRect(w.modelData.name, 1, 3) }
                 Item { id: pr2; x: root.playerRect(w.modelData.name, 2, 0); y: root.playerRect(w.modelData.name, 2, 1); width: root.playerRect(w.modelData.name, 2, 2); height: root.playerRect(w.modelData.name, 2, 3) }
                 Item { id: pr3; x: root.playerRect(w.modelData.name, 3, 0); y: root.playerRect(w.modelData.name, 3, 1); width: root.playerRect(w.modelData.name, 3, 2); height: root.playerRect(w.modelData.name, 3, 3) }
-
-                // A local monitor-sized wallpaper copy is the source for the right-click menu's glass.
-                // It is never visible on screen: opacity 0 (a ShaderEffectSource ignores its source's own opacity, the same idiom the
-                // Bar's backdrop uses). Drawn normally it was a full-screen opaque picture that covered the desktop widgets, which is
-                // why they vanished on every right-click.
-                Item {
-                    id: desktopGlassBackdrop
-                    anchors.fill: parent
-                    z: -1
-                    // Always "visible" (it is drawn at opacity 0, so it costs nothing on screen): the wallpaper copy stays decoded and
-                    // uploaded, so opening a sheet no longer has to load a screen-sized texture in the middle of the animation.
-                    visible: true
-                    opacity: 0
-                    Rectangle { anchors.fill: parent; color: root.darkMode ? "#242428" : "#e8e8ed" }
-                    Image {
-                        anchors.fill: parent
-                        visible: status === Image.Ready
-                        asynchronous: true
-                        cache: true
-                        smooth: true
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize.width: width
-                        source: root.dock && root.dock.wallpaperFor && root.dock.fileUrl
-                            ? root.dock.fileUrl(root.dock.wallpaperFor(w.modelData.name)) : ""
-                    }
-                    LiveWall {
-                        anchors.fill: parent
-                        video: root.bar ? root.bar.glassVideo : ""
-                        live: false
-                        paused: !w.glassNeeded || (!!root.bar && (root.bar.gaming || root.bar.screenCovered[w.modelData.name] === true))
-                    }
-                }
 
                 // ── the one pointer handler: select, marquee, drag, open, menu ──
                 MouseArea {
@@ -1267,782 +1233,822 @@ Scope {
                         }
                     }
                 }
-                // click outside a sheet closes it
-                MouseArea {
-                    anchors.fill: parent
-                    z: 55
-                    visible: w.sheetOpen
-                    enabled: w.sheetOpen && !root.picking
-                    acceptedButtons: Qt.AllButtons
-                    onPressed: w.closeSheets()
-                }
-
-                // ───────── Rename ─────────
-                DesktopSheet {
-                    warm: w.warm
-                    id: renameSheet
-                    z: 60
-                    property var item: null
-                    title: I18n.tr("Rename")
-                    backdrop: desktopGlassBackdrop
-                    glass: root.dock
-                    dark: root.darkMode
-                    fam: root.fam
-                    k: root.dock ? root.dock.labelK : 1
-                    contentW: 340; contentH: 56
-                    onCloseRequested: open = false
-                    function begin(it) {
-                        item = it;
-                        w.placeSheet(renameSheet);
-                        var c = w.iconCenter(it);
-                        ox = c.x - x; oy = c.y - y;
-                        nameIn.text = it.name;
-                        open = true;
-                        Qt.callLater(function () { nameIn.forceActiveFocus(); nameIn.selectAll(); });
+                // ── the sheets: Rename, Quick Preview, Folder Icon, Folder Emoji, Add Folder ──
+                // Their own layer above the windows, like the right-click menu: in this window (under the windows and the widgets) a sheet
+                // opened behind whatever covered the middle of the screen. One at a time; a press outside it or Escape closes it. The glass
+                // is over a still of the screen taken as one opens. Hidden while a sheet's file dialog is up, so the dialog is usable.
+                PanelWindow {
+                    id: sheetWin
+                    screen: w.modelData
+                    visible: w.sheetShown && !root.picking
+                    anchors { top: true; bottom: true; left: true; right: true }
+                    exclusionMode: ExclusionMode.Ignore
+                    color: "transparent"
+                    WlrLayershell.namespace: "yukidesksheet"
+                    WlrLayershell.layer: WlrLayer.Top
+                    WlrLayershell.keyboardFocus: w.sheetOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+                    // a sheet waits for the still (or does without it after a moment)
+                    readonly property bool snapReady: sheetSnap.hasContent || snapLate.late
+                    Capture {
+                        id: sheetSnap
+                        width: sheetWin.width; height: sheetWin.height
+                        opacity: 0
+                        source: sheetWin.visible ? w.modelData : null
+                        live: false
+                        paintCursor: false
                     }
-                    function commit() {
-                        var it = item, t = nameIn.text.trim();
-                        open = false;
-                        if (!it || t === "" || t === it.name) return;
-                        Quickshell.execDetached(["sh", "-c", "if [ ! -e \"$2/$3\" ] && [ ! -L \"$2/$3\" ]; then mv -- \"$1\" \"$2/$3\"; fi", "sh", it.path, root.dir, t]);
-                        rescan.restart();
+                    Timer {
+                        id: snapLate
+                        property bool late: false
+                        interval: 250
+                        running: sheetWin.visible
+                        onRunningChanged: if (running) late = false
+                        onTriggered: late = true
                     }
-                    Rectangle {
-                        x: Math.round(16 * renameSheet.k); y: Math.round(2 * renameSheet.k)
-                        width: renameSheet.width - 2 * x; height: Math.round(36 * renameSheet.k)
-                        radius: Math.round(11 * renameSheet.k)
-                        color: root.darkMode ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
-                        TextInput {
-                            id: nameIn
-                            anchors.fill: parent; anchors.leftMargin: Math.round(12 * renameSheet.k); anchors.rightMargin: Math.round(12 * renameSheet.k)
-                            verticalAlignment: TextInput.AlignVCenter
-                            color: root.darkMode ? "white" : "#1d1d1f"
-                            selectionColor: root.accent
-                            font.family: root.fam; font.pixelSize: Math.max(10, Math.round(14 * renameSheet.k))
-                            selectByMouse: true
-                            clip: true
-                            onAccepted: renameSheet.commit()
-                            Keys.onEscapePressed: renameSheet.open = false
-                        }
-                    }
-                }
-
-                // ───────── Quick Preview ─────────
-                DesktopSheet {
-                    warm: w.warm
-                    id: previewSheet
-                    z: 60
-                    property var item: null
-                    title: I18n.tr("Quick Preview")
-                    backdrop: desktopGlassBackdrop
-                    glass: root.dock
-                    dark: root.darkMode
-                    fam: root.fam
-                    k: root.dock ? root.dock.labelK : 1
-                    contentW: 400
-                    // The size is fixed when the sheet opens. The rows used to arrive (and the sheet grow) AFTER it had opened, which
-                    // rebuilt the whole glass (canvases, mask, blur) in the middle of the animation. Now the sheet waits for the
-                    // file info (a few ms), sizes itself once, then opens.
-                    property int lockedRows: 4
-                    property bool pending: false
-                    contentH: 96 + lockedRows * 20 + 18
-                    onCloseRequested: open = false
-                    function begin(it) {
-                        item = it;
-                        pending = true;
-                        pvWait.restart();
-                        root.loadInfo(it);           // root.info is reset here; openNow() runs from onInfoChanged once it is filled
-                    }
-                    function openNow() {
-                        if (!pending) return;
-                        pending = false; pvWait.stop();
-                        lockedRows = pvRows.length;
-                        w.placeSheet(previewSheet);
-                        var c = w.iconCenter(item);
-                        ox = c.x - x; oy = c.y - y;
-                        open = true;
-                    }
-                    Timer { id: pvWait; interval: 400; onTriggered: previewSheet.openNow() }
-                    Connections { target: root; function onInfoChanged() { if (previewSheet.pending && root.info && root.info.ready) previewSheet.openNow(); } }
-                    // rows of "label / value"
-                    readonly property var pvRows: {
-                        var it = item, f = root.info, r = [];
-                        if (!it) return r;
-                        var n = Number(f.extra);
-                        r.push([I18n.tr("Size"), it.isDir ? (f.ready ? n + " " + (n === 1 ? I18n.tr("item") : I18n.tr("items")) : "—") : root.humanSize(f.size)]);
-                        r.push([I18n.tr("Created"), root.fmtDate(f.birth)]);
-                        r.push([I18n.tr("Modified"), root.fmtDate(f.mod)]);
-                        if (it.kind === "Image" && probe.status === Image.Ready) r.push([I18n.tr("Dimensions"), probe.implicitWidth + " × " + probe.implicitHeight]);
-                        r.push([I18n.tr("Where"), root.dir]);
-                        if (f.link) r.push([I18n.tr("Links to"), f.link]);
-                        if (f.perms) r.push([I18n.tr("Permissions"), f.perms + (f.owner ? "  •  " + f.owner : "")]);
-                        return r;
-                    }
-                    Image { id: probe; visible: false; asynchronous: true; source: previewSheet.item && previewSheet.item.kind === "Image" ? root.fileUrl(previewSheet.item.path) : "" }
                     Item {
+                        id: sheetKeys
                         anchors.fill: parent
-                        Image {
-                            id: pvIcon
-                            x: Math.round(18 * previewSheet.k); y: Math.round(2 * previewSheet.k)
-                            width: Math.round(76 * previewSheet.k); height: width
-                            asynchronous: true; smooth: true; mipmap: true
-                            fillMode: previewSheet.item && previewSheet.item.kind === "Image" ? Image.PreserveAspectCrop : Image.PreserveAspectFit
-                            sourceSize: Qt.size(256, 256)
-                            source: previewSheet.item ? root.iconSourceFor(previewSheet.item) : ""
+                        focus: true
+                        Keys.onEscapePressed: w.closeSheets()
+
+                        // click outside a sheet closes it
+                        MouseArea {
+                            anchors.fill: parent
+                            z: 55
+                            visible: w.sheetOpen
+                            enabled: w.sheetOpen && !root.picking
+                            acceptedButtons: Qt.AllButtons
+                            onPressed: w.closeSheets()
                         }
-                        Column {
-                            x: pvIcon.x + pvIcon.width + Math.round(16 * previewSheet.k)
-                            y: Math.round(8 * previewSheet.k)
-                            width: previewSheet.width - x - Math.round(18 * previewSheet.k)
-                            spacing: Math.round(4 * previewSheet.k)
-                            Text {
-                                width: parent.width
-                                text: previewSheet.item ? (previewSheet.item.isApp ? previewSheet.item.name.replace(/\.desktop$/i, "") : previewSheet.item.name) : ""
-                                color: previewSheet.fg
-                                font.family: root.fam; font.weight: Font.DemiBold; font.pixelSize: Math.max(11, Math.round(15 * previewSheet.k))
-                                wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideMiddle
+
+                        // ───────── Rename ─────────
+                        DesktopSheet {
+                            id: renameSheet
+                            z: 60
+                            property var item: null
+                            title: I18n.tr("Rename")
+                            backdrop: sheetSnap
+                            ready: sheetWin.snapReady
+                            glass: root.dock
+                            dark: root.darkMode
+                            fam: root.fam
+                            k: root.dock ? root.dock.labelK : 1
+                            contentW: 340; contentH: 56
+                            onCloseRequested: open = false
+                            function begin(it) {
+                                item = it;
+                                w.placeSheet(renameSheet);
+                                var c = w.iconCenter(it);
+                                ox = c.x - x; oy = c.y - y;
+                                nameIn.text = it.name;
+                                open = true;
+                                Qt.callLater(function () { nameIn.forceActiveFocus(); nameIn.selectAll(); });
                             }
-                            Text {
-                                width: parent.width
-                                text: previewSheet.item ? root.kindOf(previewSheet.item, root.info) : ""
-                                color: previewSheet.fg2
-                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * previewSheet.k))
-                                elide: Text.ElideRight
+                            function commit() {
+                                var it = item, t = nameIn.text.trim();
+                                open = false;
+                                if (!it || t === "" || t === it.name) return;
+                                Quickshell.execDetached(["sh", "-c", "if [ ! -e \"$2/$3\" ] && [ ! -L \"$2/$3\" ]; then mv -- \"$1\" \"$2/$3\"; fi", "sh", it.path, root.dir, t]);
+                                rescan.restart();
+                            }
+                            Rectangle {
+                                x: Math.round(16 * renameSheet.k); y: Math.round(2 * renameSheet.k)
+                                width: renameSheet.width - 2 * x; height: Math.round(36 * renameSheet.k)
+                                radius: Math.round(11 * renameSheet.k)
+                                color: root.darkMode ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
+                                TextInput {
+                                    id: nameIn
+                                    anchors.fill: parent; anchors.leftMargin: Math.round(12 * renameSheet.k); anchors.rightMargin: Math.round(12 * renameSheet.k)
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: root.darkMode ? "white" : "#1d1d1f"
+                                    selectionColor: root.accent
+                                    font.family: root.fam; font.pixelSize: Math.max(10, Math.round(14 * renameSheet.k))
+                                    selectByMouse: true
+                                    clip: true
+                                    onAccepted: renameSheet.commit()
+                                    Keys.onEscapePressed: renameSheet.open = false
+                                }
                             }
                         }
-                        Column {
-                            x: Math.round(18 * previewSheet.k)
-                            y: Math.round(92 * previewSheet.k)
-                            width: previewSheet.width - 2 * x
-                            spacing: 0
-                            Repeater {
-                                model: previewSheet.pvRows
-                                delegate: Item {
-                                    id: pr
-                                    required property var modelData
-                                    width: parent.width; height: Math.round(20 * previewSheet.k)
+
+                        // ───────── Quick Preview ─────────
+                        DesktopSheet {
+                            id: previewSheet
+                            z: 60
+                            property var item: null
+                            title: I18n.tr("Quick Preview")
+                            backdrop: sheetSnap
+                            ready: sheetWin.snapReady
+                            glass: root.dock
+                            dark: root.darkMode
+                            fam: root.fam
+                            k: root.dock ? root.dock.labelK : 1
+                            contentW: 400
+                            // The size is fixed when the sheet opens. The rows used to arrive (and the sheet grow) AFTER it had opened, which
+                            // rebuilt the whole glass (canvases, mask, blur) in the middle of the animation. Now the sheet waits for the
+                            // file info (a few ms), sizes itself once, then opens.
+                            property int lockedRows: 4
+                            property bool pending: false
+                            contentH: 96 + lockedRows * 20 + 18
+                            onCloseRequested: open = false
+                            function begin(it) {
+                                item = it;
+                                pending = true;
+                                pvWait.restart();
+                                root.loadInfo(it);           // root.info is reset here; openNow() runs from onInfoChanged once it is filled
+                            }
+                            function openNow() {
+                                if (!pending) return;
+                                pending = false; pvWait.stop();
+                                lockedRows = pvRows.length;
+                                w.placeSheet(previewSheet);
+                                var c = w.iconCenter(item);
+                                ox = c.x - x; oy = c.y - y;
+                                open = true;
+                            }
+                            Timer { id: pvWait; interval: 400; onTriggered: previewSheet.openNow() }
+                            Connections { target: root; function onInfoChanged() { if (previewSheet.pending && root.info && root.info.ready) previewSheet.openNow(); } }
+                            // rows of "label / value"
+                            readonly property var pvRows: {
+                                var it = item, f = root.info, r = [];
+                                if (!it) return r;
+                                var n = Number(f.extra);
+                                r.push([I18n.tr("Size"), it.isDir ? (f.ready ? n + " " + (n === 1 ? I18n.tr("item") : I18n.tr("items")) : "—") : root.humanSize(f.size)]);
+                                r.push([I18n.tr("Created"), root.fmtDate(f.birth)]);
+                                r.push([I18n.tr("Modified"), root.fmtDate(f.mod)]);
+                                if (it.kind === "Image" && probe.status === Image.Ready) r.push([I18n.tr("Dimensions"), probe.implicitWidth + " × " + probe.implicitHeight]);
+                                r.push([I18n.tr("Where"), root.dir]);
+                                if (f.link) r.push([I18n.tr("Links to"), f.link]);
+                                if (f.perms) r.push([I18n.tr("Permissions"), f.perms + (f.owner ? "  •  " + f.owner : "")]);
+                                return r;
+                            }
+                            Image { id: probe; visible: false; asynchronous: true; source: previewSheet.item && previewSheet.item.kind === "Image" ? root.fileUrl(previewSheet.item.path) : "" }
+                            Item {
+                                anchors.fill: parent
+                                Image {
+                                    id: pvIcon
+                                    x: Math.round(18 * previewSheet.k); y: Math.round(2 * previewSheet.k)
+                                    width: Math.round(76 * previewSheet.k); height: width
+                                    asynchronous: true; smooth: true; mipmap: true
+                                    fillMode: previewSheet.item && previewSheet.item.kind === "Image" ? Image.PreserveAspectCrop : Image.PreserveAspectFit
+                                    sourceSize: Qt.size(256, 256)
+                                    source: previewSheet.item ? root.iconSourceFor(previewSheet.item) : ""
+                                }
+                                Column {
+                                    x: pvIcon.x + pvIcon.width + Math.round(16 * previewSheet.k)
+                                    y: Math.round(8 * previewSheet.k)
+                                    width: previewSheet.width - x - Math.round(18 * previewSheet.k)
+                                    spacing: Math.round(4 * previewSheet.k)
                                     Text {
-                                        width: Math.round(88 * previewSheet.k)
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: pr.modelData[0]
+                                        width: parent.width
+                                        text: previewSheet.item ? (previewSheet.item.isApp ? previewSheet.item.name.replace(/\.desktop$/i, "") : previewSheet.item.name) : ""
+                                        color: previewSheet.fg
+                                        font.family: root.fam; font.weight: Font.DemiBold; font.pixelSize: Math.max(11, Math.round(15 * previewSheet.k))
+                                        wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideMiddle
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: previewSheet.item ? root.kindOf(previewSheet.item, root.info) : ""
                                         color: previewSheet.fg2
                                         font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * previewSheet.k))
+                                        elide: Text.ElideRight
                                     }
-                                    Text {
-                                        x: Math.round(92 * previewSheet.k)
-                                        width: parent.width - x
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: pr.modelData[1]
-                                        color: previewSheet.fg
-                                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * previewSheet.k))
-                                        elide: Text.ElideMiddle
+                                }
+                                Column {
+                                    x: Math.round(18 * previewSheet.k)
+                                    y: Math.round(92 * previewSheet.k)
+                                    width: previewSheet.width - 2 * x
+                                    spacing: 0
+                                    Repeater {
+                                        model: previewSheet.pvRows
+                                        delegate: Item {
+                                            id: pr
+                                            required property var modelData
+                                            width: parent.width; height: Math.round(20 * previewSheet.k)
+                                            Text {
+                                                width: Math.round(88 * previewSheet.k)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: pr.modelData[0]
+                                                color: previewSheet.fg2
+                                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * previewSheet.k))
+                                            }
+                                            Text {
+                                                x: Math.round(92 * previewSheet.k)
+                                                width: parent.width - x
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: pr.modelData[1]
+                                                color: previewSheet.fg
+                                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * previewSheet.k))
+                                                elide: Text.ElideMiddle
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
 
-                // ───────── Quick Preview of a picture ─────────
-                // Light weight on purpose (see PictureSheet.qml): the glass sheet repaints CPU canvases whenever it changes size, which
-                // is what made big pictures lag.
-                PictureSheet {
-                    warm: w.warm
-                    id: picSheet
-                    z: 60
-                    backdrop: desktopGlassBackdrop
-                    glass: root.dock
-                    dark: root.darkMode
-                    fam: root.fam
-                    k: root.dock ? root.dock.labelK : 1
-                    maxW: w.width * 0.30 - 2 * pad
-                    maxH: w.height * 0.30 - headH - pad - Math.round(2 * k)
-                    property bool pending: false
-                    onCloseRequested: open = false
-                    function begin(it) {
-                        item = it;
-                        var url = root.fileUrl(it.path);
-                        pending = true;
-                        pendTimer.restart();
-                        freeTimer.stop();
-                        if (source === url && loaded) { openNow(); return; }
-                        if (source === url && status === Image.Error) { fallback(); return; }
-                        source = url;                       // opens from onPictureReady once it has been decoded
-                    }
-                    function openNow() {
-                        pending = false; pendTimer.stop();
-                        w.placeSheet(picSheet);
-                        open = true;
-                    }
-                    // a picture that cannot be read (or takes far too long) falls back to the info card
-                    function fallback() {
-                        var it = item;
-                        pending = false; pendTimer.stop();
-                        if (it) previewSheet.begin(it);
-                    }
-                    onPictureReady: if (pending) openNow()
-                    onPictureFailed: if (pending) fallback()
-                    Timer { id: pendTimer; interval: 3000; onTriggered: picSheet.fallback() }
-                    // once it has closed, let go of the picture so it does not stay in memory
-                    Timer { id: freeTimer; interval: 600; onTriggered: if (!picSheet.open && !picSheet.pending) picSheet.source = "" }
-                    onOpenChanged: { if (open) freeTimer.stop(); else freeTimer.restart(); }
-                }
+                        // ───────── Quick Preview of a picture ─────────
+                        // Light weight on purpose (see PictureSheet.qml): the glass sheet repaints CPU canvases whenever it changes size, which
+                        // is what made big pictures lag.
+                        PictureSheet {
+                            id: picSheet
+                            z: 60
+                            backdrop: sheetSnap
+                            ready: sheetWin.snapReady
+                            glass: root.dock
+                            dark: root.darkMode
+                            fam: root.fam
+                            k: root.dock ? root.dock.labelK : 1
+                            maxW: w.width * 0.30 - 2 * pad
+                            maxH: w.height * 0.30 - headH - pad - Math.round(2 * k)
+                            property bool pending: false
+                            onCloseRequested: open = false
+                            function begin(it) {
+                                item = it;
+                                var url = root.fileUrl(it.path);
+                                pending = true;
+                                pendTimer.restart();
+                                freeTimer.stop();
+                                if (source === url && loaded) { openNow(); return; }
+                                if (source === url && status === Image.Error) { fallback(); return; }
+                                source = url;                       // opens from onPictureReady once it has been decoded
+                            }
+                            function openNow() {
+                                pending = false; pendTimer.stop();
+                                w.placeSheet(picSheet);
+                                open = true;
+                            }
+                            // a picture that cannot be read (or takes far too long) falls back to the info card
+                            function fallback() {
+                                var it = item;
+                                pending = false; pendTimer.stop();
+                                if (it) previewSheet.begin(it);
+                            }
+                            onPictureReady: if (pending) openNow()
+                            onPictureFailed: if (pending) fallback()
+                            Timer { id: pendTimer; interval: 3000; onTriggered: picSheet.fallback() }
+                            // once it has closed, let go of the picture so it does not stay in memory
+                            Timer { id: freeTimer; interval: 600; onTriggered: if (!picSheet.open && !picSheet.pending) picSheet.source = "" }
+                            onOpenChanged: { if (open) freeTimer.stop(); else freeTimer.restart(); }
+                        }
 
-                // ───────── Folder Icon (pick the symbol on a folder) ─────────
-                DesktopSheet {
-                    warm: w.warm
-                    id: glyphSheet
-                    z: 60
-                    property var paths: []
-                    readonly property int cols: 6
-                    readonly property var cells: [""].concat(root.glyphList)
-                    readonly property int rows: Math.ceil(cells.length / cols)
-                    // the folder colour the previews are drawn in (that of the first chosen folder)
-                    readonly property string tint: paths.length > 0 ? (root.folderColors[paths[0]] || "") : ""
-                    // the folder's own picture, and (one folder chosen) the files in it to take one from, pictures first
-                    readonly property string pic: paths.length > 0 ? (root.folderPics[paths[0]] || "") : ""
-                    readonly property bool one: paths.length === 1
-                    property var files: []
-                    property var thumbs: ({})          // video → its still
-                    property bool listed: false
-                    readonly property int fileRows: Math.min(2, Math.max(1, Math.ceil(files.length / cols)))
-                    title: I18n.tr("Folder Icon")
-                    backdrop: desktopGlassBackdrop
-                    glass: root.dock
-                    dark: root.darkMode
-                    fam: root.fam
-                    k: root.dock ? root.dock.labelK : 1
-                    contentW: cols * 64 + 28
-                    contentH: rows * 76 + 14 + (one ? 24 + fileRows * 76 : 0) + 44
-                    onCloseRequested: open = false
-                    function begin(p) {
-                        if (!p || p.length === 0) return;
-                        paths = p;
-                        files = []; thumbs = ({}); listed = false;
-                        if (p.length === 1) { filesProc.running = false; filesProc.command = filesProc.cmd.concat([p[0]]); filesProc.running = true; }
-                        w.placeSheet(glyphSheet);
-                        ox = width / 2; oy = height / 2;
-                        open = true;
-                    }
-                    function pick(g) { root.setFolderGlyph(paths, g); open = false; }
-                    function usePic(f) { if (thumbs[f]) root.keepPicture(paths, thumbs[f]); else root.setFolderPic(paths, f); open = false; }
-                    function choosePicture() { root.pickPicture(paths); open = false; }
-                    Process {
-                        id: filesProc
-                        // the folder first (a late answer for another folder is ignored), every file, then a still of each video, made into
-                        // the wallpaper picker's cache under the same names, so either one's stills serve both
-                        readonly property var cmd: ["sh", "-c", "printf 'D\\t%s\\n' \"$1\"; cd -- \"$1\" || exit; "
-                            + "find -L . -mindepth 1 -maxdepth 1 ! -name '.*' ! -type d -printf 'F\\t%f\\n' | sort -f; printf 'E\\n'; "
-                            + "tc=\"$HOME/.cache/yukishell/thumbs\"; mkdir -p \"$tc\"; "
-                            + "find -L . -mindepth 1 -maxdepth 1 ! -name '.*' -type f -printf '%f\\n' | grep -iE '[.](mp4|webm|mkv|mov|m4v)$' | sort -f | head -n 48 | "
-                            + "while IFS= read -r f; do v=\"$1/$f\"; t=\"$tc/$(printf '%s:%s' \"$v\" \"$(stat -c %Y \"$v\" 2>/dev/null)\" | md5sum | cut -c1-16).jpg\"; "
-                            + "[ -s \"$t\" ] || nice -n 15 ffmpeg -loglevel error -y -ss 1 -i \"$v\" -frames:v 1 -vf 'scale=360:-2' \"$t\" </dev/null >/dev/null 2>&1; "
-                            + "[ -s \"$t\" ] && printf 'T\\t%s\\t%s\\n' \"$f\" \"$t\"; done", "sh"]
-                        property string dir: ""
-                        property var acc: []
-                        stdout: SplitParser {
-                            onRead: data => {
-                                var c = data.split("\t");
-                                if (c[0] === "D") { filesProc.dir = c[1]; filesProc.acc = []; return; }
-                                if (filesProc.dir !== glyphSheet.paths[0]) return;
-                                var d = filesProc.dir;
-                                if (c[0] === "F") { var a = filesProc.acc; a.push(c[1]); filesProc.acc = a; }
-                                else if (c[0] === "E") {   // pictures, then videos, then the rest
-                                    var l = filesProc.acc;
-                                    var rest = l.filter(function (x) { return !root.isPicturePath(x) && !root.isVideoPath(x); });
-                                    l = l.filter(root.isPicturePath).concat(l.filter(root.isVideoPath)).concat(rest);
-                                    glyphSheet.files = l.slice(0, 48).map(function (x) { return d + "/" + x; });
-                                    glyphSheet.listed = true;
-                                } else if (c[0] === "T") {
-                                    var m = Object.assign({}, glyphSheet.thumbs);
-                                    m[d + "/" + c[1]] = c[2];
-                                    glyphSheet.thumbs = m;
+                        // ───────── Folder Icon (pick the symbol on a folder) ─────────
+                        DesktopSheet {
+                            id: glyphSheet
+                            z: 60
+                            property var paths: []
+                            readonly property int cols: 6
+                            readonly property var cells: [""].concat(root.glyphList)
+                            readonly property int rows: Math.ceil(cells.length / cols)
+                            // the folder colour the previews are drawn in (that of the first chosen folder)
+                            readonly property string tint: paths.length > 0 ? (root.folderColors[paths[0]] || "") : ""
+                            // the folder's own picture, and (one folder chosen) the files in it to take one from, pictures first
+                            readonly property string pic: paths.length > 0 ? (root.folderPics[paths[0]] || "") : ""
+                            readonly property bool one: paths.length === 1
+                            property var files: []
+                            property var thumbs: ({})          // video → its still
+                            property bool listed: false
+                            readonly property int fileRows: Math.min(2, Math.max(1, Math.ceil(files.length / cols)))
+                            title: I18n.tr("Folder Icon")
+                            backdrop: sheetSnap
+                            ready: sheetWin.snapReady
+                            glass: root.dock
+                            dark: root.darkMode
+                            fam: root.fam
+                            k: root.dock ? root.dock.labelK : 1
+                            contentW: cols * 64 + 28
+                            contentH: rows * 76 + 14 + (one ? 24 + fileRows * 76 : 0) + 44
+                            onCloseRequested: open = false
+                            function begin(p) {
+                                if (!p || p.length === 0) return;
+                                paths = p;
+                                files = []; thumbs = ({}); listed = false;
+                                if (p.length === 1) { filesProc.running = false; filesProc.command = filesProc.cmd.concat([p[0]]); filesProc.running = true; }
+                                w.placeSheet(glyphSheet);
+                                ox = width / 2; oy = height / 2;
+                                open = true;
+                            }
+                            function pick(g) { root.setFolderGlyph(paths, g); open = false; }
+                            function usePic(f) { if (thumbs[f]) root.keepPicture(paths, thumbs[f]); else root.setFolderPic(paths, f); open = false; }
+                            function choosePicture() { root.pickPicture(paths); open = false; }
+                            Process {
+                                id: filesProc
+                                // the folder first (a late answer for another folder is ignored), every file, then a still of each video, made into
+                                // the wallpaper picker's cache under the same names, so either one's stills serve both
+                                readonly property var cmd: ["sh", "-c", "printf 'D\\t%s\\n' \"$1\"; cd -- \"$1\" || exit; "
+                                    + "find -L . -mindepth 1 -maxdepth 1 ! -name '.*' ! -type d -printf 'F\\t%f\\n' | sort -f; printf 'E\\n'; "
+                                    + "tc=\"$HOME/.cache/yukishell/thumbs\"; mkdir -p \"$tc\"; "
+                                    + "find -L . -mindepth 1 -maxdepth 1 ! -name '.*' -type f -printf '%f\\n' | grep -iE '[.](mp4|webm|mkv|mov|m4v)$' | sort -f | head -n 48 | "
+                                    + "while IFS= read -r f; do v=\"$1/$f\"; t=\"$tc/$(printf '%s:%s' \"$v\" \"$(stat -c %Y \"$v\" 2>/dev/null)\" | md5sum | cut -c1-16).jpg\"; "
+                                    + "[ -s \"$t\" ] || nice -n 15 ffmpeg -loglevel error -y -ss 1 -i \"$v\" -frames:v 1 -vf 'scale=360:-2' \"$t\" </dev/null >/dev/null 2>&1; "
+                                    + "[ -s \"$t\" ] && printf 'T\\t%s\\t%s\\n' \"$f\" \"$t\"; done", "sh"]
+                                property string dir: ""
+                                property var acc: []
+                                stdout: SplitParser {
+                                    onRead: data => {
+                                        var c = data.split("\t");
+                                        if (c[0] === "D") { filesProc.dir = c[1]; filesProc.acc = []; return; }
+                                        if (filesProc.dir !== glyphSheet.paths[0]) return;
+                                        var d = filesProc.dir;
+                                        if (c[0] === "F") { var a = filesProc.acc; a.push(c[1]); filesProc.acc = a; }
+                                        else if (c[0] === "E") {   // pictures, then videos, then the rest
+                                            var l = filesProc.acc;
+                                            var rest = l.filter(function (x) { return !root.isPicturePath(x) && !root.isVideoPath(x); });
+                                            l = l.filter(root.isPicturePath).concat(l.filter(root.isVideoPath)).concat(rest);
+                                            glyphSheet.files = l.slice(0, 48).map(function (x) { return d + "/" + x; });
+                                            glyphSheet.listed = true;
+                                        } else if (c[0] === "T") {
+                                            var m = Object.assign({}, glyphSheet.thumbs);
+                                            m[d + "/" + c[1]] = c[2];
+                                            glyphSheet.thumbs = m;
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }
-                    Grid {
-                        id: glyphGrid
-                        x: Math.round(14 * glyphSheet.k); y: Math.round(4 * glyphSheet.k)
-                        columns: glyphSheet.cols
-                        Repeater {
-                            model: glyphSheet.cells
-                            delegate: Item {
-                                id: gcell
-                                required property string modelData
-                                width: Math.round(64 * glyphSheet.k); height: Math.round(76 * glyphSheet.k)
-                                readonly property string src: modelData === "" ? "" : root.glyphIcon(glyphSheet.tint, modelData)
-                                readonly property bool current: glyphSheet.paths.length > 0 && glyphSheet.pic === "" && (root.folderGlyphs[glyphSheet.paths[0]] || "") === modelData
-                                Rectangle {
-                                    anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
-                                    radius: Math.round(10 * glyphSheet.k)
-                                    color: gMa.containsMouse ? (glyphSheet.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.09)) : "transparent"
-                                    border.width: gcell.current ? 2 : 0
-                                    border.color: root.accent
+                            Grid {
+                                id: glyphGrid
+                                x: Math.round(14 * glyphSheet.k); y: Math.round(4 * glyphSheet.k)
+                                columns: glyphSheet.cols
+                                Repeater {
+                                    model: glyphSheet.cells
+                                    delegate: Item {
+                                        id: gcell
+                                        required property string modelData
+                                        width: Math.round(64 * glyphSheet.k); height: Math.round(76 * glyphSheet.k)
+                                        readonly property string src: modelData === "" ? "" : root.glyphIcon(glyphSheet.tint, modelData)
+                                        readonly property bool current: glyphSheet.paths.length > 0 && glyphSheet.pic === "" && (root.folderGlyphs[glyphSheet.paths[0]] || "") === modelData
+                                        Rectangle {
+                                            anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
+                                            radius: Math.round(10 * glyphSheet.k)
+                                            color: gMa.containsMouse ? (glyphSheet.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.09)) : "transparent"
+                                            border.width: gcell.current ? 2 : 0
+                                            border.color: root.accent
+                                        }
+                                        Image {
+                                            x: Math.round((parent.width - width) / 2); y: Math.round(8 * glyphSheet.k)
+                                            width: Math.round(40 * glyphSheet.k); height: width
+                                            sourceSize: Qt.size(width * 2, height * 2)
+                                            asynchronous: true; cache: true; smooth: true
+                                            fillMode: Image.PreserveAspectFit
+                                            source: gcell.modelData !== "" ? gcell.src
+                                                : ((glyphSheet.tint !== "" && root.colorFolderIcon(glyphSheet.tint) !== "") ? root.colorFolderIcon(glyphSheet.tint)
+                                                   : (root.dock && root.dock.iconSrc ? root.dock.iconSrc("folder") : Quickshell.iconPath("folder")))
+                                        }
+                                        Text {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            y: Math.round(52 * glyphSheet.k)
+                                            width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+                                            text: gcell.modelData === "" ? I18n.tr("Default") : gcell.modelData.charAt(0).toUpperCase() + gcell.modelData.slice(1)
+                                            color: glyphSheet.fg2
+                                            font.family: root.fam; font.pixelSize: Math.max(8, Math.round(11 * glyphSheet.k))
+                                        }
+                                        MouseArea { id: gMa; anchors.fill: parent; hoverEnabled: true; onClicked: glyphSheet.pick(gcell.modelData) }
+                                    }
                                 }
+                            }
+                            Text {
+                                visible: glyphSheet.one
+                                x: Math.round(20 * glyphSheet.k); y: glyphGrid.y + glyphGrid.height + Math.round(4 * glyphSheet.k)
+                                text: I18n.tr("From This Folder")
+                                color: glyphSheet.fg2
+                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * glyphSheet.k)); font.weight: Font.DemiBold
+                            }
+                            Flickable {   // two rows at most; more scroll
+                                id: filesFlick
+                                visible: glyphSheet.one
+                                x: glyphGrid.x; y: glyphGrid.y + glyphGrid.height + Math.round(24 * glyphSheet.k)
+                                width: glyphGrid.width; height: glyphSheet.fileRows * Math.round(76 * glyphSheet.k)
+                                clip: true
+                                contentHeight: filesGrid.height
+                                boundsBehavior: Flickable.StopAtBounds
+                                Grid {
+                                    id: filesGrid
+                                    columns: glyphSheet.cols
+                                    Repeater {
+                                        model: glyphSheet.files
+                                        delegate: Item {
+                                            id: fcell
+                                            required property string modelData
+                                            width: Math.round(64 * glyphSheet.k); height: Math.round(76 * glyphSheet.k)
+                                            Rectangle {
+                                                anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
+                                                radius: Math.round(10 * glyphSheet.k)
+                                                color: fMa.containsMouse ? (glyphSheet.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.09)) : "transparent"
+                                                // a video's folder picture is a copy of its still, under the same name
+                                                readonly property string still: glyphSheet.thumbs[fcell.modelData] || ""
+                                                border.width: glyphSheet.pic === fcell.modelData || (still !== "" && glyphSheet.pic.endsWith(still.substring(still.lastIndexOf("/")))) ? 2 : 0
+                                                border.color: root.accent
+                                            }
+                                            Image {
+                                                x: Math.round((parent.width - width) / 2); y: Math.round(8 * glyphSheet.k)
+                                                width: Math.round(40 * glyphSheet.k); height: width
+                                                sourceSize: Qt.size(width * 2, height * 2)
+                                                asynchronous: true; cache: true; smooth: true
+                                                fillMode: Image.PreserveAspectFit
+                                                source: glyphSheet.thumbs[fcell.modelData] ? root.fileUrl(glyphSheet.thumbs[fcell.modelData]) : root.pathIcon(fcell.modelData)
+                                            }
+                                            Text {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                y: Math.round(52 * glyphSheet.k)
+                                                width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
+                                                text: fcell.modelData.substring(fcell.modelData.lastIndexOf("/") + 1)
+                                                color: glyphSheet.fg2
+                                                font.family: root.fam; font.pixelSize: Math.max(8, Math.round(11 * glyphSheet.k))
+                                            }
+                                            MouseArea { id: fMa; anchors.fill: parent; hoverEnabled: true; onClicked: glyphSheet.usePic(fcell.modelData) }
+                                        }
+                                    }
+                                }
+                            }
+                            Text {
+                                visible: glyphSheet.one && glyphSheet.listed && glyphSheet.files.length === 0
+                                anchors.centerIn: filesFlick
+                                text: I18n.tr("No files in this folder")
+                                color: glyphSheet.fg2
+                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * glyphSheet.k))
+                            }
+                            Rectangle {
+                                x: Math.round(18 * glyphSheet.k)
+                                y: (glyphSheet.one ? filesFlick.y + filesFlick.height : glyphGrid.y + glyphGrid.height) + Math.round(8 * glyphSheet.k)
+                                width: cpText.implicitWidth + Math.round(28 * glyphSheet.k); height: Math.round(28 * glyphSheet.k)
+                                radius: Math.round(11 * glyphSheet.k)
+                                color: cpMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
+                                                    : (root.darkMode ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.09))
+                                Text {
+                                    id: cpText
+                                    anchors.centerIn: parent
+                                    text: I18n.tr("Choose Picture…")
+                                    color: glyphSheet.fg
+                                    font.family: root.fam; font.pixelSize: Math.max(10, Math.round(13 * glyphSheet.k))
+                                }
+                                MouseArea { id: cpMa; anchors.fill: parent; onClicked: glyphSheet.choosePicture() }
+                            }
+                        }
+
+                        // ───────── Folder Emoji (put any emoji on a folder) ─────────
+                        // A live preview of the folder on top, a search / paste bar, the category tabs and the full emoji set. Tapping an emoji puts it
+                        // on the folder at once (tap the chosen one again, or "Remove Emoji", to take it off). The sheet stays open until Done.
+                        DesktopSheet {
+                            id: emojiSheet
+                            z: 60
+                            property var items: []
+                            property var paths: []
+                            property int cat: 0
+                            property string query: ""
+                            readonly property bool searching: query !== ""
+                            readonly property string current: paths.length > 0 ? (root.folderEmoji[paths[0]] || "") : ""
+                            readonly property var catIcons: ["😀", "👋", "🐻", "🍔", "✈️", "⚽", "💡", "🔣", "🏳️"]
+                            readonly property var shown: {
+                                var out = [], L = EmojiData.list, q = query.toLowerCase();
+                                for (var i = 0; i < L.length; i++) {
+                                    if (q !== "" ? L[i][4].indexOf(q) >= 0 : L[i][3] === cat) out.push(L[i][0]);
+                                }
+                                return out;
+                            }
+                            readonly property color hoverBg: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.08)
+                            readonly property color pillBg: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
+                            title: I18n.tr("Folder Emoji")
+                            backdrop: sheetSnap
+                            ready: sheetWin.snapReady
+                            glass: root.dock
+                            dark: root.darkMode
+                            fam: root.fam
+                            k: root.dock ? root.dock.labelK : 1
+                            contentW: 372
+                            contentH: 424
+                            onCloseRequested: open = false
+                            function begin(list) {
+                                if (!list || list.length === 0) return;
+                                items = list;
+                                paths = list.map(function (it) { return it.path; });
+                                cat = 0; query = ""; emojiIn.text = "";
+                                w.placeSheet(emojiSheet);
+                                ox = width / 2; oy = height / 2;
+                                open = true;
+                                Qt.callLater(function () { emojiIn.forceActiveFocus(); });
+                            }
+                            function apply(e) { root.setFolderEmoji(paths, e); }
+                            function tap(e) { apply(current === e ? "" : e); }
+                            function pasteIn() { if (!pasteProc.running) pasteProc.running = true; }
+                            Process {
+                                id: pasteProc
+                                command: ["sh", "-c", "wl-paste -n 2>/dev/null | head -c 96"]
+                                stdout: StdioCollector {
+                                    onStreamFinished: {
+                                        var e = root.firstEmoji(text);
+                                        if (e !== "") { emojiSheet.apply(e); emojiIn.text = ""; emojiSheet.query = ""; }
+                                    }
+                                }
+                            }
+
+                            // ── live preview ──
+                            Item {
+                                id: hero
+                                x: 0; y: 0; width: parent.width; height: Math.round(104 * emojiSheet.k)
+                                readonly property real isz: Math.round(68 * emojiSheet.k)
                                 Image {
-                                    x: Math.round((parent.width - width) / 2); y: Math.round(8 * glyphSheet.k)
-                                    width: Math.round(40 * glyphSheet.k); height: width
+                                    id: heroImg
+                                    x: Math.round((parent.width - width) / 2); y: Math.round(2 * emojiSheet.k)
+                                    width: hero.isz; height: hero.isz
                                     sourceSize: Qt.size(width * 2, height * 2)
-                                    asynchronous: true; cache: true; smooth: true
+                                    asynchronous: true; cache: true; smooth: true; mipmap: true
                                     fillMode: Image.PreserveAspectFit
-                                    source: gcell.modelData !== "" ? gcell.src
-                                        : ((glyphSheet.tint !== "" && root.colorFolderIcon(glyphSheet.tint) !== "") ? root.colorFolderIcon(glyphSheet.tint)
-                                           : (root.dock && root.dock.iconSrc ? root.dock.iconSrc("folder") : Quickshell.iconPath("folder")))
+                                    source: emojiSheet.items.length > 0 ? root.iconSourceFor(emojiSheet.items[0]) : ""
                                 }
                                 Text {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    y: Math.round(52 * glyphSheet.k)
-                                    width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
-                                    text: gcell.modelData === "" ? I18n.tr("Default") : gcell.modelData.charAt(0).toUpperCase() + gcell.modelData.slice(1)
-                                    color: glyphSheet.fg2
-                                    font.family: root.fam; font.pixelSize: Math.max(8, Math.round(11 * glyphSheet.k))
+                                    visible: emojiSheet.current !== ""
+                                    x: heroImg.x + Math.round((heroImg.width - width) / 2)
+                                    y: heroImg.y + Math.round(heroImg.height * 0.30)
+                                    text: emojiSheet.current
+                                    font.pixelSize: Math.round(hero.isz * 0.46)
+                                    renderType: Text.QtRendering
                                 }
-                                MouseArea { id: gMa; anchors.fill: parent; hoverEnabled: true; onClicked: glyphSheet.pick(gcell.modelData) }
+                                Text {
+                                    x: Math.round(24 * emojiSheet.k); y: heroImg.y + hero.isz + Math.round(6 * emojiSheet.k)
+                                    width: parent.width - 2 * x
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideMiddle
+                                    text: emojiSheet.items.length > 1 ? (emojiSheet.items.length + " " + I18n.tr("folders"))
+                                                                      : (emojiSheet.items.length === 1 ? emojiSheet.items[0].name : "")
+                                    color: emojiSheet.fg2
+                                    font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * emojiSheet.k))
+                                }
                             }
-                        }
-                    }
-                    Text {
-                        visible: glyphSheet.one
-                        x: Math.round(20 * glyphSheet.k); y: glyphGrid.y + glyphGrid.height + Math.round(4 * glyphSheet.k)
-                        text: I18n.tr("From This Folder")
-                        color: glyphSheet.fg2
-                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * glyphSheet.k)); font.weight: Font.DemiBold
-                    }
-                    Flickable {   // two rows at most; more scroll
-                        id: filesFlick
-                        visible: glyphSheet.one
-                        x: glyphGrid.x; y: glyphGrid.y + glyphGrid.height + Math.round(24 * glyphSheet.k)
-                        width: glyphGrid.width; height: glyphSheet.fileRows * Math.round(76 * glyphSheet.k)
-                        clip: true
-                        contentHeight: filesGrid.height
-                        boundsBehavior: Flickable.StopAtBounds
-                        Grid {
-                            id: filesGrid
-                            columns: glyphSheet.cols
-                            Repeater {
-                                model: glyphSheet.files
+
+                            // ── search / paste bar ──
+                            Rectangle {
+                                id: emojiBar
+                                x: Math.round(16 * emojiSheet.k); y: Math.round(108 * emojiSheet.k)
+                                width: emojiSheet.width - 2 * x - pasteBtn.width - Math.round(8 * emojiSheet.k)
+                                height: Math.round(34 * emojiSheet.k)
+                                radius: height / 2
+                                color: emojiSheet.pillBg
+                                border.width: emojiIn.activeFocus ? 1.5 : 0
+                                border.color: root.accent
+                                TextInput {
+                                    id: emojiIn
+                                    anchors.fill: parent; anchors.leftMargin: Math.round(16 * emojiSheet.k); anchors.rightMargin: Math.round(16 * emojiSheet.k)
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: root.darkMode ? "white" : "#1d1d1f"
+                                    selectionColor: root.accent
+                                    font.family: root.fam; font.pixelSize: Math.max(10, Math.round(14 * emojiSheet.k))
+                                    selectByMouse: true
+                                    clip: true
+                                    // plain words search the emoji by name; an emoji typed or pasted here goes onto the folder
+                                    onTextEdited: {
+                                        var t = text;
+                                        if (/^[\x00-\x7f]*$/.test(t)) { emojiSheet.query = t.trim(); }
+                                        else {
+                                            var e = root.firstEmoji(t);
+                                            if (e !== "") emojiSheet.apply(e);
+                                            text = ""; emojiSheet.query = "";
+                                        }
+                                    }
+                                    Keys.onEscapePressed: emojiSheet.open = false
+                                    onAccepted: emojiSheet.open = false
+                                    Text {
+                                        visible: emojiIn.text === ""
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: I18n.tr("Search, or paste an emoji")
+                                        color: emojiSheet.fg2
+                                        font: emojiIn.font
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                id: pasteBtn
+                                x: emojiSheet.width - width - Math.round(16 * emojiSheet.k); y: emojiBar.y
+                                width: Math.round(76 * emojiSheet.k); height: emojiBar.height
+                                radius: height / 2
+                                color: pbMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
+                                                    : (pbMa.containsMouse ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.12)) : emojiSheet.pillBg)
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: I18n.tr("Paste")
+                                    color: emojiSheet.fg
+                                    font.family: root.fam; font.weight: Font.Medium; font.pixelSize: Math.max(10, Math.round(13 * emojiSheet.k))
+                                }
+                                MouseArea { id: pbMa; anchors.fill: parent; hoverEnabled: true; onClicked: emojiSheet.pasteIn() }
+                            }
+
+                            // ── category tabs (replaced by a result count while searching) ──
+                            Item {
+                                id: tabs
+                                x: Math.round(16 * emojiSheet.k); y: Math.round(150 * emojiSheet.k)
+                                width: Math.round(340 * emojiSheet.k); height: Math.round(30 * emojiSheet.k)
+                                Row {
+                                    visible: !emojiSheet.searching
+                                    Repeater {
+                                        model: emojiSheet.catIcons
+                                        delegate: Item {
+                                            required property int index
+                                            required property string modelData
+                                            width: Math.round(340 * emojiSheet.k / 9); height: tabs.height
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: Math.round(32 * emojiSheet.k); height: Math.round(26 * emojiSheet.k); radius: height / 2
+                                                color: emojiSheet.cat === index ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.13))
+                                                                                : (tbMa.containsMouse ? emojiSheet.hoverBg : "transparent")
+                                            }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: modelData
+                                                opacity: emojiSheet.cat === index ? 1 : 0.62
+                                                font.pixelSize: Math.max(10, Math.round(16 * emojiSheet.k))
+                                            }
+                                            MouseArea { id: tbMa; anchors.fill: parent; hoverEnabled: true; onClicked: { emojiSheet.cat = index; grid.positionViewAtBeginning(); } }
+                                        }
+                                    }
+                                }
+                                Text {
+                                    visible: emojiSheet.searching
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: Math.round(4 * emojiSheet.k)
+                                    text: emojiSheet.shown.length === 0 ? I18n.tr("No emoji found") : (emojiSheet.shown.length + " " + I18n.tr("results"))
+                                    color: emojiSheet.fg2
+                                    font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * emojiSheet.k))
+                                }
+                            }
+                            Rectangle {
+                                x: Math.round(16 * emojiSheet.k); y: Math.round(184 * emojiSheet.k)
+                                width: emojiSheet.width - 2 * x; height: 1
+                                color: emojiSheet.dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.09)
+                            }
+
+                            // ── the emoji ──
+                            GridView {
+                                id: grid
+                                x: Math.round(16 * emojiSheet.k); y: Math.round(190 * emojiSheet.k)
+                                width: Math.round(340 * emojiSheet.k); height: Math.round(178 * emojiSheet.k)
+                                clip: true
+                                cellWidth: Math.round(340 * emojiSheet.k / 8); cellHeight: Math.round(38 * emojiSheet.k)
+                                boundsBehavior: Flickable.StopAtBounds
+                                model: emojiSheet.shown
                                 delegate: Item {
-                                    id: fcell
+                                    id: ec
                                     required property string modelData
-                                    width: Math.round(64 * glyphSheet.k); height: Math.round(76 * glyphSheet.k)
+                                    width: grid.cellWidth; height: grid.cellHeight
+                                    readonly property bool chosen: emojiSheet.current === modelData
                                     Rectangle {
-                                        anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
-                                        radius: Math.round(10 * glyphSheet.k)
-                                        color: fMa.containsMouse ? (glyphSheet.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.09)) : "transparent"
-                                        // a video's folder picture is a copy of its still, under the same name
-                                        readonly property string still: glyphSheet.thumbs[fcell.modelData] || ""
-                                        border.width: glyphSheet.pic === fcell.modelData || (still !== "" && glyphSheet.pic.endsWith(still.substring(still.lastIndexOf("/")))) ? 2 : 0
+                                        anchors.fill: parent; anchors.margins: Math.round(2 * emojiSheet.k)
+                                        radius: Math.round(9 * emojiSheet.k)
+                                        color: ec.chosen ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.38) : (ecMa.containsMouse ? emojiSheet.hoverBg : "transparent")
+                                        border.width: ec.chosen ? 1.5 : 0
                                         border.color: root.accent
                                     }
-                                    Image {
-                                        x: Math.round((parent.width - width) / 2); y: Math.round(8 * glyphSheet.k)
-                                        width: Math.round(40 * glyphSheet.k); height: width
-                                        sourceSize: Qt.size(width * 2, height * 2)
-                                        asynchronous: true; cache: true; smooth: true
-                                        fillMode: Image.PreserveAspectFit
-                                        source: glyphSheet.thumbs[fcell.modelData] ? root.fileUrl(glyphSheet.thumbs[fcell.modelData]) : root.pathIcon(fcell.modelData)
-                                    }
-                                    Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        y: Math.round(52 * glyphSheet.k)
-                                        width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
-                                        text: fcell.modelData.substring(fcell.modelData.lastIndexOf("/") + 1)
-                                        color: glyphSheet.fg2
-                                        font.family: root.fam; font.pixelSize: Math.max(8, Math.round(11 * glyphSheet.k))
-                                    }
-                                    MouseArea { id: fMa; anchors.fill: parent; hoverEnabled: true; onClicked: glyphSheet.usePic(fcell.modelData) }
-                                }
-                            }
-                        }
-                    }
-                    Text {
-                        visible: glyphSheet.one && glyphSheet.listed && glyphSheet.files.length === 0
-                        anchors.centerIn: filesFlick
-                        text: I18n.tr("No files in this folder")
-                        color: glyphSheet.fg2
-                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * glyphSheet.k))
-                    }
-                    Rectangle {
-                        x: Math.round(18 * glyphSheet.k)
-                        y: (glyphSheet.one ? filesFlick.y + filesFlick.height : glyphGrid.y + glyphGrid.height) + Math.round(8 * glyphSheet.k)
-                        width: cpText.implicitWidth + Math.round(28 * glyphSheet.k); height: Math.round(28 * glyphSheet.k)
-                        radius: Math.round(11 * glyphSheet.k)
-                        color: cpMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
-                                            : (root.darkMode ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.09))
-                        Text {
-                            id: cpText
-                            anchors.centerIn: parent
-                            text: I18n.tr("Choose Picture…")
-                            color: glyphSheet.fg
-                            font.family: root.fam; font.pixelSize: Math.max(10, Math.round(13 * glyphSheet.k))
-                        }
-                        MouseArea { id: cpMa; anchors.fill: parent; onClicked: glyphSheet.choosePicture() }
-                    }
-                }
-
-                // ───────── Folder Emoji (put any emoji on a folder) ─────────
-                // A live preview of the folder on top, a search / paste bar, the category tabs and the full emoji set. Tapping an emoji puts it
-                // on the folder at once (tap the chosen one again, or "Remove Emoji", to take it off). The sheet stays open until Done.
-                DesktopSheet {
-                    warm: w.warm
-                    id: emojiSheet
-                    z: 60
-                    property var items: []
-                    property var paths: []
-                    property int cat: 0
-                    property string query: ""
-                    readonly property bool searching: query !== ""
-                    readonly property string current: paths.length > 0 ? (root.folderEmoji[paths[0]] || "") : ""
-                    readonly property var catIcons: ["😀", "👋", "🐻", "🍔", "✈️", "⚽", "💡", "🔣", "🏳️"]
-                    readonly property var shown: {
-                        var out = [], L = EmojiData.list, q = query.toLowerCase();
-                        for (var i = 0; i < L.length; i++) {
-                            if (q !== "" ? L[i][4].indexOf(q) >= 0 : L[i][3] === cat) out.push(L[i][0]);
-                        }
-                        return out;
-                    }
-                    readonly property color hoverBg: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.08)
-                    readonly property color pillBg: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
-                    title: I18n.tr("Folder Emoji")
-                    backdrop: desktopGlassBackdrop
-                    glass: root.dock
-                    dark: root.darkMode
-                    fam: root.fam
-                    k: root.dock ? root.dock.labelK : 1
-                    contentW: 372
-                    contentH: 424
-                    onCloseRequested: open = false
-                    function begin(list) {
-                        if (!list || list.length === 0) return;
-                        items = list;
-                        paths = list.map(function (it) { return it.path; });
-                        cat = 0; query = ""; emojiIn.text = "";
-                        w.placeSheet(emojiSheet);
-                        ox = width / 2; oy = height / 2;
-                        open = true;
-                        Qt.callLater(function () { emojiIn.forceActiveFocus(); });
-                    }
-                    function apply(e) { root.setFolderEmoji(paths, e); }
-                    function tap(e) { apply(current === e ? "" : e); }
-                    function pasteIn() { if (!pasteProc.running) pasteProc.running = true; }
-                    Process {
-                        id: pasteProc
-                        command: ["sh", "-c", "wl-paste -n 2>/dev/null | head -c 96"]
-                        stdout: StdioCollector {
-                            onStreamFinished: {
-                                var e = root.firstEmoji(text);
-                                if (e !== "") { emojiSheet.apply(e); emojiIn.text = ""; emojiSheet.query = ""; }
-                            }
-                        }
-                    }
-
-                    // ── live preview ──
-                    Item {
-                        id: hero
-                        x: 0; y: 0; width: parent.width; height: Math.round(104 * emojiSheet.k)
-                        readonly property real isz: Math.round(68 * emojiSheet.k)
-                        Image {
-                            id: heroImg
-                            x: Math.round((parent.width - width) / 2); y: Math.round(2 * emojiSheet.k)
-                            width: hero.isz; height: hero.isz
-                            sourceSize: Qt.size(width * 2, height * 2)
-                            asynchronous: true; cache: true; smooth: true; mipmap: true
-                            fillMode: Image.PreserveAspectFit
-                            source: emojiSheet.items.length > 0 ? root.iconSourceFor(emojiSheet.items[0]) : ""
-                        }
-                        Text {
-                            visible: emojiSheet.current !== ""
-                            x: heroImg.x + Math.round((heroImg.width - width) / 2)
-                            y: heroImg.y + Math.round(heroImg.height * 0.30)
-                            text: emojiSheet.current
-                            font.pixelSize: Math.round(hero.isz * 0.46)
-                            renderType: Text.QtRendering
-                        }
-                        Text {
-                            x: Math.round(24 * emojiSheet.k); y: heroImg.y + hero.isz + Math.round(6 * emojiSheet.k)
-                            width: parent.width - 2 * x
-                            horizontalAlignment: Text.AlignHCenter
-                            elide: Text.ElideMiddle
-                            text: emojiSheet.items.length > 1 ? (emojiSheet.items.length + " " + I18n.tr("folders"))
-                                                              : (emojiSheet.items.length === 1 ? emojiSheet.items[0].name : "")
-                            color: emojiSheet.fg2
-                            font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * emojiSheet.k))
-                        }
-                    }
-
-                    // ── search / paste bar ──
-                    Rectangle {
-                        id: emojiBar
-                        x: Math.round(16 * emojiSheet.k); y: Math.round(108 * emojiSheet.k)
-                        width: emojiSheet.width - 2 * x - pasteBtn.width - Math.round(8 * emojiSheet.k)
-                        height: Math.round(34 * emojiSheet.k)
-                        radius: height / 2
-                        color: emojiSheet.pillBg
-                        border.width: emojiIn.activeFocus ? 1.5 : 0
-                        border.color: root.accent
-                        TextInput {
-                            id: emojiIn
-                            anchors.fill: parent; anchors.leftMargin: Math.round(16 * emojiSheet.k); anchors.rightMargin: Math.round(16 * emojiSheet.k)
-                            verticalAlignment: TextInput.AlignVCenter
-                            color: root.darkMode ? "white" : "#1d1d1f"
-                            selectionColor: root.accent
-                            font.family: root.fam; font.pixelSize: Math.max(10, Math.round(14 * emojiSheet.k))
-                            selectByMouse: true
-                            clip: true
-                            // plain words search the emoji by name; an emoji typed or pasted here goes onto the folder
-                            onTextEdited: {
-                                var t = text;
-                                if (/^[\x00-\x7f]*$/.test(t)) { emojiSheet.query = t.trim(); }
-                                else {
-                                    var e = root.firstEmoji(t);
-                                    if (e !== "") emojiSheet.apply(e);
-                                    text = ""; emojiSheet.query = "";
-                                }
-                            }
-                            Keys.onEscapePressed: emojiSheet.open = false
-                            onAccepted: emojiSheet.open = false
-                            Text {
-                                visible: emojiIn.text === ""
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: I18n.tr("Search, or paste an emoji")
-                                color: emojiSheet.fg2
-                                font: emojiIn.font
-                            }
-                        }
-                    }
-                    Rectangle {
-                        id: pasteBtn
-                        x: emojiSheet.width - width - Math.round(16 * emojiSheet.k); y: emojiBar.y
-                        width: Math.round(76 * emojiSheet.k); height: emojiBar.height
-                        radius: height / 2
-                        color: pbMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
-                                            : (pbMa.containsMouse ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.12)) : emojiSheet.pillBg)
-                        Text {
-                            anchors.centerIn: parent
-                            text: I18n.tr("Paste")
-                            color: emojiSheet.fg
-                            font.family: root.fam; font.weight: Font.Medium; font.pixelSize: Math.max(10, Math.round(13 * emojiSheet.k))
-                        }
-                        MouseArea { id: pbMa; anchors.fill: parent; hoverEnabled: true; onClicked: emojiSheet.pasteIn() }
-                    }
-
-                    // ── category tabs (replaced by a result count while searching) ──
-                    Item {
-                        id: tabs
-                        x: Math.round(16 * emojiSheet.k); y: Math.round(150 * emojiSheet.k)
-                        width: Math.round(340 * emojiSheet.k); height: Math.round(30 * emojiSheet.k)
-                        Row {
-                            visible: !emojiSheet.searching
-                            Repeater {
-                                model: emojiSheet.catIcons
-                                delegate: Item {
-                                    required property int index
-                                    required property string modelData
-                                    width: Math.round(340 * emojiSheet.k / 9); height: tabs.height
-                                    Rectangle {
-                                        anchors.centerIn: parent
-                                        width: Math.round(32 * emojiSheet.k); height: Math.round(26 * emojiSheet.k); radius: height / 2
-                                        color: emojiSheet.cat === index ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.13))
-                                                                        : (tbMa.containsMouse ? emojiSheet.hoverBg : "transparent")
-                                    }
                                     Text {
                                         anchors.centerIn: parent
-                                        text: modelData
-                                        opacity: emojiSheet.cat === index ? 1 : 0.62
-                                        font.pixelSize: Math.max(10, Math.round(16 * emojiSheet.k))
+                                        text: ec.modelData
+                                        font.pixelSize: Math.max(10, Math.round(22 * emojiSheet.k))
+                                        renderType: Text.QtRendering
                                     }
-                                    MouseArea { id: tbMa; anchors.fill: parent; hoverEnabled: true; onClicked: { emojiSheet.cat = index; grid.positionViewAtBeginning(); } }
+                                    MouseArea { id: ecMa; anchors.fill: parent; hoverEnabled: true; onClicked: emojiSheet.tap(ec.modelData) }
                                 }
                             }
-                        }
-                        Text {
-                            visible: emojiSheet.searching
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: Math.round(4 * emojiSheet.k)
-                            text: emojiSheet.shown.length === 0 ? I18n.tr("No emoji found") : (emojiSheet.shown.length + " " + I18n.tr("results"))
-                            color: emojiSheet.fg2
-                            font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * emojiSheet.k))
-                        }
-                    }
-                    Rectangle {
-                        x: Math.round(16 * emojiSheet.k); y: Math.round(184 * emojiSheet.k)
-                        width: emojiSheet.width - 2 * x; height: 1
-                        color: emojiSheet.dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.09)
-                    }
 
-                    // ── the emoji ──
-                    GridView {
-                        id: grid
-                        x: Math.round(16 * emojiSheet.k); y: Math.round(190 * emojiSheet.k)
-                        width: Math.round(340 * emojiSheet.k); height: Math.round(178 * emojiSheet.k)
-                        clip: true
-                        cellWidth: Math.round(340 * emojiSheet.k / 8); cellHeight: Math.round(38 * emojiSheet.k)
-                        boundsBehavior: Flickable.StopAtBounds
-                        model: emojiSheet.shown
-                        delegate: Item {
-                            id: ec
-                            required property string modelData
-                            width: grid.cellWidth; height: grid.cellHeight
-                            readonly property bool chosen: emojiSheet.current === modelData
+                            // ── footer: remove / done ──
                             Rectangle {
-                                anchors.fill: parent; anchors.margins: Math.round(2 * emojiSheet.k)
-                                radius: Math.round(9 * emojiSheet.k)
-                                color: ec.chosen ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.38) : (ecMa.containsMouse ? emojiSheet.hoverBg : "transparent")
-                                border.width: ec.chosen ? 1.5 : 0
-                                border.color: root.accent
+                                id: removeBtn
+                                readonly property bool live: emojiSheet.current !== ""
+                                x: Math.round(16 * emojiSheet.k); y: Math.round(378 * emojiSheet.k)
+                                width: Math.round(128 * emojiSheet.k); height: Math.round(34 * emojiSheet.k)
+                                radius: height / 2
+                                opacity: live ? 1 : 0.38
+                                color: live && rmMa.containsMouse ? Qt.rgba(1, 0.27, 0.23, 0.26) : Qt.rgba(1, 0.27, 0.23, 0.14)
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: I18n.tr("Remove Emoji")
+                                    color: "#FF6A5F"
+                                    font.family: root.fam; font.weight: Font.Medium; font.pixelSize: Math.max(10, Math.round(13 * emojiSheet.k))
+                                }
+                                MouseArea { id: rmMa; anchors.fill: parent; hoverEnabled: true; enabled: removeBtn.live; onClicked: emojiSheet.apply("") }
+                            }
+                            Rectangle {
+                                x: emojiSheet.width - width - Math.round(16 * emojiSheet.k); y: removeBtn.y
+                                width: Math.round(92 * emojiSheet.k); height: removeBtn.height
+                                radius: height / 2
+                                color: dnMa.pressed ? Qt.darker(root.accent, 1.2) : root.accent
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: I18n.tr("Done")
+                                    color: "white"
+                                    font.family: root.fam; font.weight: Font.DemiBold; font.pixelSize: Math.max(10, Math.round(13 * emojiSheet.k))
+                                }
+                                MouseArea { id: dnMa; anchors.fill: parent; onClicked: emojiSheet.open = false }
+                            }
+                        }
+
+                        // ───────── Add Folder to Desktop ─────────
+                        DesktopSheet {
+                            id: linkSheet
+                            z: 60
+                            property string error: ""
+                            title: I18n.tr("Add Folder to Desktop")
+                            backdrop: sheetSnap
+                            ready: sheetWin.snapReady
+                            glass: root.dock
+                            dark: root.darkMode
+                            fam: root.fam
+                            k: root.dock ? root.dock.labelK : 1
+                            contentW: 420; contentH: 128
+                            onCloseRequested: open = false
+                            function begin() {
+                                error = "";
+                                pathIn.text = "";
+                                w.placeSheet(linkSheet);
+                                ox = width / 2; oy = height / 2;
+                                open = true;
+                                Qt.callLater(function () { pathIn.forceActiveFocus(); });
+                            }
+                            function commit() {
+                                var t = pathIn.text.trim();
+                                if (t === "") { error = I18n.tr("Type or choose a folder."); return; }
+                                error = "";
+                                root.linkFolder(t);
+                            }
+                            Connections {
+                                target: root
+                                function onLinkFinished(code) {
+                                    if (!linkSheet.open) return;
+                                    if (code === 0) linkSheet.open = false;
+                                    else linkSheet.error = I18n.tr("That folder doesn't exist.");
+                                }
+                                function onPathPicked(p) { if (linkSheet.open) { pathIn.text = p; linkSheet.error = ""; } }
                             }
                             Text {
-                                anchors.centerIn: parent
-                                text: ec.modelData
-                                font.pixelSize: Math.max(10, Math.round(22 * emojiSheet.k))
-                                renderType: Text.QtRendering
-                            }
-                            MouseArea { id: ecMa; anchors.fill: parent; hoverEnabled: true; onClicked: emojiSheet.tap(ec.modelData) }
-                        }
-                    }
-
-                    // ── footer: remove / done ──
-                    Rectangle {
-                        id: removeBtn
-                        readonly property bool live: emojiSheet.current !== ""
-                        x: Math.round(16 * emojiSheet.k); y: Math.round(378 * emojiSheet.k)
-                        width: Math.round(128 * emojiSheet.k); height: Math.round(34 * emojiSheet.k)
-                        radius: height / 2
-                        opacity: live ? 1 : 0.38
-                        color: live && rmMa.containsMouse ? Qt.rgba(1, 0.27, 0.23, 0.26) : Qt.rgba(1, 0.27, 0.23, 0.14)
-                        Text {
-                            anchors.centerIn: parent
-                            text: I18n.tr("Remove Emoji")
-                            color: "#FF6A5F"
-                            font.family: root.fam; font.weight: Font.Medium; font.pixelSize: Math.max(10, Math.round(13 * emojiSheet.k))
-                        }
-                        MouseArea { id: rmMa; anchors.fill: parent; hoverEnabled: true; enabled: removeBtn.live; onClicked: emojiSheet.apply("") }
-                    }
-                    Rectangle {
-                        x: emojiSheet.width - width - Math.round(16 * emojiSheet.k); y: removeBtn.y
-                        width: Math.round(92 * emojiSheet.k); height: removeBtn.height
-                        radius: height / 2
-                        color: dnMa.pressed ? Qt.darker(root.accent, 1.2) : root.accent
-                        Text {
-                            anchors.centerIn: parent
-                            text: I18n.tr("Done")
-                            color: "white"
-                            font.family: root.fam; font.weight: Font.DemiBold; font.pixelSize: Math.max(10, Math.round(13 * emojiSheet.k))
-                        }
-                        MouseArea { id: dnMa; anchors.fill: parent; onClicked: emojiSheet.open = false }
-                    }
-                }
-
-                // ───────── Add Folder to Desktop ─────────
-                DesktopSheet {
-                    warm: w.warm
-                    id: linkSheet
-                    z: 60
-                    property string error: ""
-                    title: I18n.tr("Add Folder to Desktop")
-                    backdrop: desktopGlassBackdrop
-                    glass: root.dock
-                    dark: root.darkMode
-                    fam: root.fam
-                    k: root.dock ? root.dock.labelK : 1
-                    contentW: 420; contentH: 128
-                    onCloseRequested: open = false
-                    function begin() {
-                        error = "";
-                        pathIn.text = "";
-                        w.placeSheet(linkSheet);
-                        ox = width / 2; oy = height / 2;
-                        open = true;
-                        Qt.callLater(function () { pathIn.forceActiveFocus(); });
-                    }
-                    function commit() {
-                        var t = pathIn.text.trim();
-                        if (t === "") { error = I18n.tr("Type or choose a folder."); return; }
-                        error = "";
-                        root.linkFolder(t);
-                    }
-                    Connections {
-                        target: root
-                        function onLinkFinished(code) {
-                            if (!linkSheet.open) return;
-                            if (code === 0) linkSheet.open = false;
-                            else linkSheet.error = I18n.tr("That folder doesn't exist.");
-                        }
-                        function onPathPicked(p) { if (linkSheet.open) { pathIn.text = p; linkSheet.error = ""; } }
-                    }
-                    Text {
-                        x: Math.round(18 * linkSheet.k); y: Math.round(0 * linkSheet.k)
-                        text: I18n.tr("Shows the folder on your desktop as a link. The original stays where it is.")
-                        width: linkSheet.width - 2 * x
-                        wrapMode: Text.Wrap
-                        color: linkSheet.fg2
-                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * linkSheet.k))
-                    }
-                    Rectangle {
-                        id: pathBox
-                        x: Math.round(18 * linkSheet.k); y: Math.round(40 * linkSheet.k)
-                        width: linkSheet.width - 2 * x - chooseBtn.width - Math.round(8 * linkSheet.k)
-                        height: Math.round(36 * linkSheet.k)
-                        radius: Math.round(11 * linkSheet.k)
-                        color: root.darkMode ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
-                        TextInput {
-                            id: pathIn
-                            anchors.fill: parent; anchors.leftMargin: Math.round(12 * linkSheet.k); anchors.rightMargin: Math.round(12 * linkSheet.k)
-                            verticalAlignment: TextInput.AlignVCenter
-                            color: root.darkMode ? "white" : "#1d1d1f"
-                            selectionColor: root.accent
-                            font.family: root.fam; font.pixelSize: Math.max(10, Math.round(14 * linkSheet.k))
-                            selectByMouse: true
-                            clip: true
-                            onAccepted: linkSheet.commit()
-                            onTextChanged: linkSheet.error = ""
-                            Keys.onEscapePressed: linkSheet.open = false
-                            Text {
-                                visible: pathIn.text === ""
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "/home/" + (Quickshell.env("USER") || "user")
+                                x: Math.round(18 * linkSheet.k); y: Math.round(0 * linkSheet.k)
+                                text: I18n.tr("Shows the folder on your desktop as a link. The original stays where it is.")
+                                width: linkSheet.width - 2 * x
+                                wrapMode: Text.Wrap
                                 color: linkSheet.fg2
-                                font: pathIn.font
+                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * linkSheet.k))
+                            }
+                            Rectangle {
+                                id: pathBox
+                                x: Math.round(18 * linkSheet.k); y: Math.round(40 * linkSheet.k)
+                                width: linkSheet.width - 2 * x - chooseBtn.width - Math.round(8 * linkSheet.k)
+                                height: Math.round(36 * linkSheet.k)
+                                radius: Math.round(11 * linkSheet.k)
+                                color: root.darkMode ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
+                                TextInput {
+                                    id: pathIn
+                                    anchors.fill: parent; anchors.leftMargin: Math.round(12 * linkSheet.k); anchors.rightMargin: Math.round(12 * linkSheet.k)
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: root.darkMode ? "white" : "#1d1d1f"
+                                    selectionColor: root.accent
+                                    font.family: root.fam; font.pixelSize: Math.max(10, Math.round(14 * linkSheet.k))
+                                    selectByMouse: true
+                                    clip: true
+                                    onAccepted: linkSheet.commit()
+                                    onTextChanged: linkSheet.error = ""
+                                    Keys.onEscapePressed: linkSheet.open = false
+                                    Text {
+                                        visible: pathIn.text === ""
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "/home/" + (Quickshell.env("USER") || "user")
+                                        color: linkSheet.fg2
+                                        font: pathIn.font
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                id: chooseBtn
+                                x: pathBox.x + pathBox.width + Math.round(8 * linkSheet.k); y: pathBox.y
+                                width: Math.round(84 * linkSheet.k); height: pathBox.height
+                                radius: Math.round(11 * linkSheet.k)
+                                color: chMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
+                                                    : (root.darkMode ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.09))
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: I18n.tr("Choose…")
+                                    color: linkSheet.fg
+                                    font.family: root.fam; font.pixelSize: Math.max(10, Math.round(13 * linkSheet.k))
+                                }
+                                MouseArea { id: chMa; anchors.fill: parent; onClicked: root.pickFolder() }
+                            }
+                            Text {
+                                x: Math.round(18 * linkSheet.k); y: Math.round(88 * linkSheet.k)
+                                width: linkSheet.width - 2 * x - addBtn.width - Math.round(10 * linkSheet.k)
+                                text: linkSheet.error
+                                color: "#FF6A5F"
+                                font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * linkSheet.k))
+                                elide: Text.ElideRight
+                            }
+                            Rectangle {
+                                id: addBtn
+                                x: linkSheet.width - width - Math.round(18 * linkSheet.k); y: Math.round(84 * linkSheet.k)
+                                width: Math.round(84 * linkSheet.k); height: Math.round(34 * linkSheet.k)
+                                radius: Math.round(11 * linkSheet.k)
+                                color: addMa.pressed ? Qt.darker(root.accent, 1.2) : root.accent
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: I18n.tr("Add")
+                                    color: "white"
+                                    font.family: root.fam; font.weight: Font.DemiBold; font.pixelSize: Math.max(10, Math.round(13 * linkSheet.k))
+                                }
+                                MouseArea { id: addMa; anchors.fill: parent; onClicked: linkSheet.commit() }
                             }
                         }
-                    }
-                    Rectangle {
-                        id: chooseBtn
-                        x: pathBox.x + pathBox.width + Math.round(8 * linkSheet.k); y: pathBox.y
-                        width: Math.round(84 * linkSheet.k); height: pathBox.height
-                        radius: Math.round(11 * linkSheet.k)
-                        color: chMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
-                                            : (root.darkMode ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.09))
-                        Text {
-                            anchors.centerIn: parent
-                            text: I18n.tr("Choose…")
-                            color: linkSheet.fg
-                            font.family: root.fam; font.pixelSize: Math.max(10, Math.round(13 * linkSheet.k))
-                        }
-                        MouseArea { id: chMa; anchors.fill: parent; onClicked: root.pickFolder() }
-                    }
-                    Text {
-                        x: Math.round(18 * linkSheet.k); y: Math.round(88 * linkSheet.k)
-                        width: linkSheet.width - 2 * x - addBtn.width - Math.round(10 * linkSheet.k)
-                        text: linkSheet.error
-                        color: "#FF6A5F"
-                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * linkSheet.k))
-                        elide: Text.ElideRight
-                    }
-                    Rectangle {
-                        id: addBtn
-                        x: linkSheet.width - width - Math.round(18 * linkSheet.k); y: Math.round(84 * linkSheet.k)
-                        width: Math.round(84 * linkSheet.k); height: Math.round(34 * linkSheet.k)
-                        radius: Math.round(11 * linkSheet.k)
-                        color: addMa.pressed ? Qt.darker(root.accent, 1.2) : root.accent
-                        Text {
-                            anchors.centerIn: parent
-                            text: I18n.tr("Add")
-                            color: "white"
-                            font.family: root.fam; font.weight: Font.DemiBold; font.pixelSize: Math.max(10, Math.round(13 * linkSheet.k))
-                        }
-                        MouseArea { id: addMa; anchors.fill: parent; onClicked: linkSheet.commit() }
                     }
                 }
             }
