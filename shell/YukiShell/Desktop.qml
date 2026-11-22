@@ -267,7 +267,7 @@ Scope {
     // ── folder glyphs (the symbol on a folder: code, music, games, ...) ──
     // The icon pack ships folder_color_<colour>_<glyph>.svg. path → glyph name, kept in ~/.config/yukishell/desktop-glyphs.json.
     property var folderGlyphs: ({})
-    property var glyphList: ["code", "desktop", "documents", "downloads", "games", "github", "music", "pictures", "projects", "public", "steam", "templates"]
+    property var glyphList: ["code", "desktop", "documents", "downloads", "games", "github", "music", "pictures", "projects", "public", "steam", "templates", "videos"]
     FileView {
         id: glyphFile
         path: root.home + "/.config/yukishell/desktop-glyphs.json"
@@ -331,7 +331,16 @@ Scope {
     // the icon for a folder colour + glyph, "" when the pack has no such file
     function glyphIcon(color, glyph) {
         if (!glyph) return "";
-        return Quickshell.iconPath("folder_color_" + (color || "blue") + "_" + glyph, true);
+        var a = Quickshell.iconPath("folder_color_" + (color || "blue") + "_" + glyph, true);
+        if (a !== "") return a;
+        // Papirus and the like: folder-<colour>-<glyph>, folder-<glyph> in the theme's own colour
+        return Quickshell.iconPath(color ? "folder-" + packColor(color) + "-" + glyph : "folder-" + glyph, true);
+    }
+    function packColor(c) { return c === "purple" ? "violet" : (c === "gray" ? "grey" : c); }
+    // the icon pack's own folder in a colour (folder_color_green, or Papirus' folder-green), "" when it has none
+    function colorFolderIcon(c) {
+        var a = Quickshell.iconPath("folder_color_" + c, true);
+        return a !== "" ? a : Quickshell.iconPath("folder-" + packColor(c), true);
     }
     function setFolderColor(paths, name) {
         setFolderPic(paths, "");
@@ -358,6 +367,20 @@ Scope {
         Quickshell.execDetached(["sh", "-c", "mkdir -p \"$HOME/.config/yukishell\" && printf '%s' \"$1\" > \"$HOME/.config/yukishell/desktop-folder-icons.json\"", "sh", JSON.stringify(m)]);
     }
     function isPicturePath(p) { return /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(p); }
+    function isVideoPath(p) { return /\.(mp4|webm|mkv|mov|m4v)$/i.test(p); }
+    // a video's still lives in the cache, which may be cleared: it's copied to ~/.local/share/yukishell/folder-icons for the folder
+    // shortcut: copies are never removed (about 20 KB each); clean up unused ones if that ever adds up
+    property var keepFor: []
+    function keepPicture(paths, src) {
+        keepFor = paths;
+        keepProc.running = false;
+        keepProc.command = ["sh", "-c", "d=\"$HOME/.local/share/yukishell/folder-icons\"; mkdir -p \"$d\" && cp -f -- \"$1\" \"$d/\" && printf '%s' \"$d/${1##*/}\"", "sh", src];
+        keepProc.running = true;
+    }
+    Process {
+        id: keepProc
+        stdout: StdioCollector { onStreamFinished: { var t = text.trim(); if (t !== "") root.setFolderPic(root.keepFor, t); } }
+    }
     // the picture for any file: the picture itself, an app's icon, else its type's icon
     function pathIcon(p) {
         if (isPicturePath(p)) return fileUrl(p);
@@ -465,7 +488,7 @@ Scope {
             if (gi !== "") return gi;
             if (c && folderPalette[c] !== undefined) {
                 // the icon pack's own coloured folder first: folder_color_<name> (folder_color_green.svg, ...)
-                var pk = Quickshell.iconPath("folder_color_" + c, true);
+                var pk = colorFolderIcon(c);
                 if (pk !== "") return pk;
                 // the pack has none of that colour: the built-in generated SVG
                 if (folderIconsReady) return fileUrl(folderDir + "/" + c + ".svg");
@@ -1480,6 +1503,7 @@ Scope {
                     readonly property string pic: paths.length > 0 ? (root.folderPics[paths[0]] || "") : ""
                     readonly property bool one: paths.length === 1
                     property var files: []
+                    property var thumbs: ({})          // video → its still
                     property bool listed: false
                     readonly property int fileRows: Math.min(2, Math.max(1, Math.ceil(files.length / cols)))
                     title: I18n.tr("Folder Icon")
@@ -1494,27 +1518,46 @@ Scope {
                     function begin(p) {
                         if (!p || p.length === 0) return;
                         paths = p;
-                        files = []; listed = false;
+                        files = []; thumbs = ({}); listed = false;
                         if (p.length === 1) { filesProc.running = false; filesProc.command = filesProc.cmd.concat([p[0]]); filesProc.running = true; }
                         w.placeSheet(glyphSheet);
                         ox = width / 2; oy = height / 2;
                         open = true;
                     }
                     function pick(g) { root.setFolderGlyph(paths, g); open = false; }
-                    function usePic(f) { root.setFolderPic(paths, f); open = false; }
+                    function usePic(f) { if (thumbs[f]) root.keepPicture(paths, thumbs[f]); else root.setFolderPic(paths, f); open = false; }
                     function choosePicture() { root.pickPicture(paths); open = false; }
                     Process {
                         id: filesProc
-                        // the folder first, so a late answer for another folder is ignored
-                        readonly property var cmd: ["sh", "-c", "printf '%s\\n' \"$1\"; cd -- \"$1\" && find -L . -mindepth 1 -maxdepth 1 ! -name '.*' ! -type d -printf '%f\\n' | sort -f", "sh"]
-                        stdout: StdioCollector {
-                            onStreamFinished: {
-                                var l = text.split("\n").filter(function (x) { return x !== ""; });
-                                if (l.length === 0 || l[0] !== glyphSheet.paths[0]) return;
-                                var d = l.shift();
-                                l = l.filter(root.isPicturePath).concat(l.filter(function (x) { return !root.isPicturePath(x); }));
-                                glyphSheet.files = l.slice(0, 48).map(function (x) { return d + "/" + x; });
-                                glyphSheet.listed = true;
+                        // the folder first (a late answer for another folder is ignored), every file, then a still of each video, made into
+                        // the wallpaper picker's cache under the same names, so either one's stills serve both
+                        readonly property var cmd: ["sh", "-c", "printf 'D\\t%s\\n' \"$1\"; cd -- \"$1\" || exit; "
+                            + "find -L . -mindepth 1 -maxdepth 1 ! -name '.*' ! -type d -printf 'F\\t%f\\n' | sort -f; printf 'E\\n'; "
+                            + "tc=\"$HOME/.cache/yukishell/thumbs\"; mkdir -p \"$tc\"; "
+                            + "find -L . -mindepth 1 -maxdepth 1 ! -name '.*' -type f -printf '%f\\n' | grep -iE '[.](mp4|webm|mkv|mov|m4v)$' | sort -f | head -n 48 | "
+                            + "while IFS= read -r f; do v=\"$1/$f\"; t=\"$tc/$(printf '%s:%s' \"$v\" \"$(stat -c %Y \"$v\" 2>/dev/null)\" | md5sum | cut -c1-16).jpg\"; "
+                            + "[ -s \"$t\" ] || nice -n 15 ffmpeg -loglevel error -y -ss 1 -i \"$v\" -frames:v 1 -vf 'scale=360:-2' \"$t\" </dev/null >/dev/null 2>&1; "
+                            + "[ -s \"$t\" ] && printf 'T\\t%s\\t%s\\n' \"$f\" \"$t\"; done", "sh"]
+                        property string dir: ""
+                        property var acc: []
+                        stdout: SplitParser {
+                            onRead: data => {
+                                var c = data.split("\t");
+                                if (c[0] === "D") { filesProc.dir = c[1]; filesProc.acc = []; return; }
+                                if (filesProc.dir !== glyphSheet.paths[0]) return;
+                                var d = filesProc.dir;
+                                if (c[0] === "F") { var a = filesProc.acc; a.push(c[1]); filesProc.acc = a; }
+                                else if (c[0] === "E") {   // pictures, then videos, then the rest
+                                    var l = filesProc.acc;
+                                    var rest = l.filter(function (x) { return !root.isPicturePath(x) && !root.isVideoPath(x); });
+                                    l = l.filter(root.isPicturePath).concat(l.filter(root.isVideoPath)).concat(rest);
+                                    glyphSheet.files = l.slice(0, 48).map(function (x) { return d + "/" + x; });
+                                    glyphSheet.listed = true;
+                                } else if (c[0] === "T") {
+                                    var m = Object.assign({}, glyphSheet.thumbs);
+                                    m[d + "/" + c[1]] = c[2];
+                                    glyphSheet.thumbs = m;
+                                }
                             }
                         }
                     }
@@ -1544,7 +1587,7 @@ Scope {
                                     asynchronous: true; cache: true; smooth: true
                                     fillMode: Image.PreserveAspectFit
                                     source: gcell.modelData !== "" ? gcell.src
-                                        : ((glyphSheet.tint !== "" && Quickshell.iconPath("folder_color_" + glyphSheet.tint, true) !== "") ? Quickshell.iconPath("folder_color_" + glyphSheet.tint, true)
+                                        : ((glyphSheet.tint !== "" && root.colorFolderIcon(glyphSheet.tint) !== "") ? root.colorFolderIcon(glyphSheet.tint)
                                            : (root.dock && root.dock.iconSrc ? root.dock.iconSrc("folder") : Quickshell.iconPath("folder")))
                                 }
                                 Text {
@@ -1587,7 +1630,9 @@ Scope {
                                         anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
                                         radius: Math.round(10 * glyphSheet.k)
                                         color: fMa.containsMouse ? (glyphSheet.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.09)) : "transparent"
-                                        border.width: glyphSheet.pic === fcell.modelData ? 2 : 0
+                                        // a video's folder picture is a copy of its still, under the same name
+                                        readonly property string still: glyphSheet.thumbs[fcell.modelData] || ""
+                                        border.width: glyphSheet.pic === fcell.modelData || (still !== "" && glyphSheet.pic.endsWith(still.substring(still.lastIndexOf("/")))) ? 2 : 0
                                         border.color: root.accent
                                     }
                                     Image {
@@ -1596,7 +1641,7 @@ Scope {
                                         sourceSize: Qt.size(width * 2, height * 2)
                                         asynchronous: true; cache: true; smooth: true
                                         fillMode: Image.PreserveAspectFit
-                                        source: root.pathIcon(fcell.modelData)
+                                        source: glyphSheet.thumbs[fcell.modelData] ? root.fileUrl(glyphSheet.thumbs[fcell.modelData]) : root.pathIcon(fcell.modelData)
                                     }
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
