@@ -6447,8 +6447,10 @@ Scope {
 
                 Item {
                     id: maskItem
-                    x: ui.menuOpen ? 0 : dock.x
-                    width: ui.menuOpen ? ui.width : dock.width
+                    // 64 px steps while magnifying: following dock.width sent a new Wayland input region on every pointer move
+                    readonly property real maskW: hh.hovered ? Math.min(ui.width, Math.ceil((dock.width + 8) / 64) * 64) : dock.width
+                    x: ui.menuOpen ? 0 : (ui.width - maskW) / 2
+                    width: ui.menuOpen ? ui.width : maskW
                     y: ui.menuOpen ? 0 : (ui.tucked ? ui.height - 3 : (hh.hovered ? ui.activeTop : dock.y))
                     height: ui.height - y
                 }
@@ -6474,17 +6476,22 @@ Scope {
                             readonly property real bn: eb * 1.5 * ds / 64.0
                             readonly property real margin: 72
                             readonly property real padPx: root.dockGlassNew ? 30 : 10
+                            // fixed capture (the Dock at its widest, in 128 px steps): following dock.width re-allocated the capture and both
+                            // blur passes on every pointer move while icons magnified
+                            readonly property real magExtra: root.iconSize * (root.effMag - 1) * (root.magRadius / (root.iconSize + root.spacing) + 1)
+                            readonly property real capInner: Math.max(dock.width, Math.min(Math.ceil((root.totalW0 + 2 * root.hPad + magExtra) / 128) * 128, win.modelData.width))
+                            readonly property real capW: capInner + 2 * (padPx + margin)
+                            readonly property real capH: dock.height + 2 * (padPx + margin)
+                            readonly property real capX: (ui.width - capW) / 2
+                            readonly property real capY: ui.height - root.margin - dock.height + (win.modelData.height - ui.height) - padPx - margin   // untucked
                             ShaderEffectSource {
                                 id: bsrc
                                 sourceItem: glassBackdrop.item
                                 hideSource: true
                                 live: !ui.tucked
                                 visible: false
-                                sourceRect: Qt.rect(dock.x - parent.padPx - parent.margin,
-                                                    dock.y + (win.modelData.height - ui.height) - parent.padPx - parent.margin,
-                                                    dock.width + 2 * (parent.padPx + parent.margin),
-                                                    dock.height + 2 * (parent.padPx + parent.margin))
-                                textureSize: Qt.size(Math.max(1, Math.round(sourceRect.width * dg.ds)), Math.max(1, Math.round(sourceRect.height * dg.ds)))
+                                sourceRect: Qt.rect(dg.capX, dg.capY, dg.capW, dg.capH)
+                                textureSize: Qt.size(Math.max(1, Math.round(dg.capW * dg.ds)), Math.max(1, Math.round(dg.capH * dg.ds)))
                             }
                             MultiEffect {
                                 id: bblurFx
@@ -6537,8 +6544,8 @@ Scope {
                                 property real padPx: parent.padPx
                                 property vector2d itemSize: Qt.vector2d(width, height)
                                 property vector2d glassSize: Qt.vector2d(dock.width, dock.height)
-                                property vector2d srcSize: Qt.vector2d(bsrc.sourceRect.width, bsrc.sourceRect.height)
-                                property vector2d srcOffset: Qt.vector2d(parent.margin, parent.margin)
+                                property vector2d srcSize: Qt.vector2d(dg.capW, dg.capH)
+                                property vector2d srcOffset: Qt.vector2d(dock.x - padPx - dg.capX, dock.y + (win.modelData.height - ui.height) - padPx - dg.capY)
                                 property real pad: padPx
                                 property real radius: root.cornerRadius
                                 property real bezel: Math.min(dock.height * 0.36, 26)
@@ -6586,45 +6593,55 @@ Scope {
                         outline: false
                     }
 
-                    Canvas {
-                        id: sideBorder
-                        anchors.fill: parent
-                        anchors.margins: -3
-                        antialiasing: true
-                        readonly property real strength: root.dockDark ? 0.14 : 0.12
-                        onStrengthChanged: requestPaint()
-                        onWidthChanged: requestPaint()
-                        onHeightChanged: requestPaint()
-                        Connections { target: root; function onCornerRadiusChanged() { sideBorder.requestPaint(); } }
-                        onPaint: {
-                            var ctx = getContext("2d");
-                            ctx.reset();
-                            var m = 3, W = width, H = height;
-                            var w = W - 2 * m, h = H - 2 * m;
-                            if (w < 4 || h < 4) return;
-                            var r = Math.max(2, Math.min(root.cornerRadius, h / 2, w / 2));
-                            var fade = Math.min(w / 2, r * 1.05);
-                            var g = ctx.createLinearGradient(m, 0, m + w, 0);
-                            var N = 24;
-                            for (var k = 0; k <= N; k++) {
-                                var u = k / N, sm = u * u * u * (u * (u * 6 - 15) + 10), al = (strength * (1 - sm)).toFixed(4);
-                                g.addColorStop(u * fade / w, "rgba(0,0,0," + al + ")");
-                                g.addColorStop(1 - u * fade / w, "rgba(0,0,0," + al + ")");
+                    // two end caps (the right one mirrored) instead of one Canvas over the whole Dock: that one re-rasterised on every
+                    // pointer move while the Dock widened under magnification
+                    Repeater {
+                        model: 2
+                        delegate: Canvas {
+                            id: sideBorder
+                            required property int index
+                            readonly property real fadeW: Math.min(root.cornerRadius, root.bgHeight / 2) * 1.05
+                            anchors.top: parent.top; anchors.topMargin: -3
+                            anchors.bottom: parent.bottom; anchors.bottomMargin: -3
+                            width: Math.ceil(3 + fadeW) + 3
+                            x: index === 0 ? -3 : parent.width + 3 - width
+                            transform: Scale { origin.x: sideBorder.width / 2; xScale: sideBorder.index === 0 ? 1 : -1 }
+                            antialiasing: true
+                            readonly property real strength: root.dockDark ? 0.14 : 0.12
+                            onStrengthChanged: requestPaint()
+                            onWidthChanged: requestPaint()
+                            onHeightChanged: requestPaint()
+                            Connections { target: root; function onCornerRadiusChanged() { sideBorder.requestPaint(); } }
+                            onPaint: {
+                                var ctx = getContext("2d");
+                                ctx.reset();
+                                var m = 3, h = height - 2 * m;
+                                if (h < 4) return;
+                                var r = Math.max(2, Math.min(root.cornerRadius, h / 2));
+                                var fade = r * 1.05;
+                                var w = 2 * (fade + r) + 8;   // painted as if the Dock were wide: only its near end shows in this canvas
+                                var g = ctx.createLinearGradient(m, 0, m + w, 0);
+                                var N = 24;
+                                for (var k = 0; k <= N; k++) {
+                                    var u = k / N, sm = u * u * u * (u * (u * 6 - 15) + 10), al = (strength * (1 - sm)).toFixed(4);
+                                    g.addColorStop(u * fade / w, "rgba(0,0,0," + al + ")");
+                                    g.addColorStop(1 - u * fade / w, "rgba(0,0,0," + al + ")");
+                                }
+                                ctx.strokeStyle = g;
+                                ctx.lineWidth = 1.6;
+                                ctx.beginPath();
+                                ctx.moveTo(m + r, m);
+                                ctx.lineTo(m + w - r, m);
+                                ctx.arc(m + w - r, m + r, r, 1.5 * Math.PI, 2 * Math.PI, false);
+                                ctx.lineTo(m + w, m + h - r);
+                                ctx.arc(m + w - r, m + h - r, r, 0, 0.5 * Math.PI, false);
+                                ctx.lineTo(m + r, m + h);
+                                ctx.arc(m + r, m + h - r, r, 0.5 * Math.PI, Math.PI, false);
+                                ctx.lineTo(m, m + r);
+                                ctx.arc(m + r, m + r, r, Math.PI, 1.5 * Math.PI, false);
+                                ctx.closePath();
+                                ctx.stroke();
                             }
-                            ctx.strokeStyle = g;
-                            ctx.lineWidth = 1.6;
-                            ctx.beginPath();
-                            ctx.moveTo(m + r, m);
-                            ctx.lineTo(m + w - r, m);
-                            ctx.arc(m + w - r, m + r, r, 1.5 * Math.PI, 2 * Math.PI, false);
-                            ctx.lineTo(m + w, m + h - r);
-                            ctx.arc(m + w - r, m + h - r, r, 0, 0.5 * Math.PI, false);
-                            ctx.lineTo(m + r, m + h);
-                            ctx.arc(m + r, m + h - r, r, 0.5 * Math.PI, Math.PI, false);
-                            ctx.lineTo(m, m + r);
-                            ctx.arc(m + r, m + r, r, Math.PI, 1.5 * Math.PI, false);
-                            ctx.closePath();
-                            ctx.stroke();
                         }
                     }
 
