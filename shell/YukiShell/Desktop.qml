@@ -430,7 +430,7 @@ Scope {
             return dock && dock.iconSrc ? dock.iconSrc("folder") : Quickshell.iconPath("folder");
         }
         if (m.isApp) return appIcon(m.path);
-        return Quickshell.iconPath("text-x-generic", "application-x-executable");
+        return bar && bar.fileIcon ? bar.fileIcon(m.path, false) : Quickshell.iconPath("text-x-generic", "application-x-executable");   // a PDF, video ... by its type
     }
     function fileUrl(path) {
         return "file://" + encodeURI(path).replace(/#/g, "%23").replace(/\?/g, "%3F");

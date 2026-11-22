@@ -978,6 +978,16 @@ Scope {
                 rrect(1.5, 3.8, 15, 10.4, 2.4); ctx.stroke();
                 for (var kr = 0; kr < 4; kr++) { circ(5.1 + kr * 2.6, 7.4, 0.85); ctx.fill(); }
                 line(6, 10.8, 12, 10.8);
+            } else if (k === "calc") {
+                rrect(3.5, 1.8, 11, 14.4, 2.2); ctx.stroke();
+                rrect(5.6, 4, 6.8, 2.8, 0.6); ctx.fill();
+                for (var cr = 0; cr < 3; cr++) for (var cc = 0; cc < 3; cc++) { circ(6.1 + cc * 2.9, 9.6 + cr * 2.4, 0.75); ctx.fill(); }
+            } else if (k === "mouse") {
+                rrect(5, 2, 8, 14, 4); ctx.stroke();
+                line(9, 2.6, 9, 6.4);
+            } else if (k === "phone") {
+                rrect(5, 1.8, 8, 14.4, 2); ctx.stroke();
+                line(7.8, 13.4, 10.2, 13.4);
             } else if (k === "livewall") {
                 rrect(1.8, 3.2, 14.4, 11.6, 2.6); ctx.stroke();
                 if (flag) rpoly([7.3, 6.3, 12, 9, 7.3, 11.7], 0.5);
@@ -2008,8 +2018,9 @@ Scope {
     function audioKind(n, isOut) {
         if (!isOut) return "mic";
         var p = n.properties || {}, f = String(p["device.form-factor"] || "").toLowerCase();
-        var t = (String(n.description) + " " + String(n.name)).toLowerCase();
-        if (f === "headphone" || f === "headset" || /headphone|headset|airpods|buds|bluez/.test(t)) return "headphones";
+        var t = (String(n.description) + " " + String(n.name)).toLowerCase(), ic = String(p["device.icon-name"] || "").toLowerCase();
+        if (f === "speaker" || /speaker/.test(ic)) return "speaker";   // a Bluetooth speaker is not headphones
+        if (f === "headphone" || f === "headset" || /headphone|headset/.test(ic) || /headphone|headset|airpods|buds|bluez/.test(t)) return "headphones";
         if (f === "hdmi" || f === "tv" || f === "monitor" || /hdmi|displayport|display port/.test(t)) return "monitor";
         return "speaker";
     }
@@ -2197,7 +2208,12 @@ Scope {
     property string btBusy: ""
     property string btError: ""
 
-    function btIconFor(name) {
+    function btIconFor(name, icon) {
+        // what BlueZ says the device is (its Icon), else a guess from the name
+        var ic = { "audio-headset": "headphones", "audio-headphones": "headphones", "audio-card": "speaker", "input-mouse": "mouse",
+                   "input-tablet": "mouse", "input-keyboard": "keyboard", "input-gaming": "gamepad", "phone": "phone", "computer": "monitor",
+                   "video-display": "monitor", "camera-photo": "camera", "camera-video": "camera" }[icon || ""];
+        if (ic) return ic;
         var n = (name || "").toLowerCase();
         if (n.indexOf("headphone") >= 0 || n.indexOf("headset") >= 0 || n.indexOf("earbud") >= 0 || n.indexOf("airpod") >= 0 || n.indexOf("buds") >= 0 || n.indexOf("wh-") >= 0 || n.indexOf("wf-") >= 0) return "headphones";
         if (n.indexOf("mouse") >= 0 || n.indexOf("trackpad") >= 0 || n.indexOf("magic mouse") >= 0) return "mouse";
@@ -2220,7 +2236,8 @@ Scope {
             + "pr=$(printf '%s\\n' \"$i\" | grep -Ec 'Paired: yes|Bonded: yes'); "
             + "c=$(printf '%s\\n' \"$i\" | grep -c 'Connected: yes'); "
             + "b=$(printf '%s\\n' \"$i\" | sed -n 's/.*Battery Percentage: 0x[0-9a-fA-F]* (\\([0-9]*\\)).*/\\1/p' | head -n1); "
-            + "printf 'D:%s\\t%s\\t%s\\t%s\\t%s\\n' \"$mac\" \"$pr\" \"$c\" \"$b\" \"$name\"; "
+            + "ic=$(printf '%s\\n' \"$i\" | sed -n 's/^[[:space:]]*Icon: //p' | head -n1); "
+            + "printf 'D:%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$mac\" \"$pr\" \"$c\" \"$b\" \"$ic\" \"$name\"; "
             + "done"
         ]
         stdout: StdioCollector {
@@ -2233,10 +2250,10 @@ Scope {
                     if (l.indexOf("P:") === 0) { on = l.toLowerCase().indexOf("yes") >= 0; continue; }
                     if (l.indexOf("D:") !== 0) continue;
                     var f = l.substring(2).split("\t");
-                    if (f.length < 5 || !f[0]) continue;
-                    var mac = f[0], isPair = f[1] === "1", isConn = f[2] === "1", name = (f[4] || "").trim() || mac;
+                    if (f.length < 6 || !f[0]) continue;
+                    var mac = f[0], isPair = f[1] === "1", isConn = f[2] === "1", name = (f[5] || "").trim() || mac;
                     if (isConn) { connCount++; if (!firstConnName) firstConnName = name; }
-                    devList.push({ mac: mac, name: name, connected: isConn, paired: isPair, bat: f[3] || "", icon: root.btIconFor(name) });
+                    devList.push({ mac: mac, name: name, connected: isConn, paired: isPair, bat: f[3] || "", icon: root.btIconFor(name, f[4]) });
                 }
                 root.btOn = on;
                 devList.sort(function (a, b) {
@@ -2760,7 +2777,7 @@ Scope {
         if (privacy.mic.length > 0) a.push({ k: "mic", glyph: "mic", c: "#FF9F0A", title: I18n.tr("Microphone"), sub: privacy.mic.join(", ") });
         if (privacy.cam.length > 0) a.push({ k: "cam", glyph: "camera", c: "#30D158", title: "Camera", sub: privacy.cam.join(", ") });
         if (privacy.share.length > 0) a.push({ k: "share", glyph: "monitor", c: "#BF5AF2", title: I18n.tr("Screen Sharing"), sub: privacy.share.join(", ") });
-        if (recording) a.push({ k: "rec", glyph: "monitor", c: "#BF5AF2", title: I18n.tr("Screen Recording"), sub: I18n.tr("Recording ") + recTime() });
+        if (recording) a.push({ k: "rec", glyph: "record", c: "#BF5AF2", title: I18n.tr("Screen Recording"), sub: I18n.tr("Recording ") + recTime() });
         return a;
     }
     property bool recRun: false
@@ -3484,7 +3501,7 @@ Scope {
         var result;
         if(units[a][0]==="temp") result=(a==="f"||a==="°f")?(val-32)*5/9:val, result=(b==="f"||b==="°f")?result*9/5+32:result;
         else result=val*units[a][1]/units[b][1];
-        return {title:Number(result.toPrecision(7))+" "+b,sub:I18n.tr("Unit conversion"),glyph:"link",run:function(){Quickshell.execDetached(["wl-copy",String(result)]);}};
+        return {title:Number(result.toPrecision(7))+" "+b,sub:I18n.tr("Unit conversion"),glyph:"calc",run:function(){Quickshell.execDetached(["wl-copy",String(result)]);}};
     }
     function windowItems(q) {
         var out=[], s=(q||"").trim().toLowerCase(); if(!s)return out;
@@ -3525,7 +3542,7 @@ Scope {
         }
         if(s.length>0) out=appItems(q,4);
         var cv=conversion(s); if(cv) out.unshift(cv);
-        else { var expr=s.replace(/^=\s*/,""); var v=calcValue(expr); if(v!==null && (s.charAt(0)==="=" || /[+*/%xX×÷()]/.test(s))) out.unshift({title:String(Number(v.toPrecision(10))),sub:I18n.tr("Calculator · Return to copy"),glyph:"search",run:function(){Quickshell.execDetached(["wl-copy",String(v)]);}}); }
+        else { var expr=s.replace(/^=\s*/,""); var v=calcValue(expr); if(v!==null && (s.charAt(0)==="=" || /[+*/%xX×÷()]/.test(s))) out.unshift({title:String(Number(v.toPrecision(10))),sub:I18n.tr("Calculator · Return to copy"),glyph:"calc",run:function(){Quickshell.execDetached(["wl-copy",String(v)]);}}); }
         var wins=windowItems(q); for(var j=0;j<wins.length&&out.length<6;j++)out.push(wins[j]);
         var acts=actionItems(q); for(var k=0;k<acts.length&&out.length<6;k++)if(acts[k].title.toLowerCase().indexOf(s)===0)out.push(acts[k]);
         out=out.slice(0,8);
@@ -4384,6 +4401,7 @@ Scope {
         var ic = "";
         if (n.image && n.image !== "") ic = n.image;
         else if (n.appIcon && n.appIcon !== "") ic = Quickshell.iconPath(n.appIcon, true);
+        if (ic === "" && !root.isSystemNotif(n)) ic = root.appIconFor(n.appName);   // no icon sent: the app's own, not a bell
         var urg = 1;
         if (n.urgency === NotificationUrgency.Critical) urg = 2;
         else if (n.urgency === NotificationUrgency.Low) urg = 0;
@@ -6336,7 +6354,7 @@ Scope {
                                     CCSlider {
                                         t: pal; gx: volPopGlass.ctx; x: 0; y: 20; width: parent.width
                                         value: appRow.vol
-                                        leftKind: "speaker"; leftLevel: appRow.vol < 0.34 ? 1 : (appRow.vol < 0.67 ? 2 : 3)
+                                        leftKind: "speaker"; leftLevel: appRow.vol <= 0.001 ? 0 : appRow.vol < 0.34 ? 1 : (appRow.vol < 0.67 ? 2 : 3)
                                         rightKind: "speaker"; rightLevel: 3
                                         onMoved: v => {
                                             appRow.dragV = v; appRow.dragging = true; dragEnd.restart();
@@ -7341,7 +7359,7 @@ Scope {
                                     required property var modelData
                                     width: parent.width; height: 30
                                     Rectangle { anchors.fill:parent; radius:8; color:connMa.containsMouse?pp.hover:"transparent" }
-                                    Glyph { x:8; anchors.verticalCenter:parent.verticalCenter; width:14; height:14; kind:modelData.type==="vpn"?"lock":"wifi"; color:pp.fg }
+                                    Glyph { x:8; anchors.verticalCenter:parent.verticalCenter; width:14; height:14; kind:modelData.type==="vpn"?"lock":"ethernet"; color:pp.fg }
                                     Text { x:30; anchors.verticalCenter:parent.verticalCenter; width:parent.width-42; elide:Text.ElideRight; text:modelData.name+(modelData.active?I18n.tr(" · Connected"):""); color:pp.fg; font.family: root.fontForWeight(Font.Normal, pp.fam); font.pixelSize:12 }
                                     MouseArea { id:connMa; anchors.fill:parent; hoverEnabled:true; onClicked:root.toggleConnection(modelData) }
                                 }
@@ -9105,7 +9123,7 @@ Scope {
                         x: 20; anchors.verticalCenter: parent.verticalCenter
                         width: 24; height: 24
                         kind: root.osdKind === "brightness" ? "sun" : "speaker"
-                        level: root.osdKind === "brightness" ? 3 : (root.osdValue < 0.34 ? 1 : (root.osdValue < 0.67 ? 2 : 3))
+                        level: root.osdKind === "brightness" ? 3 : (root.osdValue <= 0 ? 0 : root.osdValue < 0.34 ? 1 : (root.osdValue < 0.67 ? 2 : 3))
                         color: pal.fg
                     }
                     Row {

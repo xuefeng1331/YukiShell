@@ -229,6 +229,9 @@ Canvas {
             rrect(6.4, 1.9, 5.2, 3.4, 1.2); ctx.stroke();
             line(6.4, 9, 11.6, 9);
             line(6.4, 12, 10, 12);
+        } else if (k === "person") {
+            circ(9, 6.1, 3.2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(2.6, 16); ctx.bezierCurveTo(2.6, 10.6, 15.4, 10.6, 15.4, 16); ctx.closePath(); ctx.fill();
         } else if (k === "smile") {
             circ(9, 9, 6.6); ctx.stroke();
             circ(6.7, 7.5, 0.95); ctx.fill();

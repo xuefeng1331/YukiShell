@@ -574,7 +574,7 @@ Scope {
             { id: "sound",      sec: 4, name: "Sound",           wg: "speaker",    c1: "#FF5E7E", c2: "#E8344F", keys: "volume output input microphone speakers headphones effects ui sounds" },
             { id: "focus",      sec: 4, name: "Focus",           wg: "moon",       c1: "#7D7AFF", c2: "#5856D6", keys: "do not disturb keep awake sleep" },
             { id: "lockscreen", sec: 5, name: "Lock Screen",     wg: "lock",       c1: "#3A3A3C", c2: "#1C1C1E", keys: "lock password album lyrics media clock" },
-            { id: "users",      sec: 5, name: "Users & Groups",  wg: "smile",      c1: "#3D9BFF", c2: "#0A6CFF", keys: "account user name picture avatar" },
+            { id: "users",      sec: 5, name: "Users & Groups",  wg: "person",     c1: "#3D9BFF", c2: "#0A6CFF", keys: "account user name picture avatar" },
             { id: "keyboard",   sec: 6, name: "Keyboard",        wg: "keyboard",   c1: "#A7A7AD", c2: "#7C7C82", keys: "repeat rate delay layout typing" },
             { id: "mouse",      sec: 6, name: "Mouse",           wg: "mouse",      c1: "#A7A7AD", c2: "#7C7C82", keys: "tracking speed scroll natural acceleration" },
             { id: "cursor",     sec: 6, name: "Cursor",          wg: "cursor",     c1: "#A7A7AD", c2: "#7C7C82", keys: "pointer mouse theme size hide typing idle focus follows magnify zoom warp custom" },
