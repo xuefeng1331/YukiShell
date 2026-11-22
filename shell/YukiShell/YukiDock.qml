@@ -6907,7 +6907,11 @@ Scope {
                                     onFinished: cell.bounceStep()
                                 }
 
-                                readonly property bool tipOn: root.showLabels && !cell.isSep && ma.containsMouse && !ma.pressed && !ui.menuOpen && !ui.dragging
+                                // the label (a whole glass bubble) waits until the pointer rests: a fast sweep built and tore one down per icon crossed
+                                property bool hoverSettled: false
+                                Timer { interval: 90; running: ma.containsMouse && !cell.isSep; onTriggered: cell.hoverSettled = true }
+                                Connections { target: ma; function onContainsMouseChanged() { if (!ma.containsMouse) cell.hoverSettled = false; } }
+                                readonly property bool tipOn: root.showLabels && !cell.isSep && cell.hoverSettled && ma.containsMouse && !ma.pressed && !ui.menuOpen && !ui.dragging
                                 Loader {
                                     id: tip
                                     z: 10
