@@ -11,6 +11,7 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import "I18n.js" as I18n
 import "Fonts.js" as Fonts
 import "EmojiData.js" as EmojiData
@@ -569,7 +570,7 @@ Scope {
             }
 
             // any glass (right-click menu or a sheet) on screen?
-            readonly property bool glassNeeded: dctx.open || renameSheet.visible || previewSheet.visible || picSheet.visible || linkSheet.visible || glyphSheet.visible || emojiSheet.visible
+            readonly property bool glassNeeded: renameSheet.visible || previewSheet.visible || picSheet.visible || linkSheet.visible || glyphSheet.visible || emojiSheet.visible
             // Shortly after start-up every sheet is shown once at opacity 0.01: the glass (shaders, blur and mask objects, canvases) gets
             // built and compiled then, instead of during the first real Quick Preview.
             property bool warm: false
@@ -603,6 +604,26 @@ Scope {
             property real mqY1: 0
 
             // the icon under a point (the whole cell counts), or null
+            // the right-click menu for whatever is at this point: a widget's settings, the icon (selected), or the empty desktop
+            function contextAt(mx, my) {
+                if (root.pointOverWidget(mx, my, modelData.name)) { dctx.show({ widget: true }, mx, my); return; }
+                var it = iconAt(mx, my);
+                if (it) { if (!root.isSelected(it.path)) root.selectOnly(it.path); }
+                else root.clearSelection();
+                dctx.show(it, mx, my);
+            }
+            // a window of this screen's workspace at this point (the desktop, under the windows, never gets clicks there)
+            function windowAt(mx, my) {
+                var mon = Hyprland.monitorFor(modelData), ws = mon && mon.activeWorkspace ? mon.activeWorkspace.id : -1;
+                var cs = root.hub ? root.hub.glassClients || [] : [];   // hyprctl clients, kept fresh by shell.qml
+                for (var i = 0; i < cs.length; i++) {
+                    var o = cs[i];
+                    if (!o || !o.at || !o.size || !o.workspace || o.workspace.id !== ws || o.hidden || o.mapped === false) continue;
+                    var x = o.at[0] - modelData.x, y = o.at[1] - modelData.y;
+                    if (mx >= x && my >= y && mx < x + o.size[0] && my < y + o.size[1]) return true;
+                }
+                return false;
+            }
             function iconAt(x, y) {
                 for (var i = 0; i < root.items.length; i++) {
                     var p = layoutMap[root.items[i].name];
@@ -739,7 +760,7 @@ Scope {
                     LiveWall {
                         anchors.fill: parent
                         video: root.bar ? root.bar.glassVideo : ""
-                        live: !!root.dock && root.dock.glassLive && dctx.open
+                        live: false
                         paused: !w.glassNeeded || (!!root.bar && (root.bar.gaming || root.bar.screenCovered[w.modelData.name] === true))
                     }
                 }
@@ -759,21 +780,13 @@ Scope {
                     property bool ignoring: false         // the press landed on a widget: the desktop does nothing (no menu, no selection)
 
                     onPressed: mouse => {
-                        ignoring = root.pointOverWidget(mouse.x, mouse.y, w.modelData.name);
-                        if (ignoring) {
-                            // on a widget the desktop does nothing, except offering its settings
-                            if (mouse.button === Qt.RightButton) dctx.show({ widget: true }, mouse.x, mouse.y);
-                            return;
-                        }
                         px = mouse.x; py = mouse.y; moved = false; collapseTo = "";
+                        // on a widget the desktop does nothing, except offering its settings
+                        ignoring = root.pointOverWidget(mouse.x, mouse.y, w.modelData.name);
+                        if (mouse.button === Qt.RightButton) { w.contextAt(mouse.x, mouse.y); return; }
+                        if (ignoring) return;
                         addMode = (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) !== 0;
                         pressedItem = w.iconAt(mouse.x, mouse.y);
-                        if (mouse.button === Qt.RightButton) {
-                            if (pressedItem) { if (!root.isSelected(pressedItem.path)) root.selectOnly(pressedItem.path); }
-                            else root.clearSelection();
-                            dctx.show(pressedItem, mouse.x, mouse.y);
-                            return;
-                        }
                         dctx.item = undefined;
                         if (pressedItem) {
                             if (addMode) root.toggleSelect(pressedItem.path);
@@ -785,6 +798,8 @@ Scope {
                         }
                     }
                     onPositionChanged: mouse => {
+                        // the right button still held after opening the menu: the row under the pointer lights up (let go to pick it)
+                        if (pressed && (mouse.buttons & Qt.RightButton) && dctx.open) { var r = dctx.rowAt(mouse.x, mouse.y); if (r >= 0 || dctx.hot >= 0) dctx.hot = r; return; }
                         if (ignoring || !pressed || !(mouse.buttons & Qt.LeftButton)) return;
                         if (!moved && Math.abs(mouse.x - px) + Math.abs(mouse.y - py) < 6) return;
                         moved = true;
@@ -806,6 +821,11 @@ Scope {
                         }
                     }
                     onReleased: mouse => {
+                        if (mouse.button === Qt.RightButton) {   // let go on a row after dragging onto it: pick it; a plain right click leaves the menu open
+                            var r = dctx.rowAt(mouse.x, mouse.y);
+                            if (r >= 0 && Math.abs(mouse.x - px) + Math.abs(mouse.y - py) > 6) dctx.run(dctx.menuModel[r].k);
+                            return;
+                        }
                         if (ignoring) return;
                         if (w.dragActive) w.finishDrag(mouse.x, mouse.y);
                         else if (!moved && collapseTo !== "") root.selectOnly(collapseTo);
@@ -901,178 +921,285 @@ Scope {
                     z: 5
                 }
 
-                // Right-click menu uses the same glass bubble component as the Dock's context menu.
-                DockGlassPanel {
-                    id: dctx
-                    shadow: false
-                    property var item: undefined
-                    readonly property bool open: item !== undefined
-                    // no pop animation: the menu appears and disappears instantly
-                    property real prog: open ? 1 : 0
-                    property real ox: 0
-                    property real oy: 0
-                    // hidden until positionAt() has run for THIS click: otherwise the menu showed for a frame where the previous one was
-                    property bool placed: false
-                    visible: open && placed
-                    opacity: 1
-                    z: 50
-                    property real menuScale: root.dock ? root.dock.labelK : 1
-                    property real clickX: 0
-                    property real clickY: 0
-                    backdrop: desktopGlassBackdrop
-                    live: visible
-                    frozen: false
-                    dark: root.darkMode
-                    k: menuScale
-                    radius: 16 * k
-                    tailW: 0
-                    tailH: 0
-                    tailTipR: 0
-                    readonly property real pad: Math.round(5 * k)
-                    width: 224 * k
-                    bodyH: col.height + 2 * pad
-                    // Holding the Scope here keeps the menu's actions working: looking "root" up from inside the
-                    // delegate's handler fails at runtime, which is what used to make Move to Trash do nothing.
-                    readonly property var app: root
-                    // Opens with its top-RIGHT corner under the pointer (the menu sits to the left of the click). It flips to the other side
-                    // of the pointer when it would run off the screen, under the top bar, or behind a widget or the Dock.
-                    function positionAt() {
-                        var W = iconLayer.width, H = iconLayer.height, n = w.modelData.name;
-                        var opts = [root.placeNear(width, height, clickX - width, clickY, n, W, H),
-                                    root.placeNear(width, height, clickX, clickY, n, W, H),
-                                    root.placeNear(width, height, clickX - width, clickY - height, n, W, H),
-                                    root.placeNear(width, height, clickX, clickY - height, n, W, H)];
-                        var r = opts[0];
-                        for (var i = 1; i < opts.length; i++) if (opts[i].score < r.score) r = opts[i];
-                        x = r.x; y = r.y;
-                        ox = Math.max(0, Math.min(width, clickX - x));
-                        oy = Math.max(0, Math.min(height, clickY - y));
+                // ── right-click menu ──
+                // Its own layer above the windows (this one sits under them, so the menu used to hide behind any window it overlapped and
+                // stay open when you clicked one). Liquid Glass like the Dock's menu, over a still of the screen taken as it opens. It
+                // grows out of the click and fades away; a press anywhere else closes it (a right press on the desktop opens it there
+                // instead), holding the right button and letting go on a row picks it, and the arrow keys, Return and Escape work.
+                PanelWindow {
+                    id: menuWin
+                    screen: w.modelData
+                    visible: dctx.open || dctx.prog > 0
+                    anchors { top: true; bottom: true; left: true; right: true }
+                    exclusionMode: ExclusionMode.Ignore
+                    color: "transparent"
+                    WlrLayershell.namespace: "yukideskmenu"
+                    WlrLayershell.layer: WlrLayer.Overlay
+                    WlrLayershell.keyboardFocus: dctx.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+                    Capture {   // what is behind the menu, for the glass
+                        id: menuSnap
+                        width: menuWin.width; height: menuWin.height
+                        opacity: 0
+                        source: menuWin.visible && dctx.liquid ? w.modelData : null
+                        live: false
+                        paintCursor: false
+                        onHasContentChanged: if (hasContent) dctx.reveal()
                     }
-                    // The rows are fixed when the menu opens and kept until it has finished fading out. They used to be bound to `item`,
-                    // so on dismiss (item → undefined) the menu turned into the empty-desktop menu for the length of its fade-out.
-                    property var menuModel: []
-                    function buildModel(it) {
-                        var a = dctx.app, hasDir = a.selectedItems().some(function (x) { return x.isDir; });
-                        if (it && it.widget) return [{ t: "Widget Settings\u2026", k: "widgets" }];
-                        if (!it) return [{ t: "New Folder", k: "newfolder" }, { t: "Add Folder to Desktop\u2026", k: "link" },
-                                         { t: "sep" }, { t: "Desktop Settings\u2026", k: "settings" }, { t: "Change Wallpaper\u2026", k: "wallpaper" }];
-                        var m = [{ t: "Open", k: "open" }];
-                        if (a.selectionCount <= 1) { m.push({ t: "Quick Preview", k: "ql" }); m.push({ t: "Rename\u2026", k: "rename" }); }
-                        if (hasDir) { m.push({ t: "sep" }); m.push({ t: "colors" }); m.push({ t: "Folder Icon\u2026", k: "glyph" }); m.push({ t: "Folder Emoji\u2026", k: "emoji" }); }
-                        m.push({ t: "sep" });
-                        if (a.selectionCount <= 1) m.push({ t: "Copy Path", k: "copy" });
-                        m.push({ t: "Move to Trash", k: "trash", danger: true });
-                        m.push({ t: "sep" }); m.push({ t: "New Folder", k: "newfolder" });
-                        return m;
-                    }
-                    function show(it, mx, my) {
-                        menuModel = buildModel(it);
-                        placed = false;
-                        item = it;
-                        clickX = mx; clickY = my;
-                        Qt.callLater(function () { if (dctx.open) { dctx.positionAt(); dctx.placed = true; } });
-                    }
-                    function run(k) {
-                        var a = dctx.app, it = dctx.item, sel = a.selectedItems();
-                        dctx.item = undefined;
-                        if (k === "open" && it) { for (var i = 0; i < sel.length; i++) a.openItem(sel[i]); }
-                        else if (k === "ql" && it) { if (it.kind === "Image") picSheet.begin(it); else previewSheet.begin(it); }
-                        else if (k === "rename" && it) renameSheet.begin(it);
-                        else if (k === "link") linkSheet.begin();
-                        else if (k === "settings" && a.dock) a.dock.openPrefs("dock");
-                        else if (k === "widgets" && a.dock) a.dock.openPrefs("widgets");
-                        else if (k === "glyph") glyphSheet.begin(sel.filter(function (s2) { return s2.isDir; }).map(function (s2) { return s2.path; }));
-                        else if (k === "emoji") emojiSheet.begin(sel.filter(function (s2) { return s2.isDir; }));
-                        else if (k.indexOf("color:") === 0) {
-                            var dirs = sel.filter(function (s2) { return s2.isDir; }).map(function (s2) { return s2.path; });
-                            a.setFolderColor(dirs, k.substring(6));
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.AllButtons
+                        enabled: dctx.open
+                        property real px: 0
+                        property real py: 0
+                        onPressed: mouse => {
+                            px = mouse.x; py = mouse.y;
+                            var again = mouse.button === Qt.RightButton && !w.windowAt(mouse.x, mouse.y);
+                            dctx.close();
+                            if (again) w.contextAt(mouse.x, mouse.y);
                         }
-                        else if (k === "copy" && it) Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", it.path]);
-                        else if (k === "trash" && it) {
-                            w.flyToTrash(sel, 0, 0, dctx.clickX, dctx.clickY);      // the same fly-into-the-Trash as a drag and drop
-                            a.trashMany(sel.map(function (s) { return s.path; }));
+                        onPositionChanged: mouse => { if ((mouse.buttons & Qt.RightButton) && dctx.open) { var r = dctx.rowAt(mouse.x, mouse.y); if (r >= 0 || dctx.hot >= 0) dctx.hot = r; } }
+                        onReleased: mouse => {
+                            var r = mouse.button === Qt.RightButton ? dctx.rowAt(mouse.x, mouse.y) : -1;
+                            if (r >= 0 && Math.abs(mouse.x - px) + Math.abs(mouse.y - py) > 6) dctx.run(dctx.menuModel[r].k);
                         }
-                        else if (k === "newfolder") a.newFolder();
-                        else if (k === "wallpaper" && a.dock) a.dock.openPrefs("wallpaper");
                     }
-                    Column {
-                        id: col
-                        x: dctx.pad; y: dctx.pad; width: dctx.width - 2 * dctx.pad
-                        Repeater {
-                            model: dctx.menuModel
-                            delegate: Item {
-                                id: mrow
-                                required property var modelData
-                                readonly property bool sep: modelData.t === "sep"
-                                readonly property bool colors: modelData.t === "colors"
-                                width: parent.width
-                                height: sep ? Math.round(11 * dctx.k) : (colors ? Math.round(30 * dctx.k) : Math.round(22 * dctx.k))
-                                Rectangle {
-                                    visible: mrow.sep
-                                    x: 10 * dctx.k; y: 4 * dctx.k; width: parent.width - 20 * dctx.k; height: 1
-                                    color: dctx.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.12)
-                                }
-                                Rectangle {
-                                    visible: !mrow.sep && !mrow.colors && mMa.containsMouse
-                                    x: 4 * dctx.k; width: parent.width - 8 * dctx.k; height: parent.height - 2 * dctx.k; y: dctx.k
-                                    radius: 8 * dctx.k
-                                    color: dctx.app.accent
-                                }
-                                // folder colour dots
-                                Row {
-                                    visible: mrow.colors
-                                    anchors.centerIn: parent
-                                    spacing: Math.round(6 * dctx.k)
-                                    Repeater {
-                                        model: dctx.app.folderSwatches
-                                        delegate: Item {
-                                            id: sw
-                                            required property var modelData
-                                            width: Math.round(16 * dctx.k); height: width
-                                            Rectangle {
-                                                anchors.fill: parent; radius: width / 2
-                                                color: sw.modelData.name === "none" ? "transparent" : sw.modelData.color
-                                                border.width: sw.modelData.name === "none" ? 1.5 : 1
-                                                border.color: sw.modelData.name === "none" ? (dctx.dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.4)) : Qt.rgba(0, 0, 0, 0.22)
-                                                scale: swMa.containsMouse ? 1.18 : 1
-                                                Behavior on scale { NumberAnimation { duration: 90 } }
-                                                Rectangle {   // the "no colour" dot is a ring with a slash
-                                                    visible: sw.modelData.name === "none"
-                                                    anchors.centerIn: parent
-                                                    width: parent.width * 0.9; height: 1.5; rotation: -45
-                                                    color: dctx.dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.4)
+
+                    Item {
+                        id: dctx
+                        property var item: undefined
+                        readonly property bool open: item !== undefined
+                        property real prog: 0                  // 0 gone … 1 fully open
+                        property bool closing: false
+                        property bool placed: false            // positioned for THIS click (else it showed for a frame where the last one was)
+                        property int hot: -1                   // the highlighted row: pointer or arrow keys
+                        property real ox: 0                    // where the click was, inside the menu: it grows out of there
+                        property real oy: 0
+                        property real clickX: 0
+                        property real clickY: 0
+                        readonly property bool dark: root.darkMode
+                        readonly property real k: root.dock ? root.dock.labelK : 1
+                        readonly property real pad: Math.round(5 * k)
+                        readonly property bool liquid: !!root.dock && root.dock.liquidActive
+                        // Holding the Scope here keeps the menu's actions working: looking "root" up from inside the
+                        // delegate's handler fails at runtime, which is what used to make Move to Trash do nothing.
+                        readonly property var app: root
+                        width: 224 * k
+                        height: col.height + 2 * pad
+                        visible: placed && prog > 0
+                        opacity: prog
+                        transform: Scale {
+                            origin.x: dctx.ox; origin.y: dctx.oy
+                            xScale: dctx.closing ? 1 : 0.92 + 0.08 * dctx.prog
+                            yScale: dctx.closing ? 1 : 0.92 + 0.08 * dctx.prog
+                        }
+                        NumberAnimation { id: inA; target: dctx; property: "prog"; to: 1; duration: 170; easing.type: Easing.OutCubic }
+                        NumberAnimation { id: outA; target: dctx; property: "prog"; to: 0; duration: 150; easing.type: Easing.InQuad }
+
+                        LiquidPane {
+                            anchors.fill: parent
+                            backdrop: menuSnap.hasContent ? menuSnap : null
+                            shaderUrl: root.dock ? root.dock.glassShaderUrl : ""
+                            liquid: dctx.liquid && menuSnap.hasContent
+                            dark: dctx.dark
+                            bx: dctx.x; by: dctx.y
+                            shadowAmt: 0
+                            flatInner: 1
+                            rimTint: 1
+                            ringW: 0
+                            cornerR: 14 * dctx.k
+                            tint: root.dock ? root.dock.glassOpacity : 0.42
+                            thickness: 22
+                            strength: root.dock ? root.dock.glassLiquidEff : 1
+                            rim: root.dock ? root.dock.glassRimEff : 0.45
+                            grain: root.dock ? root.dock.glassGrain : 0.03
+                            blur: root.dock ? root.dock.glassBlurEff : 5
+                            accentTint: root.dock ? root.dock.accentTintVec : Qt.vector4d(0, 0, 0, 0)
+                        }
+                        MenuBorder {
+                            z: 2
+                            anchors.fill: parent
+                            cornerR: 14 * dctx.k
+                            dark: dctx.dark
+                            tint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
+                        }
+
+                        // Opens with its top-RIGHT corner under the pointer (the menu sits to the left of the click). It flips to the other side
+                        // of the pointer when it would run off the screen, under the top bar, or behind a widget or the Dock.
+                        function positionAt() {
+                            var W = iconLayer.width, H = iconLayer.height, n = w.modelData.name;
+                            var opts = [root.placeNear(width, height, clickX - width, clickY, n, W, H),
+                                        root.placeNear(width, height, clickX, clickY, n, W, H),
+                                        root.placeNear(width, height, clickX - width, clickY - height, n, W, H),
+                                        root.placeNear(width, height, clickX, clickY - height, n, W, H)];
+                            var r = opts[0];
+                            for (var i = 1; i < opts.length; i++) if (opts[i].score < r.score) r = opts[i];
+                            x = r.x; y = r.y;
+                            ox = Math.max(0, Math.min(width, clickX - x));
+                            oy = Math.max(0, Math.min(height, clickY - y));
+                        }
+                        // The rows are fixed when the menu opens and kept until it has finished fading out. They used to be bound to `item`,
+                        // so on dismiss (item → undefined) the menu turned into the empty-desktop menu for the length of its fade-out.
+                        property var menuModel: []
+                        function buildModel(it) {
+                            var a = dctx.app, hasDir = a.selectedItems().some(function (x) { return x.isDir; });
+                            if (it && it.widget) return [{ t: "Widget Settings\u2026", k: "widgets" }];
+                            if (!it) return [{ t: "New Folder", k: "newfolder" }, { t: "Add Folder to Desktop\u2026", k: "link" },
+                                             { t: "sep" }, { t: "Desktop Settings\u2026", k: "settings" }, { t: "Change Wallpaper\u2026", k: "wallpaper" }];
+                            var m = [{ t: "Open", k: "open" }];
+                            if (a.selectionCount <= 1) { m.push({ t: "Quick Preview", k: "ql" }); m.push({ t: "Rename\u2026", k: "rename" }); }
+                            if (hasDir) { m.push({ t: "sep" }); m.push({ t: "colors" }); m.push({ t: "Folder Icon\u2026", k: "glyph" }); m.push({ t: "Folder Emoji\u2026", k: "emoji" }); }
+                            m.push({ t: "sep" });
+                            if (a.selectionCount <= 1) m.push({ t: "Copy Path", k: "copy" });
+                            m.push({ t: "Move to Trash", k: "trash", danger: true });
+                            m.push({ t: "sep" }); m.push({ t: "New Folder", k: "newfolder" });
+                            return m;
+                        }
+                        function show(it, mx, my) {
+                            outA.stop(); inA.stop();
+                            prog = 0; closing = false; placed = false; hot = -1;
+                            menuModel = buildModel(it);
+                            item = it;
+                            clickX = mx; clickY = my;
+                            Qt.callLater(function () {
+                                if (!dctx.open) return;
+                                dctx.positionAt();
+                                dctx.placed = true;
+                                if (!dctx.liquid || menuSnap.hasContent) dctx.reveal(); else revealT.restart();
+                            });
+                        }
+                        // opens once it's in place and the still of the screen is in (or didn't come)
+                        function reveal() {
+                            if (!open || !placed || inA.running || prog > 0) return;
+                            revealT.stop();
+                            inA.start();
+                            forceActiveFocus();
+                        }
+                        Timer { id: revealT; interval: 150; onTriggered: dctx.reveal() }
+                        function close() {
+                            if (!open) return;
+                            item = undefined;
+                            closing = true;
+                            inA.stop(); outA.start();
+                        }
+                        // the row under a point on the screen, for letting go of the right button on it; -1 for none
+                        function rowAt(mx, my) {
+                            if (!open || !placed) return -1;
+                            var r = col.childAt(mx - x - col.x, my - y - col.y);
+                            return r && r.modelData && r.modelData.k ? r.index : -1;
+                        }
+                        function step(d) {   // the next row the arrow keys land on, skipping separators and the colour dots
+                            var n = menuModel.length;
+                            for (var i = 1; i <= n; i++) {
+                                var j = ((hot < 0 ? (d > 0 ? -1 : 0) : hot) + d * i + n * 2) % n;
+                                if (menuModel[j].k) { hot = j; return; }
+                            }
+                        }
+                        Keys.onPressed: ev => {
+                            if (ev.key === Qt.Key_Escape) close();
+                            else if (ev.key === Qt.Key_Down || ev.key === Qt.Key_Tab) step(1);
+                            else if (ev.key === Qt.Key_Up || ev.key === Qt.Key_Backtab) step(-1);
+                            else if ((ev.key === Qt.Key_Return || ev.key === Qt.Key_Enter || ev.key === Qt.Key_Space) && hot >= 0) run(menuModel[hot].k);
+                            else return;
+                            ev.accepted = true;
+                        }
+                        function run(k) {
+                            var a = dctx.app, it = dctx.item, sel = a.selectedItems();
+                            dctx.close();
+                            if (k === "open" && it) { for (var i = 0; i < sel.length; i++) a.openItem(sel[i]); }
+                            else if (k === "ql" && it) { if (it.kind === "Image") picSheet.begin(it); else previewSheet.begin(it); }
+                            else if (k === "rename" && it) renameSheet.begin(it);
+                            else if (k === "link") linkSheet.begin();
+                            else if (k === "settings" && a.dock) a.dock.openPrefs("dock");
+                            else if (k === "widgets" && a.dock) a.dock.openPrefs("widgets");
+                            else if (k === "glyph") glyphSheet.begin(sel.filter(function (s2) { return s2.isDir; }).map(function (s2) { return s2.path; }));
+                            else if (k === "emoji") emojiSheet.begin(sel.filter(function (s2) { return s2.isDir; }));
+                            else if (k.indexOf("color:") === 0) {
+                                var dirs = sel.filter(function (s2) { return s2.isDir; }).map(function (s2) { return s2.path; });
+                                a.setFolderColor(dirs, k.substring(6));
+                            }
+                            else if (k === "copy" && it) Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", it.path]);
+                            else if (k === "trash" && it) {
+                                w.flyToTrash(sel, 0, 0, dctx.clickX, dctx.clickY);      // the same fly-into-the-Trash as a drag and drop
+                                a.trashMany(sel.map(function (s) { return s.path; }));
+                            }
+                            else if (k === "newfolder") a.newFolder();
+                            else if (k === "wallpaper" && a.dock) a.dock.openPrefs("wallpaper");
+                        }
+                        Column {
+                            id: col
+                            x: dctx.pad; y: dctx.pad; width: dctx.width - 2 * dctx.pad
+                            Repeater {
+                                model: dctx.menuModel
+                                delegate: Item {
+                                    id: mrow
+                                    required property var modelData
+                                    required property int index
+                                    readonly property bool sep: modelData.t === "sep"
+                                    readonly property bool colors: modelData.t === "colors"
+                                    width: parent.width
+                                    height: sep ? Math.round(11 * dctx.k) : (colors ? Math.round(30 * dctx.k) : Math.round(22 * dctx.k))
+                                    Rectangle {
+                                        visible: mrow.sep
+                                        x: 10 * dctx.k; y: 4 * dctx.k; width: parent.width - 20 * dctx.k; height: 1
+                                        color: dctx.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.12)
+                                    }
+                                    Rectangle {
+                                        visible: !mrow.sep && !mrow.colors && dctx.hot === mrow.index
+                                        x: 4 * dctx.k; width: parent.width - 8 * dctx.k; height: parent.height - 2 * dctx.k; y: dctx.k
+                                        radius: 8 * dctx.k
+                                        color: dctx.app.accent
+                                    }
+                                    // folder colour dots
+                                    Row {
+                                        visible: mrow.colors
+                                        anchors.centerIn: parent
+                                        spacing: Math.round(6 * dctx.k)
+                                        Repeater {
+                                            model: dctx.app.folderSwatches
+                                            delegate: Item {
+                                                id: sw
+                                                required property var modelData
+                                                width: Math.round(16 * dctx.k); height: width
+                                                Rectangle {
+                                                    anchors.fill: parent; radius: width / 2
+                                                    color: sw.modelData.name === "none" ? "transparent" : sw.modelData.color
+                                                    border.width: sw.modelData.name === "none" ? 1.5 : 1
+                                                    border.color: sw.modelData.name === "none" ? (dctx.dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.4)) : Qt.rgba(0, 0, 0, 0.22)
+                                                    scale: swMa.containsMouse ? 1.18 : 1
+                                                    Behavior on scale { NumberAnimation { duration: 90 } }
+                                                    Rectangle {   // the "no colour" dot is a ring with a slash
+                                                        visible: sw.modelData.name === "none"
+                                                        anchors.centerIn: parent
+                                                        width: parent.width * 0.9; height: 1.5; rotation: -45
+                                                        color: dctx.dark ? Qt.rgba(1, 1, 1, 0.55) : Qt.rgba(0, 0, 0, 0.4)
+                                                    }
                                                 }
+                                                MouseArea { id: swMa; anchors.fill: parent; hoverEnabled: true; enabled: dctx.open; onClicked: dctx.run("color:" + sw.modelData.name) }
                                             }
-                                            MouseArea { id: swMa; anchors.fill: parent; hoverEnabled: true; onClicked: dctx.run("color:" + sw.modelData.name) }
                                         }
                                     }
-                                }
-                                Text {
-                                    visible: !mrow.sep && !mrow.colors
-                                    x: 11 * dctx.k; anchors.verticalCenter: parent.verticalCenter
-                                    text: I18n.tr(mrow.modelData.t)
-                                    color: mMa.containsMouse ? "white"
-                                           : (mrow.modelData.danger ? "#FF453A" : (dctx.dark ? Qt.rgba(1, 1, 1, 0.92) : Qt.rgba(0, 0, 0, 0.86)))
-                                    font.family: dctx.app.fam; font.pixelSize: Math.max(9, Math.round(13 * dctx.k))
-                                }
-                                MouseArea {
-                                    id: mMa
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    enabled: !mrow.sep && !mrow.colors
-                                    onClicked: dctx.run(mrow.modelData.k)
+                                    Text {
+                                        visible: !mrow.sep && !mrow.colors
+                                        x: 11 * dctx.k; anchors.verticalCenter: parent.verticalCenter
+                                        text: I18n.tr(mrow.modelData.t)
+                                        color: dctx.hot === mrow.index ? "white"
+                                               : (mrow.modelData.danger ? "#FF453A" : (dctx.dark ? Qt.rgba(1, 1, 1, 0.92) : Qt.rgba(0, 0, 0, 0.86)))
+                                        font.family: dctx.app.fam; font.pixelSize: Math.max(9, Math.round(13 * dctx.k))
+                                    }
+                                    MouseArea {
+                                        id: mMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: dctx.open && !mrow.sep && !mrow.colors
+                                        onEntered: dctx.hot = mrow.index
+                                        onExited: if (dctx.hot === mrow.index) dctx.hot = -1
+                                        onClicked: dctx.run(mrow.modelData.k)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    z: 40
-                    visible: dctx.open
-                    enabled: dctx.open
-                    acceptedButtons: Qt.AllButtons
-                    onPressed: dctx.item = undefined
                 }
                 // click outside a sheet closes it
                 MouseArea {
