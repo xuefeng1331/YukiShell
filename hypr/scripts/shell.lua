@@ -20,6 +20,10 @@ bind("CTRL + ALT + W",  hl.dsp.exec_cmd(qs .. "wallpapers toggle"), "Wallpapers"
 bind("SUPER + G",       hl.dsp.exec_cmd(qs .. "gaming toggle"), "Game Mode")
 bind("SUPER + comma",   hl.dsp.exec_cmd(qs .. "notifications open"), "Notifications")
 bind("SUPER + A",       hl.dsp.exec_cmd(qs .. "controlcenter toggle"), "Control Center")
+bind("SUPER + ALT + up",   hl.dsp.exec_cmd(qs .. "missioncontrol toggle"), "Mission Control")
+bind("SUPER + ALT + down", hl.dsp.exec_cmd(qs .. "missioncontrol appActive"), "App Exposé")
+hl.gesture({ fingers = 3, direction = "up", action = function() hl.exec_cmd(qs .. "missioncontrol toggle") end })
+hl.gesture({ fingers = 3, direction = "down", action = function() hl.exec_cmd(qs .. "missioncontrol appActive") end })
 
 bind("SUPER + slash",   hl.dsp.exec_cmd(qs .. "settings pane keyboard"), "Keyboard Shortcuts")
 

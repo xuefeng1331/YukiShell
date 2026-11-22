@@ -5669,6 +5669,8 @@ Scope {
                              run: function () { w.activate(); } });
                 })(wins[i]);
             }
+            if (root.hub && root.hub.mission && wins[0].appId)
+                m.push({ kind: "item", label: I18n.tr("Show All Windows"), run: function () { root.hub.mission.showApp(wins[0].appId); } });
             m.push({ kind: "sep" });
         }
         if (item.entry) {

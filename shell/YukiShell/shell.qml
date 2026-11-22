@@ -10,6 +10,7 @@ ShellRoot {
     property var yukiWidgets: null
     property var clockApp: null
     property var aboutApp: null
+    property var missionControl: null
     FontLoader { id: uiFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Regular.otf") }
     FontLoader { id: uiBoldFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Semibold.otf") }
 
@@ -78,6 +79,7 @@ ShellRoot {
         property var widgets: yukiWidgets
         property var clock: clockApp
         property var about: aboutApp
+        property var mission: missionControl
         function openSettings(pane) { yukiDock.openPrefs(pane); }
 
         property bool barWantsGeo: false
@@ -367,6 +369,7 @@ ShellRoot {
         yukiWidgets = makePart("YukiWidgets", { hub: sharedHub });
         clockApp = makePart("ClockApp", { hub: sharedHub });
         aboutApp = makePart("AboutApp", { hub: sharedHub });
+        missionControl = makePart("MissionControl", { hub: sharedHub });
     }
 
     IpcHandler {
@@ -382,6 +385,13 @@ ShellRoot {
         function tab(name: string): void { clockApp.open(name); }
         function stop(): void { clockApp.stopRing(); }
         function snooze(): void { clockApp.snooze(); }
+    }
+    IpcHandler {
+        target: "missioncontrol"
+        function toggle(): void { if (missionControl) missionControl.toggle(); }
+        function close(): void { if (missionControl) missionControl.close(); }
+        function app(cls: string): void { if (missionControl) missionControl.showApp(cls); }
+        function appActive(): void { if (missionControl) missionControl.showActiveApp(); }
     }
     IpcHandler {
         target: "about"

@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "Mission Control": "Mission Control",
+    "App Exposé": "Cửa sổ ứng dụng",
+    "No open windows": "Không có cửa sổ nào đang mở",
+    "Show All Windows": "Hiện tất cả cửa sổ",
     "Previous Workspace": "Không gian làm việc trước",
     "Lock automatically": "Tự động khóa",
     "Turn display off": "Tắt màn hình",

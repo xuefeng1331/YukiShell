@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "Mission Control": "Mission Control",
+    "App Exposé": "앱 윈도우",
+    "No open windows": "열린 윈도우 없음",
+    "Show All Windows": "모든 윈도우 보기",
     "Previous Workspace": "이전 작업 공간",
     "Lock automatically": "자동으로 잠금",
     "Turn display off": "디스플레이 끄기",

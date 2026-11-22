@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "Mission Control": "调度中心",
+    "App Exposé": "应用程序窗口",
+    "No open windows": "没有打开的窗口",
+    "Show All Windows": "显示所有窗口",
     "Previous Workspace": "上一个工作区",
     "Lock automatically": "自动锁定",
     "Turn display off": "关闭显示器",
