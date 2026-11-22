@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "From This Folder": "Из этой папки",
+    "No files in this folder": "В этой папке нет файлов",
+    "Choose Picture…": "Выбрать изображение…",
     "Shake to find": "Встряхнуть, чтобы найти",
     "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "Быстро встряхните мышь, и указатель ненадолго увеличится, чтобы его было легко найти.",
     "Copy Text from Screen": "Скопировать текст с экрана",

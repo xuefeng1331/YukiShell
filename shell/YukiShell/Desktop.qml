@@ -277,6 +277,7 @@ Scope {
         onLoaded: { try { root.folderGlyphs = JSON.parse(text()); } catch (e) { root.folderGlyphs = ({}); } }
     }
     function setFolderGlyph(paths, name) {
+        setFolderPic(paths, "");
         var m = {}; for (var k in folderGlyphs) m[k] = folderGlyphs[k];
         for (var i = 0; i < paths.length; i++) { if (name === "") delete m[paths[i]]; else m[paths[i]] = name; }
         folderGlyphs = m;
@@ -310,6 +311,7 @@ Scope {
         return e;
     }
     function setFolderEmoji(paths, emoji) {
+        if (emoji !== "") setFolderPic(paths, "");
         var m = {}; for (var k in folderEmoji) m[k] = folderEmoji[k];
         for (var i = 0; i < paths.length; i++) { if (emoji === "") delete m[paths[i]]; else m[paths[i]] = emoji; }
         folderEmoji = m;
@@ -332,10 +334,49 @@ Scope {
         return Quickshell.iconPath("folder_color_" + (color || "blue") + "_" + glyph, true);
     }
     function setFolderColor(paths, name) {
+        setFolderPic(paths, "");
         var m = {}; for (var k in folderColors) m[k] = folderColors[k];
         for (var i = 0; i < paths.length; i++) { if (name === "none") delete m[paths[i]]; else m[paths[i]] = name; }
         folderColors = m;
         Quickshell.execDetached(["sh", "-c", "mkdir -p \"$HOME/.config/yukishell\" && printf '%s' \"$1\" > \"$HOME/.config/yukishell/desktop-colors.json\"", "sh", JSON.stringify(m)]);
+    }
+    // ── a folder's own picture: any image, or a file inside it (its picture or icon) ──
+    // path → file, kept in ~/.config/yukishell/desktop-folder-icons.json. It wins over the colour and symbol; choosing those takes it off.
+    property var folderPics: ({})
+    FileView {
+        path: root.home + "/.config/yukishell/desktop-folder-icons.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { root.folderPics = JSON.parse(text()); } catch (e) { root.folderPics = ({}); } }
+    }
+    function setFolderPic(paths, file) {
+        var m = {}, had = false; for (var k in folderPics) m[k] = folderPics[k];
+        for (var i = 0; i < paths.length; i++) { if (m[paths[i]] !== undefined) had = true; if (file === "") delete m[paths[i]]; else m[paths[i]] = file; }
+        if (file === "" && !had) return;   // nothing to take off: no write
+        folderPics = m;
+        Quickshell.execDetached(["sh", "-c", "mkdir -p \"$HOME/.config/yukishell\" && printf '%s' \"$1\" > \"$HOME/.config/yukishell/desktop-folder-icons.json\"", "sh", JSON.stringify(m)]);
+    }
+    function isPicturePath(p) { return /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(p); }
+    // the picture for any file: the picture itself, an app's icon, else its type's icon
+    function pathIcon(p) {
+        if (isPicturePath(p)) return fileUrl(p);
+        if (/\.desktop$/i.test(p)) return appIcon(p);
+        return bar && bar.fileIcon ? bar.fileIcon(p, false) : Quickshell.iconPath("text-x-generic");
+    }
+    property var picFor: []
+    function pickPicture(paths) {
+        if (picProc.running) return;
+        picFor = paths;
+        picProc.running = true;
+    }
+    Process {
+        id: picProc
+        command: ["sh", "-c", "d=\"$HOME/Pictures\"; [ -d \"$d\" ] || d=\"$HOME\"; "
+            + "if command -v kdialog >/dev/null 2>&1; then kdialog --getopenfilename \"$d\" 'Pictures (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.avif *.svg)'; "
+            + "elif command -v zenity >/dev/null 2>&1; then zenity --file-selection --filename=\"$d/\" --file-filter='Pictures | *.png *.PNG *.jpg *.JPG *.jpeg *.JPEG *.webp *.gif *.bmp *.avif *.svg'; "
+            + "elif command -v yad >/dev/null 2>&1; then yad --file --filename=\"$d/\"; fi"]
+        stdout: StdioCollector { onStreamFinished: { var t = text.trim(); if (t !== "") root.setFolderPic(root.picFor, t); } }
     }
 
     // ── info for Quick Preview ──
@@ -415,9 +456,10 @@ Scope {
     }
 
     // the picture for one item (also used by the menu bar's glass backdrop, so the glass shows the same icons)
-    function iconSourceFor(m) {
+    function iconSourceFor(m, plain) {   // plain: a folder's normal icon, leaving out its own picture
         if (m.kind === "Image") return fileUrl(m.path);
         if (m.isDir) {
+            if (!plain && folderPics[m.path]) return pathIcon(folderPics[m.path]);
             var c = folderColors[m.path];
             var gi = glyphIcon(c, folderGlyphs[m.path]);
             if (gi !== "") return gi;
@@ -861,7 +903,8 @@ Scope {
                         dropTarget: w.dropPath === modelData.path
                         dragging: moving
                         source: root.iconSourceFor(modelData)
-                        emoji: modelData.isDir ? (root.folderEmoji[modelData.path] || "") : ""
+                        fallback: modelData.isDir && root.folderPics[modelData.path] ? root.iconSourceFor(modelData, true) : ""
+                        emoji: modelData.isDir && !root.folderPics[modelData.path] ? (root.folderEmoji[modelData.path] || "") : ""
                     }
                 }
 
@@ -1433,6 +1476,12 @@ Scope {
                     readonly property int rows: Math.ceil(cells.length / cols)
                     // the folder colour the previews are drawn in (that of the first chosen folder)
                     readonly property string tint: paths.length > 0 ? (root.folderColors[paths[0]] || "") : ""
+                    // the folder's own picture, and (one folder chosen) the files in it to take one from, pictures first
+                    readonly property string pic: paths.length > 0 ? (root.folderPics[paths[0]] || "") : ""
+                    readonly property bool one: paths.length === 1
+                    property var files: []
+                    property bool listed: false
+                    readonly property int fileRows: Math.min(2, Math.max(1, Math.ceil(files.length / cols)))
                     title: I18n.tr("Folder Icon")
                     backdrop: desktopGlassBackdrop
                     glass: root.dock
@@ -1440,17 +1489,37 @@ Scope {
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1
                     contentW: cols * 64 + 28
-                    contentH: rows * 76 + 14
+                    contentH: rows * 76 + 14 + (one ? 24 + fileRows * 76 : 0) + 44
                     onCloseRequested: open = false
                     function begin(p) {
                         if (!p || p.length === 0) return;
                         paths = p;
+                        files = []; listed = false;
+                        if (p.length === 1) { filesProc.running = false; filesProc.command = filesProc.cmd.concat([p[0]]); filesProc.running = true; }
                         w.placeSheet(glyphSheet);
                         ox = width / 2; oy = height / 2;
                         open = true;
                     }
                     function pick(g) { root.setFolderGlyph(paths, g); open = false; }
+                    function usePic(f) { root.setFolderPic(paths, f); open = false; }
+                    function choosePicture() { root.pickPicture(paths); open = false; }
+                    Process {
+                        id: filesProc
+                        // the folder first, so a late answer for another folder is ignored
+                        readonly property var cmd: ["sh", "-c", "printf '%s\\n' \"$1\"; cd -- \"$1\" && find -L . -mindepth 1 -maxdepth 1 ! -name '.*' ! -type d -printf '%f\\n' | sort -f", "sh"]
+                        stdout: StdioCollector {
+                            onStreamFinished: {
+                                var l = text.split("\n").filter(function (x) { return x !== ""; });
+                                if (l.length === 0 || l[0] !== glyphSheet.paths[0]) return;
+                                var d = l.shift();
+                                l = l.filter(root.isPicturePath).concat(l.filter(function (x) { return !root.isPicturePath(x); }));
+                                glyphSheet.files = l.slice(0, 48).map(function (x) { return d + "/" + x; });
+                                glyphSheet.listed = true;
+                            }
+                        }
+                    }
                     Grid {
+                        id: glyphGrid
                         x: Math.round(14 * glyphSheet.k); y: Math.round(4 * glyphSheet.k)
                         columns: glyphSheet.cols
                         Repeater {
@@ -1460,7 +1529,7 @@ Scope {
                                 required property string modelData
                                 width: Math.round(64 * glyphSheet.k); height: Math.round(76 * glyphSheet.k)
                                 readonly property string src: modelData === "" ? "" : root.glyphIcon(glyphSheet.tint, modelData)
-                                readonly property bool current: glyphSheet.paths.length > 0 && (root.folderGlyphs[glyphSheet.paths[0]] || "") === modelData
+                                readonly property bool current: glyphSheet.paths.length > 0 && glyphSheet.pic === "" && (root.folderGlyphs[glyphSheet.paths[0]] || "") === modelData
                                 Rectangle {
                                     anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
                                     radius: Math.round(10 * glyphSheet.k)
@@ -1489,6 +1558,81 @@ Scope {
                                 MouseArea { id: gMa; anchors.fill: parent; hoverEnabled: true; onClicked: glyphSheet.pick(gcell.modelData) }
                             }
                         }
+                    }
+                    Text {
+                        visible: glyphSheet.one
+                        x: Math.round(20 * glyphSheet.k); y: glyphGrid.y + glyphGrid.height + Math.round(4 * glyphSheet.k)
+                        text: I18n.tr("From This Folder")
+                        color: glyphSheet.fg2
+                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * glyphSheet.k)); font.weight: Font.DemiBold
+                    }
+                    Flickable {   // two rows at most; more scroll
+                        id: filesFlick
+                        visible: glyphSheet.one
+                        x: glyphGrid.x; y: glyphGrid.y + glyphGrid.height + Math.round(24 * glyphSheet.k)
+                        width: glyphGrid.width; height: glyphSheet.fileRows * Math.round(76 * glyphSheet.k)
+                        clip: true
+                        contentHeight: filesGrid.height
+                        boundsBehavior: Flickable.StopAtBounds
+                        Grid {
+                            id: filesGrid
+                            columns: glyphSheet.cols
+                            Repeater {
+                                model: glyphSheet.files
+                                delegate: Item {
+                                    id: fcell
+                                    required property string modelData
+                                    width: Math.round(64 * glyphSheet.k); height: Math.round(76 * glyphSheet.k)
+                                    Rectangle {
+                                        anchors.fill: parent; anchors.margins: Math.round(2 * glyphSheet.k)
+                                        radius: Math.round(10 * glyphSheet.k)
+                                        color: fMa.containsMouse ? (glyphSheet.dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.09)) : "transparent"
+                                        border.width: glyphSheet.pic === fcell.modelData ? 2 : 0
+                                        border.color: root.accent
+                                    }
+                                    Image {
+                                        x: Math.round((parent.width - width) / 2); y: Math.round(8 * glyphSheet.k)
+                                        width: Math.round(40 * glyphSheet.k); height: width
+                                        sourceSize: Qt.size(width * 2, height * 2)
+                                        asynchronous: true; cache: true; smooth: true
+                                        fillMode: Image.PreserveAspectFit
+                                        source: root.pathIcon(fcell.modelData)
+                                    }
+                                    Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        y: Math.round(52 * glyphSheet.k)
+                                        width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
+                                        text: fcell.modelData.substring(fcell.modelData.lastIndexOf("/") + 1)
+                                        color: glyphSheet.fg2
+                                        font.family: root.fam; font.pixelSize: Math.max(8, Math.round(11 * glyphSheet.k))
+                                    }
+                                    MouseArea { id: fMa; anchors.fill: parent; hoverEnabled: true; onClicked: glyphSheet.usePic(fcell.modelData) }
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        visible: glyphSheet.one && glyphSheet.listed && glyphSheet.files.length === 0
+                        anchors.centerIn: filesFlick
+                        text: I18n.tr("No files in this folder")
+                        color: glyphSheet.fg2
+                        font.family: root.fam; font.pixelSize: Math.max(9, Math.round(12 * glyphSheet.k))
+                    }
+                    Rectangle {
+                        x: Math.round(18 * glyphSheet.k)
+                        y: (glyphSheet.one ? filesFlick.y + filesFlick.height : glyphGrid.y + glyphGrid.height) + Math.round(8 * glyphSheet.k)
+                        width: cpText.implicitWidth + Math.round(28 * glyphSheet.k); height: Math.round(28 * glyphSheet.k)
+                        radius: Math.round(11 * glyphSheet.k)
+                        color: cpMa.pressed ? (root.darkMode ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(0, 0, 0, 0.16))
+                                            : (root.darkMode ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.09))
+                        Text {
+                            id: cpText
+                            anchors.centerIn: parent
+                            text: I18n.tr("Choose Picture…")
+                            color: glyphSheet.fg
+                            font.family: root.fam; font.pixelSize: Math.max(10, Math.round(13 * glyphSheet.k))
+                        }
+                        MouseArea { id: cpMa; anchors.fill: parent; onClicked: glyphSheet.choosePicture() }
                     }
                 }
 

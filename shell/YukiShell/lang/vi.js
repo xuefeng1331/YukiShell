@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "From This Folder": "Từ thư mục này",
+    "No files in this folder": "Thư mục này không có tệp nào",
+    "Choose Picture…": "Chọn ảnh…",
     "Shake to find": "Lắc để tìm",
     "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "Lắc chuột thật nhanh, con trỏ sẽ phóng to trong giây lát để bạn dễ thấy.",
     "Copy Text from Screen": "Sao chép văn bản trên màn hình",

@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "From This Folder": "이 폴더에서",
+    "No files in this folder": "이 폴더에 파일이 없음",
+    "Choose Picture…": "사진 선택…",
     "Shake to find": "흔들어서 찾기",
     "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "마우스를 빠르게 흔들면 포인터가 잠시 커져서 쉽게 찾을 수 있습니다.",
     "Copy Text from Screen": "화면에서 텍스트 복사",

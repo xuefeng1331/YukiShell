@@ -14,6 +14,9 @@ Item {
     property bool dropTarget: false      // another icon is being dragged over this one
     property bool dragging: false
     property string emoji: ""            // emoji shown on a folder ("" = none)
+    property string fallback: ""         // shown when source won't load (a folder's own picture that was deleted or moved)
+    property bool failed: false
+    onSourceChanged: failed = false
 
     readonly property int pad: 10
     readonly property int boxSize: iconSize + 2 * pad
@@ -63,7 +66,8 @@ Item {
         asynchronous: true; cache: true; smooth: true; mipmap: true
         fillMode: ic.item && ic.item.kind === "Image" ? Image.PreserveAspectCrop : Image.PreserveAspectFit
         sourceSize: Qt.size(ic.iconSize * 2, ic.iconSize * 2)
-        source: ic.source
+        source: ic.failed && ic.fallback !== "" ? ic.fallback : ic.source
+        onStatusChanged: if (status === Image.Error) ic.failed = true
     }
 
     // ── emoji set on a folder: drawn on the folder's body ──

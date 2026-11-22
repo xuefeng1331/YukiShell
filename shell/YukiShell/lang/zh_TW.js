@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "From This Folder": "來自此檔案夾",
+    "No files in this folder": "此檔案夾中沒有檔案",
+    "Choose Picture…": "選擇圖片…",
     "Shake to find": "搖晃以尋找",
     "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "快速搖晃滑鼠，指標會短暫變大，方便你找到它。",
     "Copy Text from Screen": "從螢幕拷貝文字",
