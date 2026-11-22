@@ -11,6 +11,7 @@ ShellRoot {
     property var clockApp: null
     property var aboutApp: null
     property var missionControl: null
+    property var windowBar: null
     FontLoader { id: uiFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Regular.otf") }
     FontLoader { id: uiBoldFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Semibold.otf") }
 
@@ -86,6 +87,7 @@ ShellRoot {
 
         property bool barWantsGeo: false
         property bool dockWantsGeo: false
+        property bool winBarWantsGeo: false
         property bool barWantsWallpaper: false
         property bool dockWantsWallpaper: false
         property bool widgetsWantWallpaper: false
@@ -227,7 +229,7 @@ ShellRoot {
         Timer {
             interval: sharedHub.geoHot ? 90 : 250
             repeat: true
-            running: (sharedHub.barWantsGeo || sharedHub.dockWantsGeo) && !sharedHub.ipcOk
+            running: (sharedHub.barWantsGeo || sharedHub.dockWantsGeo || sharedHub.winBarWantsGeo) && !sharedHub.ipcOk
             triggeredOnStart: true
             onTriggered: if (!geoProc.running) geoProc.running = true
         }
@@ -294,7 +296,7 @@ ShellRoot {
         Timer {
             interval: sharedHub.geoHot ? 16 : 400
             repeat: true
-            running: (sharedHub.barWantsGeo || sharedHub.dockWantsGeo) && !sharedHub.ipcBroken
+            running: (sharedHub.barWantsGeo || sharedHub.dockWantsGeo || sharedHub.winBarWantsGeo) && !sharedHub.ipcBroken
             triggeredOnStart: true
             onTriggered: sharedHub.ipcPoll()
         }
@@ -374,6 +376,7 @@ ShellRoot {
         clockApp = makePart("ClockApp", { hub: sharedHub });
         aboutApp = makePart("AboutApp", { hub: sharedHub });
         missionControl = makePart("MissionControl", { hub: sharedHub });
+        windowBar = makePart("WindowBar", { hub: sharedHub });
     }
 
     IpcHandler {
@@ -389,6 +392,12 @@ ShellRoot {
         function tab(name: string): void { clockApp.open(name); }
         function stop(): void { clockApp.stopRing(); }
         function snooze(): void { clockApp.snooze(); }
+    }
+    IpcHandler {
+        target: "tile"
+        // fill, center, left, right, top, bottom, topleft, topright, bottomleft, bottomright, restore
+        function to(kind: string): void { if (yukiBar) yukiBar.tile(kind); }
+        function window(kind: string, address: string): void { if (yukiBar) yukiBar.tile(kind, address); }
     }
     IpcHandler {
         target: "missioncontrol"

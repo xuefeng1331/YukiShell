@@ -3456,6 +3456,18 @@ Scope {
                         subtitle: I18n.tr("New windows float, centred, instead of tiling. Super + Alt + Space switches one window.")
                         SSwitch { t: pal; checked: root.bar ? root.bar.floatNewWindows : true; onToggled: v => { if (root.bar) root.bar.floatNewWindows = v; } }
                     }
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Window buttons")
+                        subtitle: I18n.tr("Close, minimize and zoom buttons on the active window. Hover the green one to move and resize it.")
+                        SSwitch { t: pal; checked: root.bar ? root.bar.windowBar : false; onToggled: v => { if (root.bar) root.bar.windowBar = v; } }
+                    }
+                    SRow {
+                        t: pal
+                        visible: root.bar ? root.bar.windowBar : false
+                        title: I18n.tr("Show the app name")
+                        SSwitch { t: pal; checked: root.bar ? root.bar.windowBarTitle : true; onToggled: v => { if (root.bar) root.bar.windowBarTitle = v; } }
+                    }
                 }
                 SLabel { t: pal; header: true; text: I18n.tr("Behavior") }
                 Loader { width: parent.width; sourceComponent: paneBehavior }

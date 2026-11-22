@@ -177,6 +177,8 @@ menu bar show each item's shortcut next to it.
 | `Super+Shift+F` | maximize, keeping the bar and gaps |
 | `Super+Alt+Space` | toggle floating (new windows open floating, centred; *Settings → Desktop & Dock → Open windows floating*) |
 | `Super+C` | centre a floating window |
+| `Super+Ctrl+Alt+Arrows` | tile the window into the left / right / top / bottom half (quarters: hover the green window button, *Settings → Desktop & Dock → Window buttons*, or the **Window** menu) |
+| `Super+Ctrl+F` / `Super+Ctrl+C` / `Super+Ctrl+R` | fill the screen / centre / return to the size it had before |
 | `Super+Shift+P` | pin a floating window to every workspace |
 | `Super+M` / `Super+Shift+M` | minimize / show minimized windows |
 | `Super+Alt+S` | hide the focused window (again: the next one); with nothing focused, bring them all back |
@@ -194,6 +196,7 @@ menu bar show each item's shortcut next to it.
 | `Super+Shift+O` | move the window to the next monitor |
 | `Super+Scroll` | next / previous workspace |
 | `Super+Tab` | back to the previous workspace |
+| `Super+Alt+Up` / `Super+Alt+Down` (or three fingers up / down) | Mission Control / every window of the current app |
 | `Super+Arrows` (or `H` `K` `N`) | move focus |
 | `Super+Shift+Arrows` | swap with the neighbouring window |
 | `Super+Ctrl+Arrows` | resize from the keyboard (hold it) |

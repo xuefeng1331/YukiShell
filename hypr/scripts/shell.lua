@@ -22,6 +22,13 @@ bind("SUPER + comma",   hl.dsp.exec_cmd(qs .. "notifications open"), "Notificati
 bind("SUPER + A",       hl.dsp.exec_cmd(qs .. "controlcenter toggle"), "Control Center")
 bind("SUPER + ALT + up",   hl.dsp.exec_cmd(qs .. "missioncontrol toggle"), "Mission Control")
 bind("SUPER + ALT + down", hl.dsp.exec_cmd(qs .. "missioncontrol appActive"), "App Exposé")
+bind("SUPER + CTRL + F", hl.dsp.exec_cmd(qs .. "tile to fill"), "Fill")
+bind("SUPER + CTRL + C", hl.dsp.exec_cmd(qs .. "tile to center"), "Center")
+bind("SUPER + CTRL + ALT + left",  hl.dsp.exec_cmd(qs .. "tile to left"), "Tile Left Half")
+bind("SUPER + CTRL + ALT + right", hl.dsp.exec_cmd(qs .. "tile to right"), "Tile Right Half")
+bind("SUPER + CTRL + ALT + up",    hl.dsp.exec_cmd(qs .. "tile to top"), "Tile Top Half")
+bind("SUPER + CTRL + ALT + down",  hl.dsp.exec_cmd(qs .. "tile to bottom"), "Tile Bottom Half")
+bind("SUPER + CTRL + R", hl.dsp.exec_cmd(qs .. "tile to restore"), "Return to Previous Size")
 hl.gesture({ fingers = 3, direction = "up", action = function() hl.exec_cmd(qs .. "missioncontrol toggle") end })
 hl.gesture({ fingers = 3, direction = "down", action = function() hl.exec_cmd(qs .. "missioncontrol appActive") end })
 

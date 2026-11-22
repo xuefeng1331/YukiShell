@@ -77,6 +77,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
 import "EmojiData.js" as EmojiData
+import "Tile.js" as Tile
 import "I18n.js" as I18n
 import "Fonts.js" as Fonts
 
@@ -167,6 +168,8 @@ Scope {
     property string cursorTheme: "Bibata-Modern-Classic"
     property int cursorSize: 24
     property bool cursorHideTyping: false
+    property bool windowBar: false
+    property bool windowBarTitle: true
     property real cursorHideIdle: 10
     property bool cursorFollowFocus: true
     property bool cursorWarpWs: false
@@ -396,7 +399,7 @@ Scope {
         "focusFullscreen", "focusAllowUrgent", "lockShowNotifs", "lockWallpaper", "uiSoundVolume", "alertSound",
         "kbRepeatRate", "kbRepeatDelay", "mouseSens", "mouseNatural", "mouseAccel", "tpNatural", "tpTap", "tpDwt", "tpScroll",
         "cursorTheme", "cursorSize", "cursorHideTyping", "cursorHideIdle", "cursorFollowFocus", "cursorWarpWs", "cursorZoom", "windowBorder", "floatNewWindows",
-        "wsNumerals"]
+        "wsNumerals", "windowBar", "windowBarTitle"]
     property var barWidgets: ["appleMenu", "appMenus", "workspaces", "volume", "keyboard", "notifications", "privacy", "controlCenter", "clock", "wifi", "bluetooth"]
     function barWidgetEnabled(id) { return barWidgets.indexOf(id) >= 0; }
     function resolvedBarLogoUrl() {
@@ -2921,6 +2924,56 @@ Scope {
     function msep() { return { kind: "sep" }; }
     function ico(item, g) { item.glyph = g; return item; }
     function hlx(expr) { Quickshell.execDetached(["hyprctl", "dispatch", expr]); }
+
+    // ── Move & Resize: tile a window into a half, a quarter, fill or centre it, and put it back ──
+    property var tileGeo: ({ gapsOut: 12, gapsIn: 6, border: 1 })
+    Process {
+        running: true
+        command: ["sh", "-c", "printf '['; hyprctl -j getoption general:gaps_out; printf ','; hyprctl -j getoption general:gaps_in; printf ','; hyprctl -j getoption general:border_size; printf ']'"]
+        stdout: StdioCollector { onStreamFinished: {
+            var o; try { o = JSON.parse(text); } catch (err) { return; }
+            function num(x) { return x ? (x.int !== undefined ? x.int : parseInt(String(x.css || x.str || "").split(" ")[0]) || 0) : 0; }
+            root.tileGeo = { gapsOut: num(o[0]), gapsIn: num(o[1]), border: num(o[2]) };
+        } }
+    }
+    property var tilePrev: ({})          // address -> where it was before its first tile (Return to Previous Size)
+    property string tileKind: ""
+    property string tileAddr: ""
+    function tile(kind, addr) {           // addr "" = the active window
+        tileKind = kind; tileAddr = addr || "";
+        tileProc.command = tileAddr ? ["hyprctl", "-j", "clients"] : ["hyprctl", "-j", "activewindow"];
+        tileProc.running = true;
+    }
+    Process {
+        id: tileProc
+        stdout: StdioCollector { onStreamFinished: {
+            var o; try { o = JSON.parse(text); } catch (err) { return; }
+            if (Array.isArray(o)) o = o.filter(function (c) { return c.address === root.tileAddr; })[0];
+            if (o && o.address) root.tileWindow(o, root.tileKind);
+        } }
+    }
+    function tileWindow(c, kind) {
+        var sel = 'window = "address:' + c.address + '"', P = {}, k;
+        for (k in tilePrev) P[k] = tilePrev[k];
+        function place(r) {
+            return 'hl.dispatch(hl.dsp.window.resize({ x = ' + r.w + ', y = ' + r.h + ', "exact", ' + sel + ' })); '
+                 + 'hl.dispatch(hl.dsp.window.move({ x = ' + r.x + ', y = ' + r.y + ', "exact", ' + sel + ' }))';
+        }
+        if (kind === "restore") {
+            var p = P[c.address];
+            if (!p) return;
+            delete P[c.address]; tilePrev = P;
+            Quickshell.execDetached(["hyprctl", "eval", p.floating ? place(p) : 'hl.dispatch(hl.dsp.window.float({ action = "disable", ' + sel + ' }))']);
+            return;
+        }
+        var mons = hub ? (hub.monData || []) : [], mon = null;
+        for (var i = 0; i < mons.length; i++) if (mons[i].id === c.monitor) mon = mons[i];
+        if (!mon || c.fullscreen > 0) return;
+        var g = tileGeo, r = Tile.rect(kind, Tile.area(mon, g.gapsOut, g.border), 2 * g.gapsIn + 2 * g.border, { w: c.size[0], h: c.size[1] });
+        if (!r) return;
+        if (!P[c.address]) { P[c.address] = { floating: !!c.floating, x: c.at[0], y: c.at[1], w: c.size[0], h: c.size[1] }; tilePrev = P; }
+        Quickshell.execDetached(["hyprctl", "eval", (c.floating ? "" : 'hl.dispatch(hl.dsp.window.float({ action = "enable", ' + sel + ' })); ') + place(r)]);
+    }
     function disp(expr) { return function () { root.hlx(expr); }; }
     // Menu shortcuts are sent to the focused window with Hyprland's sendshortcut (no extra tool needed).
     // If some app ignores them, set this to true to type them with wtype instead.
@@ -3594,6 +3647,14 @@ Scope {
                     m.push(mi("Minimize", hk("Minimize Window"), disp('hl.dsp.window.move({ workspace = "special:minimized", follow = false })')));
                     m.push(mchk("Zoom", hk("Maximize Window"), fsMode === 1, disp('hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })')));
                     m.push(mi(floating ? "Tile Window" : "Float Window", hk("Toggle Floating"), disp('hl.dsp.window.float({ action = "toggle" })')));
+                    m.push(msep());
+                    m.push(mi("Fill", hk("Fill"), function () { root.tile("fill"); }));
+                    m.push(mi("Center", hk("Center"), function () { root.tile("center"); }));
+                    m.push(mi("Left Half", hk("Tile Left Half"), function () { root.tile("left"); }));
+                    m.push(mi("Right Half", hk("Tile Right Half"), function () { root.tile("right"); }));
+                    m.push(mi("Top Half", hk("Tile Top Half"), function () { root.tile("top"); }));
+                    m.push(mi("Bottom Half", hk("Tile Bottom Half"), function () { root.tile("bottom"); }));
+                    if (aw && root.tilePrev[aw.address]) m.push(mi("Return to Previous Size", hk("Return to Previous Size"), function () { root.tile("restore"); }));
                     m.push(msep());
                     m.push(mi("Move Window Left", hk("Swap Window with Neighbour"), disp('hl.dsp.window.swap({ direction = "left" })')));
                     m.push(mi("Move Window Right", hk("Swap Window with Neighbour").replace("\u2190", "\u2192"), disp('hl.dsp.window.swap({ direction = "right" })')));
