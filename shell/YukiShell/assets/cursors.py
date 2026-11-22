@@ -6,6 +6,8 @@
   cursors.py install <folder>      copy a cursor theme folder (one with a "cursors" or "hyprcursors" folder inside, or holding one
                                    such theme) into ~/.local/share/icons, or turn a Windows cursor pack (.cur / .ani, GIF
                                    animations) into one (wincursor.py); prints the theme's id
+  cursors.py arrow <theme>         the theme's arrow at its largest size for shake to find (CursorFinder.qml), as JSON
+                                   {png, size (the image's nominal size), x, y (hotspot)}; {} if it has no Xcursor arrow
   cursors.py apply <theme> <size>  use it now and from the next login: Hyprland (setcursor + the environment new apps get), GTK,
                                    KDE/Qt apps, X apps (the "default" theme), and ~/.config/yukishell/cursor for hypr/scripts/look.lua
 """
@@ -36,7 +38,8 @@ def theme_name(d, fallback):
     return fallback
 
 def xcursor_png(path, out, want=48):
-    """The image of an Xcursor file closest to `want` px, written as a PNG. False if it is not an Xcursor file."""
+    """The image of an Xcursor file closest to `want` px, written as a PNG: (nominal size, width, height, x hotspot, y hotspot).
+    False if it is not an Xcursor file."""
     with open(path, "rb") as f:
         data = f.read()
     if data[:4] != b"Xcur":
@@ -49,7 +52,7 @@ def xcursor_png(path, out, want=48):
             best = (sub, pos)
     if not best:
         return False
-    _, _, _, _, w, h, _, _, _ = struct.unpack_from("<IIIIIIIII", data, best[1])
+    _, _, _, _, w, h, xhot, yhot, _ = struct.unpack_from("<IIIIIIIII", data, best[1])
     px = data[best[1] + 36: best[1] + 36 + w * h * 4]
     rows = bytearray()
     for y in range(h):
@@ -68,7 +71,7 @@ def xcursor_png(path, out, want=48):
     with open(tmp, "wb") as f:
         f.write(png)
     os.replace(tmp, out)
-    return True
+    return best[0], w, h, xhot, yhot
 
 def preview(tid, d):
     os.makedirs(CACHE, exist_ok=True)
@@ -85,6 +88,23 @@ def preview(tid, d):
         except (OSError, struct.error, ValueError):
             pass
     return ""
+
+def arrow(theme):
+    os.makedirs(CACHE, exist_ok=True)
+    out = os.path.join(CACHE, "big-" + theme.replace("/", "_") + ".png")
+    for base in ICON_DIRS:
+        for n in ("left_ptr", "default", "arrow", "top_left_arrow"):
+            src = os.path.join(base, theme, "cursors", n)
+            if not os.path.exists(src):
+                continue
+            try:
+                r = xcursor_png(src, out, 1024)
+            except (OSError, struct.error, ValueError):
+                r = False
+            if r:
+                print(json.dumps({"png": out, "size": r[0], "x": r[3], "y": r[4]}))
+                return
+    print("{}")
 
 def list_themes():
     seen, out = set(), []
@@ -163,6 +183,8 @@ if __name__ == "__main__":
         list_themes()
     elif a[:1] == ["install"] and len(a) == 2:
         install(a[1])
+    elif a[:1] == ["arrow"] and len(a) == 2:
+        arrow(a[1])
     elif a[:1] == ["apply"] and len(a) == 3:
         apply(a[1], a[2])
     else:

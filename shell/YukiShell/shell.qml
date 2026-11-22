@@ -12,6 +12,7 @@ ShellRoot {
     property var aboutApp: null
     property var missionControl: null
     property var windowBar: null
+    property var cursorFinder: null
     FontLoader { id: uiFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Regular.otf") }
     FontLoader { id: uiBoldFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Semibold.otf") }
 
@@ -377,6 +378,7 @@ ShellRoot {
         aboutApp = makePart("AboutApp", { hub: sharedHub });
         missionControl = makePart("MissionControl", { hub: sharedHub });
         windowBar = makePart("WindowBar", { hub: sharedHub });
+        cursorFinder = makePart("CursorFinder", { hub: sharedHub });
     }
 
     IpcHandler {

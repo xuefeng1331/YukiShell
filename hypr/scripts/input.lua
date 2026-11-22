@@ -12,21 +12,11 @@ hl.config({
 
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
--- Shake the pointer to find it: it grows for a moment, as on macOS. Settings → Cursor switches it (SHAKE_TO_FIND).
+-- Shake the pointer to find it, as on macOS. Settings → Cursor switches it (SHAKE_TO_FIND). The shell (CursorFinder.qml) hides
+-- the real cursor and draws a big one: resizing the real one reloads the whole cursor theme, which froze everything each time.
 local Shake = require("scripts.shake")
-local shake = { x = Shake.new(), y = Shake.new(), t = 0, quiet = -1000, size = 0, base = 24, theme = "" }
-local function cursorLook()   -- what Settings last applied (assets/cursors.py writes it), as look.lua reads it
-    local theme, size = "Bibata-Modern-Classic", 24
-    local f = io.open((os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/yukishell/cursor", "r")
-    if f then
-        local t, s = f:read("l"), f:read("l")
-        f:close()
-        if t and t ~= "" then theme = t end
-        size = tonumber(s) or size
-    end
-    return theme, size
-end
-local function setSize(n) hl.exec_cmd(string.format("hyprctl setcursor '%s' %d", shake.theme, n)) end
+local shake = { x = Shake.new(), y = Shake.new(), t = 0, big = false, unhide = 0 }
+local function tell(what) hl.exec_cmd("qs -c YukiShell ipc call cursor " .. what) end
 local function shakeTick()
     local c = hl.get_cursor_pos()
     if not c then return end
@@ -34,20 +24,24 @@ local function shakeTick()
     local now = shake.t
     local hit = Shake.feed(shake.x, c.x, now)
     hit = Shake.feed(shake.y, c.y, now) or hit
-    if hit then
-        shake.quiet = now
-        if shake.size == 0 then shake.theme, shake.base = cursorLook(); shake.size = shake.base end
+    if hit and not shake.big then
+        local w = hl.get_active_window()
+        if w and (w.fullscreen or 0) > 0 then hit = false end   -- a game or a video: the shaking is meant for it
     end
-    if shake.size == 0 then return end
-    -- grow to three times the size in a few steps, and shrink back the same way once the shaking stops
-    local target = now - shake.quiet < 250 and shake.base * 3 or shake.base
-    local n = target > shake.size and math.min(target, math.floor(shake.size * 1.5)) or math.max(target, math.floor(shake.size / 1.5))
-    if n ~= shake.size then shake.size = n; setSize(n) end
-    if n == shake.base and target == shake.base then shake.size = 0 end
+    if hit and not shake.big then
+        shake.big, shake.unhide = true, 0
+        tell(string.format("grow %d %d", math.floor(c.x), math.floor(c.y)))
+    elseif shake.big and now - math.max(shake.x.at[#shake.x.at] or 0, shake.y.at[#shake.y.at] or 0) > 350 then
+        -- no turn for a moment: the shaking stopped. Forget the old turns, or it would grow again straight away
+        shake.big, shake.unhide = false, now + 700
+        shake.x.at, shake.y.at = {}, {}
+        tell("shrink")
+    end
+    -- the shell shows the real cursor again once its big one has shrunk; this is for when the shell is gone
+    if shake.unhide > 0 and now >= shake.unhide then shake.unhide = 0; hl.config({ cursor = { invisible = false } }) end
 end
 function SHAKE_TO_FIND(on)
     if on and not shake.timer then shake.timer = hl.timer(shakeTick, { timeout = 30, type = "repeat" }) return end
     if shake.timer then shake.timer:set_enabled(on) end
-    if not on and shake.size > 0 then shake.size = 0; setSize(shake.base) end
+    if not on and shake.big then shake.big = false; tell("shrink"); hl.config({ cursor = { invisible = false } }) end
 end
-SHAKE_TO_FIND(true)
