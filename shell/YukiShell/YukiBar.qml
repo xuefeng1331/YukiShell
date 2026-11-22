@@ -2043,7 +2043,7 @@ Scope {
     function refreshWifi() { if (!wifiProc.running) wifiProc.running = true; }
     Process {
         id: wifiProc
-        command: ["sh", "-c", "nmcli radio wifi 2>/dev/null; nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi 2>/dev/null | grep '^yes' | head -n1; echo; nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected$' && echo eth || echo -; { [ -n \"$(ls /sys/class/ieee80211 2>/dev/null)\" ] || nmcli -t -f TYPE dev 2>/dev/null | grep -qx wifi; } && echo hw || echo nohw"]
+        command: ["sh", "-c", "nmcli radio wifi 2>/dev/null; nmcli -t -f IN-USE,SSID,SIGNAL dev wifi 2>/dev/null | grep '^\\*' | head -n1; echo; nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected$' && echo eth || echo -; { [ -n \"$(ls /sys/class/ieee80211 2>/dev/null)\" ] || nmcli -t -f TYPE dev 2>/dev/null | grep -qx wifi; } && echo hw || echo nohw"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var l = text.split("\n");
