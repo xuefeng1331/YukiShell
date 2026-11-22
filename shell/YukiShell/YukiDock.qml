@@ -5525,8 +5525,9 @@ Scope {
             })(path, name, dir === true);
         }
         if (n === 0) m.push({ kind: "item", label: I18n.tr("No downloads"), disabled: true });
-        m.push({ kind: "sep" });
+        m.push({ kind: "sep", foot: true });
         m.push({ kind: "item", label: I18n.tr("Open Downloads Folder"), run: function () { Quickshell.execDetached(["xdg-open", root.downloadsDir]); } });
+        m.push({ kind: "item", label: I18n.tr("Remove from Dock"), run: function () { root.showDownloads = false; } });
         return m;
     }
     property var knownKeys: ({})
@@ -7227,7 +7228,11 @@ Scope {
                     Behavior on scale { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
                     width: ui.menuModel.some(function (m) { return !!m.icon; }) ? 300 : 224
-                    height: menuCol.height + 12
+                    // no taller than the room above the Dock: a long menu (the Downloads stack) scrolls, its actions (after a "foot" separator) stay put
+                    readonly property int footAt: ui.menuModel.findIndex(function (m) { return m.foot === true; })
+                    readonly property var body: footAt < 0 ? ui.menuModel : ui.menuModel.slice(0, footAt)
+                    readonly property var foot: footAt < 0 ? [] : ui.menuModel.slice(footAt)
+                    height: Math.min(menuCol.height + menuFoot.height + 12, ui.height - root.margin - root.bgHeight - root.iconSize * (root.effMag - 1) - 20)
                     x: Math.round(Math.max(8, Math.min(ui.width - width - 8, ui.menuCx - width / 2)))
                     y: Math.round(ui.height - root.margin - root.bgHeight - root.iconSize * (root.effMag - 1) - 12 - height)
                     readonly property point bpos: glassBackdrop.item ? glassBackdrop.item.mapFromItem(ui, x, y) : Qt.point(x, y)
@@ -7261,23 +7266,37 @@ Scope {
                         tint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
                     }
 
+                    Flickable {
+                        x: 6; y: 6
+                        width: parent.width - 12; height: parent.height - 12 - menuFoot.height
+                        clip: true
+                        contentHeight: menuCol.height
+                        interactive: contentHeight > height
+                        boundsBehavior: Flickable.StopAtBounds
+                        readonly property var model: ui.menuModel
+                        onModelChanged: contentY = 0   // a new menu starts at its top
                     Column {
                         id: menuCol
-                        x: 6
-                        y: 6
-                        width: parent.width - 12
-
-                        Repeater {
-                            model: ui.menuModel
-
-                            delegate: Item {
+                        width: menu.width - 12
+                        Repeater { model: menu.body; delegate: menuRow }
+                    }
+                    }
+                    Column {
+                        id: menuFoot
+                        x: 6; y: parent.height - 6 - height
+                        width: menu.width - 12
+                        Repeater { model: menu.foot; delegate: menuRow }
+                    }
+                    Component {
+                        id: menuRow
+                            Item {
                                 id: mi
                                 required property var modelData
                                 readonly property bool isSep: modelData.kind === "sep"
                                 readonly property bool off: !isSep && modelData.disabled === true
                                 readonly property bool armedNow: !isSep && modelData.confirm === true && ui.armed === modelData.label
                                 readonly property bool hot: !isSep && !off && mia.containsMouse
-                                width: menuCol.width
+                                width: menu.width - 12
                                 height: isSep ? 8 : 28
 
                                 Rectangle {
@@ -7329,7 +7348,6 @@ Scope {
                                     }
                                 }
                             }
-                        }
                     }
                 }
             }
