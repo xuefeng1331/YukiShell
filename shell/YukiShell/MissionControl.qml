@@ -15,6 +15,12 @@ Scope {
     readonly property var dock: hub ? hub.dock : null
     readonly property var bar: hub ? hub.bar : null
     readonly property string fam: dock ? dock.fontFamily : "Open Runde"
+    // borders as the windows have them on the desktop: their thickness, the accent colour, full on the active window
+    readonly property int borderW: bar ? Math.max(0, Math.min(8, Math.round(bar.windowBorder))) : 1
+    readonly property color accent: bar ? bar.accent : "#0A84FF"
+    function ink(a) { return Qt.rgba(accent.r, accent.g, accent.b, a); }
+    readonly property string activeAddr: Hyprland.activeToplevel ? "0x" + String(Hyprland.activeToplevel.address).replace(/^0x/, "") : ""
+    readonly property bool dark: dock ? dock.darkMode : true
 
     property bool shown: false
     property string appClass: ""          // "" = Mission Control, a window class = App Exposé
@@ -225,11 +231,11 @@ Scope {
                                 width: Math.round(height * w.sw / Math.max(1, w.sh))
                                 Rectangle {
                                     anchors.fill: parent
-                                    anchors.margins: -3
-                                    radius: 10
+                                    anchors.margins: -border.width
+                                    radius: 7 + border.width
                                     color: "transparent"
-                                    border.width: 3
-                                    border.color: sp.cur ? "white" : Qt.rgba(1, 1, 1, sp.hot ? 0.55 : 0)
+                                    border.width: Math.max(1, root.borderW)
+                                    border.color: sp.cur ? root.accent : root.ink(sp.hot ? 0.55 : 0)
                                 }
                                 Item {
                                     id: spPic
@@ -246,7 +252,8 @@ Scope {
                                             width: modelData.size[0] * k; height: modelData.size[1] * k
                                             radius: 3
                                             color: Qt.rgba(0.16, 0.16, 0.18, 0.92)
-                                            border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.12)
+                                            border.width: Math.min(1, root.borderW)
+                                            border.color: "0x" + String(modelData.address).replace(/^0x/, "") === root.activeAddr ? root.accent : root.ink(0.25)
                                             Image {
                                                 anchors.centerIn: parent
                                                 width: Math.min(28, parent.width * 0.6, parent.height * 0.6); height: width
@@ -278,7 +285,7 @@ Scope {
                                 anchors.fill: parent
                                 radius: 8
                                 color: Qt.rgba(1, 1, 1, plusHover.hovered ? 0.22 : 0.12)
-                                border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.25)
+                                border.width: Math.max(1, root.borderW); border.color: root.ink(plusHover.hovered ? 0.85 : 0.35)
                             }
                             Text { anchors.centerIn: parent; text: "+"; color: "white"; font.pixelSize: 30; font.weight: Font.Light }
                             HoverHandler { id: plusHover }
@@ -331,8 +338,9 @@ Scope {
                         RectangularShadow {
                             anchors.fill: parent
                             radius: 10
-                            blur: 28; spread: 0; offset.y: 8
-                            color: Qt.rgba(0, 0, 0, 0.45 * wi.k)
+                            blur: 28; spread: wi.hot && !wi.dragging ? 4 : 0; offset.y: wi.hot && !wi.dragging ? 0 : 8
+                            color: wi.hot && !wi.dragging ? root.ink(0.7 * wi.k) : Qt.rgba(0, 0, 0, 0.45 * wi.k)
+                            Behavior on color { ColorAnimation { duration: 120 } }
                         }
                         Item {
                             id: pic
@@ -360,13 +368,14 @@ Scope {
                             }
                         }
                         Item { id: picMask; anchors.fill: parent; visible: false; layer.enabled: true; Rectangle { anchors.fill: parent; radius: 10; color: "black" } }
-                        Rectangle {
+                        Rectangle {   // the window's own border
+                            visible: root.borderW > 0
                             anchors.fill: parent
-                            anchors.margins: -4
-                            radius: 13
+                            anchors.margins: -root.borderW
+                            radius: 10 + root.borderW
                             color: "transparent"
-                            border.width: 4
-                            border.color: Qt.rgba(1, 1, 1, wi.hot && !wi.dragging ? 0.85 : 0)
+                            border.width: root.borderW
+                            border.color: (wi.hot && !wi.dragging) || wi.addr === root.activeAddr ? root.accent : root.ink(0.25)
                             Behavior on border.color { ColorAnimation { duration: 120 } }
                         }
                         Image {   // the app's icon on the bottom edge, as macOS draws it
@@ -384,7 +393,8 @@ Scope {
                             anchors.top: parent.bottom; anchors.topMargin: 32
                             width: Math.min(titleText.implicitWidth + 24, Math.max(160, parent.width + 80)); height: 26
                             radius: 13
-                            color: Qt.rgba(0.1, 0.1, 0.12, 0.82)
+                            color: root.dark ? Qt.rgba(0.1, 0.1, 0.12, 0.82) : Qt.rgba(0.97, 0.97, 0.98, 0.9)
+                            border.width: 1; border.color: root.ink(0.35)
                             Text {
                                 id: titleText
                                 anchors.centerIn: parent
@@ -392,7 +402,7 @@ Scope {
                                 horizontalAlignment: Text.AlignHCenter
                                 elide: Text.ElideRight
                                 text: wi.title
-                                color: "white"
+                                color: root.dark ? "white" : "#1D1D1F"
                                 font.family: Fonts.forWeight(Font.DemiBold, root.fam); font.pixelSize: 12; font.weight: Font.DemiBold
                             }
                         }
