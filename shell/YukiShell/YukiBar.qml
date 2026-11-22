@@ -78,6 +78,7 @@ import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
 import "EmojiData.js" as EmojiData
 import "Tile.js" as Tile
+import "NotifGroups.js" as NotifGroups
 import "I18n.js" as I18n
 import "Fonts.js" as Fonts
 
@@ -4381,10 +4382,11 @@ Scope {
         else if (n.urgency === NotificationUrgency.Low) urg = 0;
         var rec = {
             nid: id, app: n.appName || "", summary: n.summary || "", body: n.body || "",
-            icon: ic || "", urgency: urg, time: Date.now(),
+            icon: ic || "", urgency: urg, time: Date.now(), fresh: !root.notifOpen,
             timeout: n.expireTimeout > 0 ? Math.round(n.expireTimeout * 1000) : 0
         };
         notifHist.insert(0, rec);
+        NotifGroups.gather(notifHist);
         while (notifHist.count > 60) {
             var old = notifHist.get(notifHist.count - 1).nid;
             notifHist.remove(notifHist.count - 1);
@@ -4407,7 +4409,19 @@ Scope {
         try { n.bodyChanged.connect(function () { upd("body", n.body); }); } catch (e) {}
     }
     onNotifUnreadChanged: lockNotifSave.restart()
-    Connections { target: notifHist; function onCountChanged() { lockNotifSave.restart(); } }
+    Connections {
+        target: notifHist
+        function onCountChanged() { lockNotifSave.restart(); }
+        function onRowsInserted() { Qt.callLater(root.ncRegroup); }
+        function onRowsRemoved() { Qt.callLater(root.ncRegroup); }
+        function onRowsMoved() { Qt.callLater(root.ncRegroup); }
+    }
+    // Notification Center: one stack per app, opened by a click
+    property var ncGroups: ({})
+    property var ncOpenApps: ({})
+    function ncRegroup() { ncGroups = NotifGroups.runs(notifHist); }
+    function ncSetOpen(app, on) { var o = {}; for (var k in ncOpenApps) o[k] = ncOpenApps[k]; if (on) o[app] = true; else delete o[app]; ncOpenApps = o; }
+    signal notifDustApp(string app)
     Timer { id: lockNotifSave; interval: 300; onTriggered: root.lockNotifWrite() }
     function appIconFor(app) {
         if (!app) return "";
@@ -4417,10 +4431,10 @@ Scope {
         return Quickshell.iconPath(nm, true) || "";
     }
     function lockNotifWrite() {
-        var out = [], n = lockShowNotifs ? Math.min(notifUnread, notifHist.count, 20) : 0;
-        for (var i = 0; i < n; i++) {
+        var out = [];
+        for (var i = 0; lockShowNotifs && i < notifHist.count && out.length < 20; i++) {
             var r = notifHist.get(i);
-            out.push({ id: r.nid, app: r.app || "Notification", icon: appIconFor(r.app), time: r.time });
+            if (r.fresh) out.push({ id: r.nid, app: r.app || "Notification", icon: appIconFor(r.app), time: r.time });
         }
         Quickshell.execDetached(["sh", "-c", "mkdir -p \"$HOME/.cache/yukishell\" && printf '%s\\n' \"$1\" > \"$HOME/.cache/yukishell/lock-notifs.json.tmp\" && mv -f \"$HOME/.cache/yukishell/lock-notifs.json.tmp\" \"$HOME/.cache/yukishell/lock-notifs.json\"",
             "sh", JSON.stringify(out)]);
@@ -4435,7 +4449,7 @@ Scope {
         notifToastRemove(id);
         var i = notifIndex(notifHist, id);
         if (i >= 0) {
-            if (i < root.notifUnread) root.notifUnread--;  // unread ones are the newest, at the top of the history
+            if (notifHist.get(i).fresh && root.notifUnread > 0) root.notifUnread--;
             notifHist.remove(i);
         }
         var n = root.notifRefs[id];
@@ -4447,7 +4461,7 @@ Scope {
     property bool notifFlying: false
     onNotifMergeFromChanged: { if (Object.keys(notifMergeFrom).length > 0) { notifFlying = true; flyEnd.restart(); } }
     Timer { id: flyEnd; interval: 900; onTriggered: root.notifFlying = false }
-    onNotifOpenChanged: if (!notifOpen) notifMergeFrom = ({})
+    onNotifOpenChanged: if (!notifOpen) { notifMergeFrom = ({}); ncOpenApps = ({}); }
     function notifClearAnimated() {
         if (notifHist.count === 0) return;
         notifClearing = true;
@@ -5307,7 +5321,7 @@ Scope {
                     if (pop !== "cc" && ccEdit) { root.ccEditCancel(); ccEdit = false; }
                     if (pop !== "cc") ccPage = "";
                     root.notifOpen = (pop === "notif");
-                    if (root.notifOpen) root.notifUnread = 0;
+                    if (root.notifOpen) { root.notifUnread = 0; for (var ni = 0; ni < notifHist.count; ni++) notifHist.setProperty(ni, "fresh", false); }
                     if (pop === "wifi") { root.wifiError = ""; root.scanWifi(); root.refreshConnections(); }
                     if (pop === "bt") { root.btError = ""; root.scanBt(); root.refreshBt(); }
                     if (pop === "spot") {
@@ -6783,9 +6797,19 @@ Scope {
                                         target: root
                                         function onNotifMergeFromChanged() { Qt.callLater(hcd.flyFromPopup); }
                                     }
-                                    height: hc.height * inT
-                                    cardH: hc.height
-                                    opacity: inT
+                                    readonly property var grp: root.ncGroups[nid] || ({ head: true, n: 1 })
+                                    readonly property bool grpOpen: root.ncOpenApps[app] === true
+                                    readonly property bool stacked: grp.head && grp.n > 1 && !grpOpen
+                                    property real foldT: grp.head || grpOpen ? 0 : 1
+                                    Behavior on foldT { NumberAnimation { duration: 340; easing.type: Easing.OutCubic } }
+                                    property real headH: grp.head && grp.n > 1 && grpOpen ? 30 : 0
+                                    Behavior on headH { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                                    property real peek: stacked ? (grp.n > 2 ? 12 : 6) : 0
+                                    Behavior on peek { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                                    visible: foldT < 0.99
+                                    height: (headH + hc.height + peek) * inT * (1 - foldT)
+                                    cardH: headH + hc.height + peek
+                                    opacity: inT * (1 - foldT)
                                     transform: [
                                         Scale { origin.x: hcd.width; origin.y: 0; xScale: hcd.flipS; yScale: hcd.flipS },
                                         Translate { x: hcd.flipX; y: (hcd.inT - 1) * 18 + hcd.flipY }
@@ -6801,7 +6825,63 @@ Scope {
                                             hcd.dissolve(hcd.index * 55);
                                             collapseT.interval = 120 + hcd.index * 55; collapseT.restart();
                                         }
+                                        function onNotifDustApp(a) { if (a === hcd.app) hcd.dissolve(1 + Math.max(0, hcd.index) % 8 * 40); }
                                     }
+                                // the app's name, Show Less and clear, over an open stack
+                                Item {
+                                    width: hcd.width; height: hcd.headH
+                                    visible: hcd.headH > 1
+                                    opacity: hcd.headH / 30
+                                    Text {
+                                        anchors.left: parent.left; anchors.leftMargin: 6; anchors.right: grpBtns.left; anchors.rightMargin: 8
+                                        y: 2
+                                        text: hcd.app !== "" ? hcd.app : I18n.tr("Notification")
+                                        elide: Text.ElideRight
+                                        color: pal.fg
+                                        font.family: root.fontForWeight(Font.DemiBold, pal.fam); font.pixelSize: 14; font.weight: Font.DemiBold
+                                    }
+                                    Row {
+                                        id: grpBtns
+                                        anchors.right: parent.right; y: 0
+                                        spacing: 6
+                                        Rectangle {
+                                            width: lessText.implicitWidth + 20; height: 22; radius: 11
+                                            color: lessMa.containsMouse ? pal.btnHover : pal.btnOff
+                                            Text {
+                                                id: lessText
+                                                anchors.centerIn: parent
+                                                text: I18n.tr("Show Less")
+                                                color: pal.fg
+                                                font.family: root.fontForWeight(Font.Medium, pal.fam); font.pixelSize: 12; font.weight: Font.Medium
+                                            }
+                                            MouseArea { id: lessMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.ncSetOpen(hcd.app, false) }
+                                        }
+                                        Rectangle {
+                                            width: 22; height: 22; radius: 11
+                                            color: grpXMa.containsMouse ? pal.btnHover : pal.btnOff
+                                            Glyph { anchors.centerIn: parent; width: 12; height: 12; kind: "close"; color: pal.fg }
+                                            MouseArea { id: grpXMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.notifDustApp(hcd.app) }
+                                        }
+                                    }
+                                }
+                                // the cards under a closed stack, peeking out below it
+                                Repeater {
+                                    model: 2
+                                    Item {
+                                        required property int index
+                                        readonly property real inset: 14 * (index + 1)
+                                        visible: hcd.peek > index * 6 + 0.5
+                                        clip: true
+                                        x: inset; width: hcd.width - 2 * inset
+                                        y: hcd.headH + hc.height; height: Math.max(0, Math.min(6, hcd.peek - index * 6)) + index * 6
+                                        z: -1 - index
+                                        Rectangle {
+                                            width: parent.width; y: -24; height: parent.height + 24; radius: 14
+                                            color: pal.tile; opacity: 0.8 - 0.25 * parent.index
+                                            border.width: 1; border.color: Qt.rgba(pal.tileBorder.r, pal.tileBorder.g, pal.tileBorder.b, pal.tileBorder.a * 0.4)
+                                        }
+                                    }
+                                }
                                 Rectangle {
                                     id: hc
                                     readonly property int nid: hcd.nid
@@ -6812,6 +6892,7 @@ Scope {
                                     readonly property int urgency: hcd.urgency
                                     readonly property real time: hcd.time
                                     width: hcd.width
+                                    y: hcd.headH
                                     height: hbody.height
                                     radius: 18
                                     color: pal.tile
@@ -6819,7 +6900,7 @@ Scope {
                                     HoverHandler { id: hhov }
                                     MouseArea {
                                         anchors.fill: parent
-                                        onClicked: { root.notifActivate(hc.nid); ui.pop = ""; }
+                                        onClicked: { if (hcd.stacked) root.ncSetOpen(hcd.app, true); else { root.notifActivate(hc.nid); ui.pop = ""; } }
                                     }
                                     NotifBody {
                                         id: hbody
@@ -6829,7 +6910,7 @@ Scope {
                                         urgency: hc.urgency; stamp: hc.time; nowMs: clock.date.getTime()
                                         showTime: true
                                         showClose: hhov.hovered
-                                        onCloseClicked: hcd.dissolve(1)
+                                        onCloseClicked: { if (hcd.stacked) root.notifDustApp(hcd.app); else hcd.dissolve(1); }
                                     }
                                 }
                                 }
