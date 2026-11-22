@@ -8,6 +8,13 @@ Item {
 
     property var backdrop: null
     property bool live: false
+    // frozen: keep the blurred picture as it is (no re-capture) until false again; it takes hold after a moment, so the bubble first
+    // gets one current picture at its final place
+    property bool frozen: false
+    property bool hold: false
+    Timer { id: holdT; interval: 160; onTriggered: gp.hold = true }
+    onFrozenChanged: { if (frozen) holdT.restart(); else { holdT.stop(); hold = false; } }
+    property bool shadow: true           // false: no drop shadow (the canvas is not even painted)
     property bool dark: false
     property real k: 1
     property real radius: 16
@@ -32,13 +39,13 @@ Item {
     readonly property string shapeKey: [width, bodyH, tailW, tailH, tailTipR, tailX, radius, dark, live, k, tinted, accent].join("|")
 
     function syncPos() {
-        if (!gp.backdrop) return;
+        if (!gp.backdrop || gp.hold) return;
         var p = gp.backdrop.mapFromItem(gp, 0, 0);
         if (Math.abs(p.x - gp.bx) > 0.01) gp.bx = p.x;
         if (Math.abs(p.y - gp.by) > 0.01) gp.by = p.y;
     }
     FrameAnimation {
-        running: gp.live && gp.visible && gp.backdrop !== null
+        running: gp.live && gp.visible && gp.backdrop !== null && !gp.hold
         onTriggered: gp.syncPos()
     }
     onVisibleChanged: if (visible) syncPos()
@@ -46,13 +53,14 @@ Item {
 
     Canvas {
         id: shadowCv
+        visible: gp.shadow
         x: -gp.sp; y: -gp.sp
         width: gp.width + 2 * gp.sp
         height: gp.height + 2 * gp.sp
         onPaint: {
             var ctx = getContext("2d");
             ctx.reset();
-            if (gp.width < 2 || gp.bodyH < 2) return;
+            if (!gp.shadow || gp.width < 2 || gp.bodyH < 2) return;
             ctx.shadowColor = gp.dark ? "rgba(0,0,0,0.50)" : "rgba(0,0,0,0.26)";
             ctx.shadowBlur = 20 * gp.k;
             ctx.shadowOffsetX = 0;
@@ -84,7 +92,7 @@ Item {
                 id: ses
                 sourceItem: gp.backdrop
                 sourceRect: Qt.rect(gp.bx - gp.m, gp.by - gp.m, gp.width + 2 * gp.m, gp.height + 2 * gp.m)
-                live: gp.visible
+                live: gp.visible && !gp.hold
                 visible: false
             }
             Shape {

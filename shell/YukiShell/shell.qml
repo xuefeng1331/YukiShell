@@ -80,6 +80,8 @@ ShellRoot {
         property var clock: clockApp
         property var about: aboutApp
         property var mission: missionControl
+        property var desktop: desktopIcons
+        property var dfocus: desktopFocus
         function openSettings(pane) { yukiDock.openPrefs(pane); }
 
         property bool barWantsGeo: false
@@ -350,6 +352,8 @@ ShellRoot {
 
     AudioVis { id: audioVis }
     DesktopFocus { id: desktopFocus; enabled: sharedHub.bar ? sharedHub.bar.cursorFollowFocus !== false : true }
+    // the files on the desktop; declared before the widgets are made, so its layer stays under theirs
+    Desktop { id: desktopIcons; hub: sharedHub }
 
     function makePart(name, props) {
         var urls = ["file://" + String(Quickshell.shellDir).replace(/\/$/, "") + "/" + name + ".qml", Qt.resolvedUrl(name + ".qml")];

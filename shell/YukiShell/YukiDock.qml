@@ -124,6 +124,8 @@ Scope {
     property bool showLabels: true
     property bool showIndicators: true
     property bool bounceOnLaunch: true
+    property bool desktopIcons: true      // files, folders and .desktop shortcuts from the XDG Desktop folder (Desktop.qml)
+    property int desktopIconSize: 48
     property bool showRecents: true       // the last few apps you quit, after the running ones
     property bool showDownloads: true     // the Downloads stack by the Settings button
     property var recentApps: []           // desktop ids, newest first
@@ -3394,6 +3396,28 @@ Scope {
             Column {
                 spacing: 12
                 Loader { width: parent.width; sourceComponent: paneDock }
+                SLabel { t: pal; header: true; text: I18n.tr("Desktop") }
+                SCard {
+                    t: pal
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Desktop Icons")
+                        subtitle: I18n.tr("Show files, folders, images and .desktop app shortcuts. Icons automatically avoid desktop widgets.")
+                        SSwitch { t: pal; checked: root.desktopIcons; onToggled: v => root.desktopIcons = v }
+                    }
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Icon Size")
+                        subtitle: I18n.tr("Desktop icon size (") + root.desktopIconSize + " px)"
+                        SSlider {
+                            t: pal; from: 32; to: 128; stepSize: 2
+                            value: root.desktopIconSize
+                            leftLabel: I18n.tr("Small"); rightLabel: I18n.tr("Large")
+                            resetValue: 48
+                            onMoved: v => root.desktopIconSize = Math.round(v / 2) * 2
+                        }
+                    }
+                }
                 SLabel { t: pal; header: true; text: I18n.tr("App Switcher (Alt + Tab)") }
                 SCard {
                     t: pal
@@ -5561,7 +5585,7 @@ Scope {
     readonly property string settingsSig: [dockEnabled, settingsEnabled, iconSize, magnification, magnificationEnabled, spacing, margin,
         cornerRadius, glassOpacity, glassBlur, glassLiquid, dockStyle, wallpaperPath, String(accent), accentUi, fontFamily, hideMode, hideDelay, monitor,
         showSettings, showLabels, showIndicators, bounceOnLaunch, showThumbs, windowCapture, glassLive, iconTint, iconTintColor, iconTintStrength, pickerThumb,
-        showRecents, showDownloads, recentApps.join(",")].join("|")
+        showRecents, showDownloads, recentApps.join(","), desktopIcons, desktopIconSize].join("|")
     property bool settingsReady: false
     onSettingsSigChanged: if (settingsReady) saveTimer.restart()
     onShowSettingsChanged: rebuild()
@@ -5582,7 +5606,8 @@ Scope {
             showSettings: showSettings, showLabels: showLabels, showIndicators: showIndicators,
             bounceOnLaunch: bounceOnLaunch, showThumbs: showThumbs, windowCapture: windowCapture, glassLive: glassLive,
             iconTint: iconTint, iconTintColor: iconTintColor, iconTintStrength: iconTintStrength, pickerThumb: pickerThumb,
-            showRecents: showRecents, showDownloads: showDownloads, recentApps: recentApps
+            showRecents: showRecents, showDownloads: showDownloads, recentApps: recentApps,
+            desktopIcons: desktopIcons, desktopIconSize: desktopIconSize
         };
         settingsStore.setText(JSON.stringify(o, null, 2));
     }
@@ -5592,7 +5617,7 @@ Scope {
         var keys = ["dockEnabled", "settingsEnabled", "iconSize", "magnification", "magnificationEnabled", "spacing", "margin", "cornerRadius",
                     "glassOpacity", "dockStyle", "wallpaperPath", "glassDebug", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "accent", "accentUi", "fontFamily", "hideMode", "hideDelay", "monitor",
                     "showSettings", "showLabels", "showIndicators", "bounceOnLaunch", "showThumbs", "windowCapture", "glassLive", "iconTint", "iconTintColor", "iconTintStrength", "pickerThumb",
-                    "showRecents", "showDownloads", "recentApps"];
+                    "showRecents", "showDownloads", "recentApps", "desktopIcons", "desktopIconSize"];
         for (var i = 0; i < keys.length; i++) {
             if (o[keys[i]] === undefined) continue;
             try { root[keys[i]] = o[keys[i]]; } catch (err) { }
