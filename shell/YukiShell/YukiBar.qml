@@ -2837,6 +2837,11 @@ Scope {
     Timer { id: fileDebounce; interval: 260; onTriggered: {
         if (root.fileQuery.length > 0 && !fileSearchProc.running) { root.fileSearchFor=root.fileQuery; root.fileSearchPending=true; fileSearchProc.running=true; }
     } }
+    function fileQueryFor(text) {   // what Spotlight looks for on disk while `text` is typed ("" = nothing)
+        var s = (text || "").trim().toLowerCase();
+        if (/^(file|find)\s+/.test(s)) return s.replace(/^(file|find)\s+/, "").trim();
+        return s.length >= 2 && !/^[=\d\s.+\-*\/%()xX×÷^]+$/.test(s) ? s : "";
+    }
     function updateFileSearch(q) { fileQuery=q; fileSearchPending=true; fileDebounce.restart(); }   // old hits stay until new ones come: no blinking
     function revealFile(path) {   // the file manager, with the file selected
         var uri = "file://" + path.split("/").map(encodeURIComponent).join("/");
@@ -3455,7 +3460,7 @@ Scope {
     function homeItems(q) {
         var out = [], s = (q || "").trim().toLowerCase();
         if (s.indexOf("file ") === 0 || s.indexOf("find ") === 0) {
-            var fq=s.replace(/^(file|find)\s+/,"").trim(); if(fq!=="" && fileQuery!==fq) updateFileSearch(fq);
+            var fq=fileQueryFor(s);
             out=fileItems(fq); if(out.length===0) out.push({title:fileSearchPending?I18n.tr("Searching files…"):I18n.tr("No matching files"),sub:I18n.tr("Files"),glyph:"folder",run:function(){}});
             return out;
         }
@@ -3465,7 +3470,7 @@ Scope {
         var wins=windowItems(q); for(var j=0;j<wins.length&&out.length<6;j++)out.push(wins[j]);
         var acts=actionItems(q); for(var k=0;k<acts.length&&out.length<6;k++)if(acts[k].title.toLowerCase().indexOf(s)===0)out.push(acts[k]);
         out=out.slice(0,8);
-        if(s.length>=2 && !/^[=\d\s.+\-*\/%()xX×÷^]+$/.test(s)){ if(fileQuery!==s) updateFileSearch(s); out=out.concat(fileItems(s,5)); }   // and files, as macOS does
+        if(fileQueryFor(s)!=="") out=out.concat(fileItems(s,5));   // and files, as macOS does
         return out;
     }
 
@@ -9792,7 +9797,7 @@ Scope {
                                 selectedTextColor: "white"
                                 font.family: root.fontForWeight(Font.Normal, spotPal.fam); font.pixelSize: 17
                                 horizontalAlignment: /[\u0590-\u08ff]/.test(text) ? Text.AlignRight : Text.AlignLeft
-                                onTextChanged: { if (!ui.spFull) { ui.spQuery = text; ui.spSel = 0; ui.armed = ""; if (/^(file|find)\s+/i.test(text)) root.updateFileSearch(text.replace(/^(file|find)\s+/i, "").trim()); } }
+                                onTextChanged: { if (!ui.spFull) { ui.spQuery = text; ui.spSel = 0; ui.armed = ""; var fq = root.fileQueryFor(text); if (fq !== "" && fq !== root.fileQuery) root.updateFileSearch(fq); } }
                                 Keys.onPressed: event => ui.spKey(event)
                             }
                             Item {
