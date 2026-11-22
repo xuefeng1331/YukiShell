@@ -41,6 +41,7 @@ if not keys.overridden("Screenshot a Region") then bind("SUPER + SHIFT + S", hl.
 bind("CTRL + PRINT",    hl.dsp.exec_cmd(qs .. "screenshot window"), "Screenshot a Window")
 bind("SUPER + ALT + R", hl.dsp.exec_cmd(qs .. "actions recording"), "Start or Stop Screen Recording")
 bind("SUPER + ALT + C", hl.dsp.exec_cmd(qs .. "actions pickColor"), "Pick Color")
+bind("SUPER + SHIFT + T", hl.dsp.exec_cmd(qs .. "actions liveText"), "Copy Text from Screen")
 
 local function hw(action, fallback)
     return "sh -c '" .. qs .. "hardware " .. action .. " >/dev/null 2>&1 || " .. fallback .. "'"

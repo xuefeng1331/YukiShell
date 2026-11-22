@@ -2827,6 +2827,9 @@ Scope {
         var m = Math.floor(recSecs / 60), r = recSecs % 60;
         return m + ":" + (r < 10 ? "0" : "") + r;
     }
+    function liveText() {   // pick a part of the screen, its text goes to the clipboard
+        Quickshell.execDetached(["sh", Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-livetext.sh", language === "auto" ? I18n.code() : language]);
+    }
     function pickColor() { sh("c=$(hyprpicker -a) && [ -n \"$c\" ] && notify-send -a yukibar 'Color copied' \"$c\""); }
     Process {
         id: fileSearchProc
@@ -3601,6 +3604,7 @@ Scope {
                 m.push(mi("Screenshot Screen", hk("Screenshot the Screen"), function () { root.shot(""); }));
                 m.push(mi(root.recording ? "Stop Screen Recording" : "Start Screen Recording", hk("Start or Stop Screen Recording"), function () { root.toggleRecording(); }));
                 m.push(mi("Pick Color", hk("Pick Color"), function () { root.pickColor(); }));
+                m.push(mi("Copy Text from Screen\u2026", hk("Copy Text from Screen"), function () { root.liveText(); }));
             } else if (name === "edit") {
                 if (has && term) {
                     m.push(mi("Copy", "Ctrl+Shift+C", keys(["ctrl", "shift"], "c")));
@@ -3746,6 +3750,7 @@ Scope {
         target: "actions"
         function recording(): void { root.toggleRecording(); }
         function pickColor(): void { root.pickColor(); }
+        function liveText(): void { root.liveText(); }
     }
     IpcHandler {
         target: "screenshot"

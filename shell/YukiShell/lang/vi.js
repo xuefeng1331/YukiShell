@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Copy Text from Screen": "Sao chép văn bản trên màn hình",
+    "Copy Text from Screen…": "Sao chép văn bản trên màn hình…",
     "Move & Resize": "Di chuyển & đổi kích thước",
     "Fill": "Lấp đầy",
     "Center": "Căn giữa",

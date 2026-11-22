@@ -45,7 +45,7 @@ pkgs=(
     # one feature each: Settings and the menu bar switch off what is missing
     grim slurp wf-recorder hyprpicker imagemagick awww mpvpaper ffmpeg jq wl-clipboard cliphist
     playerctl cava mpv mpv-mpris swayimg networkmanager bluez bluez-utils wireplumber pipewire libpulse
-    brightnessctl ddcutil hyprsunset power-profiles-daemon upower inotify-tools wtype
+    brightnessctl ddcutil hyprsunset power-profiles-daemon upower inotify-tools wtype tesseract tesseract-data-eng
     fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-bamboo fcitx5-chinese-addons
     dolphin chromium fastfetch btop tty-clock
 )

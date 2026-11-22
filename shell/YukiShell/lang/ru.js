@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Copy Text from Screen": "Скопировать текст с экрана",
+    "Copy Text from Screen…": "Скопировать текст с экрана…",
     "Move & Resize": "Переместить и изменить размер",
     "Fill": "Заполнить",
     "Center": "По центру",

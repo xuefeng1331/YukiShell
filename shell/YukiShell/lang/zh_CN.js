@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Copy Text from Screen": "从屏幕拷贝文本",
+    "Copy Text from Screen…": "从屏幕拷贝文本…",
     "Move & Resize": "移动与调整大小",
     "Fill": "填充",
     "Center": "居中",

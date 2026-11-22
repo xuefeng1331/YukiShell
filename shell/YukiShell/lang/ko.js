@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Copy Text from Screen": "화면에서 텍스트 복사",
+    "Copy Text from Screen…": "화면에서 텍스트 복사…",
     "Move & Resize": "이동 및 크기 조절",
     "Fill": "채우기",
     "Center": "가운데",

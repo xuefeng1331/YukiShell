@@ -89,6 +89,7 @@ know what each one is for.
 | Package | What it's for |
 | --- | --- |
 | `grim`, `slurp` | screenshots |
+| `tesseract`, `tesseract-data-eng` | Live Text: copy the text in a part of the screen (`Super+Shift+T`; add `tesseract-data-vie`, `-jpn` ... for your language) |
 | `imagemagick` | cropping your profile picture, a picture as the menu bar logo, light/dark wallpaper blends |
 | `awww`, `mpvpaper`, `ffmpeg`, `jq` | still and animated wallpapers |
 | `wl-clipboard`, `cliphist` | copying, clipboard history (`Super+V`) |
@@ -216,6 +217,7 @@ menu bar show each item's shortcut next to it.
 | `Ctrl+Alt+W` | wallpaper picker |
 | `Print` (or `Super+Shift+S`) / `Shift+Print` / `Ctrl+Print` | screenshot a region / the screen / a window |
 | `Super+Alt+R` | start / stop screen recording |
+| `Super+Shift+T` | Live Text: copy the text in a part of the screen |
 | `Super+Alt+C` | colour picker |
 | `Super+G` | Game Mode (the shell drops its effects while you play) |
 | `Super+L` | lock |

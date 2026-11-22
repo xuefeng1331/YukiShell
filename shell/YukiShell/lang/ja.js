@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Copy Text from Screen": "画面からテキストをコピー",
+    "Copy Text from Screen…": "画面からテキストをコピー…",
     "Move & Resize": "移動とサイズ変更",
     "Fill": "フィル",
     "Center": "中央",
