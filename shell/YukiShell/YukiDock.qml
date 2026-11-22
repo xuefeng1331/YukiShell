@@ -5869,7 +5869,7 @@ Scope {
         for (var lr in lastExtras) if (!running[lr] && lookup(lastExtras[lr])) rec.unshift(lookup(lastExtras[lr]).id);
         for (var x0 = 0; x0 < extras.length; x0++) nowRun[extras[x0].key] = extras[x0].appId;
         lastExtras = nowRun;
-        rec = rec.filter(function (id, i) { var k = id.toLowerCase(); return rec.map(function (v) { return v.toLowerCase(); }).indexOf(k) === i && !seen[k] && !running[k]; }).slice(0, 3);
+        rec = rec.filter(function (id, i) { var k = id.toLowerCase(); return rec.map(function (v) { return v.toLowerCase(); }).indexOf(k) === i && !seen[k] && !running[k] && !isShellApp(id); }).slice(0, 3);
         if (rec.join("|") !== recentApps.join("|")) recentApps = rec;
         var recItems = [];
         if (showRecents) for (var ri = 0; ri < rec.length; ri++) {
