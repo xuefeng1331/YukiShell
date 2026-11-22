@@ -230,6 +230,7 @@ ShellRoot {
 
         property bool ipcOk: false
         property bool ipcBroken: false
+        property int monTick: 0
         function ipcPoll() {
             var ts, ms, i, o, m, cl = [], mo = [], raw = 0, gh = 0, mapped;
             try {
@@ -246,19 +247,26 @@ ShellRoot {
                 if (gh !== tlGhosts) { tlGhosts = gh; console.log("[yukishell] " + gh + " ghost window(s) in Quickshell's Hyprland list are hidden"); }
                 for (i = 0; i < ms.length; i++) { m = ms[i].lastIpcObject; if (m && m.name !== undefined) mo.push(m); }
                 Hyprland.refreshToplevels();
-                Hyprland.refreshMonitors();
+                // monitors change on workspace / monitor events, which refresh them at once (onRawEvent): every 6th tick is plenty
+                if ((++monTick % 6) === 0) Hyprland.refreshMonitors();
             } catch (err) { ipcBroken = true; ipcOk = false; return; }
             if (mo.length === 0 || (ts.length > 0 && raw === 0)) { ipcOk = false; return; }
             ipcOk = true;
             tlSeed();
-            var gk = [], j, c;
+            // plain string keys, no JSON.stringify of nested arrays: this runs up to 60 times a second
+            var gKey = "", key = "", j, c, at, sz;
             for (j = 0; j < cl.length; j++) {
-                c = cl[j];
-                gk.push([c.address, c.at, c.size, c.workspace ? (c.workspace.name || c.workspace.id) : 0, c.monitor, c.floating, c.fullscreen, c.mapped, c.hidden]);
+                c = cl[j]; at = c.at; sz = c.size;
+                gKey += c.address + "," + (at ? at[0] + "," + at[1] : "") + "," + (sz ? sz[0] + "," + sz[1] : "") + ","
+                      + (c.workspace ? (c.workspace.name || c.workspace.id) : 0) + "," + c.monitor + "," + (c.floating ? 1 : 0) + ","
+                      + c.fullscreen + "," + (c.mapped ? 1 : 0) + (c.hidden ? 1 : 0) + ";";
             }
-            var mk = [];
-            for (j = 0; j < mo.length; j++) mk.push([mo[j].name, mo[j].x, mo[j].y, mo[j].width, mo[j].height, mo[j].scale, mo[j].activeWorkspace ? mo[j].activeWorkspace.id : 0, mo[j].specialWorkspace ? mo[j].specialWorkspace.id : 0]);
-            var key = JSON.stringify([mk, gk]), gKey = JSON.stringify(gk);
+            for (j = 0; j < mo.length; j++) {
+                m = mo[j];
+                key += m.name + "," + m.x + "," + m.y + "," + m.width + "," + m.height + "," + m.scale + ","
+                     + (m.activeWorkspace ? m.activeWorkspace.id : 0) + "," + (m.specialWorkspace ? m.specialWorkspace.id : 0) + ";";
+            }
+            key += "|" + gKey;
             if (key === geoLast) return;
             geoLast = key;
             if (gKey !== geoClientsLast) { geoClientsLast = gKey; geoHot = true; geoCool.restart(); }
