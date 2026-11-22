@@ -42,7 +42,7 @@ by updating the other.
 What you get:
 
 - **YukiShell**: the menu bar, Dock, Spotlight, Control Center, desktop widgets, notifications and a Settings app, all in Liquid Glass
-- **YukiLock**: the lock screen
+- **YukiLock**: the lock screen, and the login screen that looks like it (greetd)
 - Matching configs for Hyprland (Lua), kitty, fish, fastfetch, btop, cava, GTK 3/4 and Qt/KDE apps
 
 Mauve and pink accents, a lot of glass, and an animated wallpaper if you want one.
@@ -133,8 +133,8 @@ and after the restart YukiShell is ready. Along the way it:
    animated wallpaper inside all the glass runs on one video decoder instead of one per window.
 6. Turns on Bluetooth and the power-mode service if it just installed them, and sets fish as your shell on a first install if you
    were still on bash.
-7. If you have no login screen, asks how you want to get in: **SDDM** (installed and turned on), or **Hyprland starting by itself**
-   when you log in on the first text console, or neither. With a login screen you already have, pick Hyprland in its session menu once.
+7. If you have no login screen, asks how you want to get in: **YukiShell's login screen** (the lock screen, to sign in; installs
+   greetd), **SDDM**, or **Hyprland starting by itself** when you log in on the first text console, or none of them. With a login screen you already have, pick Hyprland in its session menu once.
 8. Runs `tools/doctor` and offers to restart. If you're in Hyprland already, the shell starts straight away.
 
 It's safe to run again whenever you pull new changes, and it only asks for your password when something is missing.
@@ -459,7 +459,7 @@ hypr-yukishell/
 │   │   ├── YukiWidgets.qml    desktop widgets
 │   │   ├── lang/              translations
 │   │   └── assets/            logo, credit pictures, small helpers
-│   ├── YukiLock/              the lock screen
+│   ├── YukiLock/              the lock screen (and greeter.qml / greeter.lua, the login screen)
 │   ├── bin/                   yuki-start, yuki-restart, yuki-brightness, yukishell (yukishell stats)
 │   ├── scripts/               wallpaper, Game Mode and sound helpers
 │   └── env.example

@@ -165,13 +165,14 @@ if [ ! -e /etc/systemd/system/display-manager.service ] && command -v systemctl 
   You don't have a login screen, so after a restart you'd land on a text console.
   How do you want to get into YukiShell?
 
-    1) a login screen (installs SDDM)
-    2) log in on the text console and Hyprland starts by itself
-    3) leave it, I'll start it myself
+    1) YukiShell's login screen: the lock screen, to sign in (installs greetd)
+    2) a classic login screen (installs SDDM)
+    3) log in on the text console and Hyprland starts by itself
+    4) leave it, I'll start it myself
 
 EOF
         read -r -p "Pick one [1]: " a </dev/tty || a=""
-        case "$a" in 2) login=console ;; 3) login="" ;; *) login=sddm ;; esac
+        case "$a" in 2) login=sddm ;; 3) login=console ;; 4) login="" ;; *) login=greetd ;; esac
     fi
 fi
 echo
@@ -180,6 +181,9 @@ install_packages
 if [ "$login" = sddm ]; then
     # enabled, not started: starting it now would take the screen away from this install
     { sudo pacman -S --needed --noconfirm sddm && sudo systemctl enable sddm; } || { failed+=(sddm); login=""; }
+fi
+if [ "$login" = greetd ]; then
+    { sudo pacman -S --needed --noconfirm greetd && sudo systemctl enable greetd; } || { failed+=(greetd); login=""; }
 fi
 
 first=0
@@ -201,6 +205,7 @@ done
 link "$here/shell/YukiShell"                   "$cfg/quickshell/YukiShell"
 link "$here/shell/YukiLock"                    "$cfg/quickshell/YukiLock"
 link "$here/shell/bin/yuki-start"              "$HOME/.local/bin/yuki-start"
+link "$here/shell/bin/yuki-greeter-sync"       "$HOME/.local/bin/yuki-greeter-sync"
 link "$here/shell/bin/yuki-restart"            "$HOME/.local/bin/yuki-restart"
 link "$here/shell/bin/yuki-brightness"         "$HOME/.local/bin/yuki-brightness"
 link "$here/shell/bin/yukishell"               "$HOME/.local/bin/yukishell"
@@ -211,6 +216,20 @@ link "$here/qt/CatppuccinMauve.colors" "$HOME/.local/share/color-schemes/Catppuc
 link "$here/chromium/chromium-flags.conf" "$cfg/chromium-flags.conf"
 link "$here/xdg/menus/applications.menu" "$cfg/menus/applications.menu"
 link "$here/swayimg/init.lua"              "$cfg/swayimg/init.lua"
+
+# YukiShell's login screen: greetd's "greeter" user can't read your home, so it runs a copy (refreshed on every install)
+# and reads who you are and your wallpaper from /var/lib/yukigreet (yuki-greeter-sync)
+if [ "$login" = greetd ] || grep -qs yukishell /etc/greetd/config.toml; then
+    g=/usr/local/share/yukishell
+    sudo mkdir -p "$g" && sudo rm -rf "$g/YukiLock" && sudo cp -r "$here/shell/YukiLock" "$g/YukiLock" && sudo chmod -R a+rX "$g"
+    sudo install -d -m 755 -o "$(id -un)" /var/lib/yukigreet
+    if ! grep -qs yukishell /etc/greetd/config.toml; then
+        [ -f /etc/greetd/config.toml ] && sudo cp -n /etc/greetd/config.toml /etc/greetd/config.toml.pre-yukishell
+        printf '[terminal]\nvt = 1\n\n[default_session]\ncommand = "start-hyprland -- --config %s/YukiLock/greeter.lua"\nuser = "greeter"\n' "$g" \
+            | sudo tee /etc/greetd/config.toml >/dev/null
+    fi
+    "$here/shell/bin/yuki-greeter-sync"
+fi
 
 [ -e "$cfg/fastfetch/logo.png" ] || cp "$here/shell/YukiShell/assets/yukishell-logo.png" "$cfg/fastfetch/logo.png"
 
@@ -332,6 +351,7 @@ fi
 echo "All done, YukiShell is installed."
 case "$login" in
     sddm)    echo "After the restart, log in on the new login screen and you're in." ;;
+    greetd)  echo "After the restart, sign in on the new login screen (it looks like the lock screen) and you're in." ;;
     console) echo "After the restart, log in on the text console and Hyprland starts by itself." ;;
     *) if [ -e /etc/systemd/system/display-manager.service ]; then
            echo "After the restart, pick Hyprland in your login screen's session menu (it remembers it after that)."

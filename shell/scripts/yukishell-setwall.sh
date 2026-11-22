@@ -242,3 +242,8 @@ else
     awww_ready && awww img "$f" --transition-type grow --transition-duration 0.9 >/dev/null 2>&1
     printf '%s\n' "$f"
 fi
+# the login screen shows it too (a video's still frame)
+if [ -x "$HOME/.local/bin/yuki-greeter-sync" ]; then
+    if is_video "$f"; then w=$still; else w=$f; fi
+    "$HOME/.local/bin/yuki-greeter-sync" "$w" >/dev/null 2>&1 </dev/null &
+fi

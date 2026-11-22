@@ -1515,7 +1515,7 @@ Item {
         MorphText {
             horizontalAlignment: Text.AlignHCenter
             anchors.horizontalCenter: parent.horizontalCenter
-            text: ls.st.message !== "" ? I18n.tr(ls.st.message) : I18n.tr("Enter your password to unlock")
+            text: ls.st.message !== "" ? I18n.tr(ls.st.message) : I18n.tr(ls.st.hint || "Enter your password to unlock")
             color: ls.st.message !== "" ? Qt.rgba(1, 0.78, 0.76, 0.95) : Qt.rgba(1, 1, 1, 0.55)
             font.family: ls.fam; font.pixelSize: 12 * ls.u
             opacity: ls.st.engaged || ls.st.message !== "" ? 1 : 0

@@ -63,6 +63,7 @@ if command -v awww-daemon >/dev/null 2>&1 && [ -n "$(ls -A "${XDG_CACHE_HOME:-$H
         awww restore >/dev/null 2>&1
     ) 9>&- &
 fi
+[ -x "$HOME/.local/bin/yuki-greeter-sync" ] && "$HOME/.local/bin/yuki-greeter-sync" >/dev/null 2>&1 </dev/null 9>&- &
 setwall="$CONF/hypr-yukishell/scripts/yukishell-setwall.sh"
 if [ -s "$CONF/yukishell/wallpaper-video" ] && [ -x "$setwall" ] && command -v mpvpaper >/dev/null 2>&1; then
     "$setwall" --restore >/dev/null 2>&1 </dev/null 9>&- &

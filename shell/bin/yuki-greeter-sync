@@ -1,0 +1,25 @@
+#!/bin/sh
+# yuki-greeter-sync: what the login screen (shell/YukiLock/greeter.qml) shows: who signs in, their picture, wallpaper and clock.
+# The login screen runs as greetd's "greeter" user and can't read your home, so this copies them to /var/lib/yukigreet,
+# a folder install.sh makes yours. yuki-start runs it at every login and the wallpaper script when the wallpaper changes
+# (with the new picture as $1).
+d="${YUKIGREET_DIR:-/var/lib/yukigreet}"
+[ -d "$d" ] && [ -w "$d" ] || exit 0
+command -v jq >/dev/null || exit 0
+s="${XDG_CONFIG_HOME:-$HOME/.config}/yukibar/settings.json"
+me=$(id -un)
+put() { [ -f "$1" ] || return 1; cmp -s "$1" "$d/$2" || cp -f "$1" "$d/$2"; chmod 644 "$d/$2"; }
+
+wall=$(jq -r '.lockWallpaper // empty' "$s" 2>/dev/null)
+[ -f "$wall" ] || wall=$1
+[ -f "$wall" ] || wall=$(jq -r '.wallpaperPath // empty' "$s" 2>/dev/null)
+[ -f "$wall" ] || wall=$(awww query 2>/dev/null | sed -n 's/.*image: //p' | head -n1)
+w=; put "$wall" wallpaper && w=wallpaper
+a=; for f in "$HOME/.face" "$HOME/.face.icon" "/var/lib/AccountsService/icons/$me"; do put "$f" avatar && { a=avatar; break; }; done
+name=$(getent passwd "$me" | cut -d: -f5 | cut -d, -f1)
+
+{ cat "$s" 2>/dev/null || echo '{}'; } | jq --arg user "$me" --arg name "${name:-$me}" --arg a "$a" --arg w "$w" '{
+    user: $user, name: $name, avatar: $a, wallpaper: $w,
+    use24h: (.use24h != false), artBg: (.lockArtBackground != false), language: (.language // "auto"),
+    clock: { f: .lockClockFont, w: .lockClockWeight, m: .lockClockMaterial, d: .lockClockDate, i: .lockClockIntensity, c: .lockClockTint }
+}' > "$d/profile.json.tmp" && chmod 644 "$d/profile.json.tmp" && mv -f "$d/profile.json.tmp" "$d/profile.json"
