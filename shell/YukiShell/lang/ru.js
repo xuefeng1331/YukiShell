@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Shake to find": "Встряхнуть, чтобы найти",
+    "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "Быстро встряхните мышь, и указатель ненадолго увеличится, чтобы его было легко найти.",
     "Copy Text from Screen": "Скопировать текст с экрана",
     "Copy Text from Screen…": "Скопировать текст с экрана…",
     "Move & Resize": "Переместить и изменить размер",

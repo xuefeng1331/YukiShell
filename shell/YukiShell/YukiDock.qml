@@ -4793,6 +4793,12 @@ Scope {
                     }
                     SRow {
                         t: pal
+                        title: I18n.tr("Shake to find")
+                        subtitle: I18n.tr("Shake the mouse quickly and the pointer grows for a moment, so you can spot it.")
+                        SSwitch { t: pal; checked: root.bar ? root.bar.cursorShake : true; onToggled: v => { if (root.bar) root.bar.cursorShake = v; } }
+                    }
+                    SRow {
+                        t: pal
                         title: I18n.tr("Hide when idle")
                         subtitle: !root.bar || root.bar.cursorHideIdle < 0.5 ? I18n.tr("Never") : I18n.tr("After %1 s without moving").arg(Math.round(root.bar.cursorHideIdle))
                         SSlider {

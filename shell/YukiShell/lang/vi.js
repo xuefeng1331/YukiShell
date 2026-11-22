@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Shake to find": "Lắc để tìm",
+    "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "Lắc chuột thật nhanh, con trỏ sẽ phóng to trong giây lát để bạn dễ thấy.",
     "Copy Text from Screen": "Sao chép văn bản trên màn hình",
     "Copy Text from Screen…": "Sao chép văn bản trên màn hình…",
     "Move & Resize": "Di chuyển & đổi kích thước",

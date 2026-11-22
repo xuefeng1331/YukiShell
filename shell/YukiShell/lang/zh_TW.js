@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Shake to find": "搖晃以尋找",
+    "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "快速搖晃滑鼠，指標會短暫變大，方便你找到它。",
     "Copy Text from Screen": "從螢幕拷貝文字",
     "Copy Text from Screen…": "從螢幕拷貝文字…",
     "Move & Resize": "移動與調整大小",

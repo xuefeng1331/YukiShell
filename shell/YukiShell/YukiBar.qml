@@ -174,19 +174,21 @@ Scope {
     property real cursorHideIdle: 10
     property bool cursorFollowFocus: true
     property bool cursorWarpWs: false
+    property bool cursorShake: true
     property real cursorZoom: 1.0
     readonly property string cursorScript: decodeURIComponent(String(Qt.resolvedUrl("assets/cursors.py")).replace(/^file:\/\//, ""))
     readonly property string cursorLook: cursorTheme + "|" + cursorSize
     onCursorLookChanged: if (settingsReady) cursorLookT.restart()
     Timer { id: cursorLookT; interval: 250; onTriggered: Quickshell.execDetached([root.cursorScript, "apply", root.cursorTheme, String(root.cursorSize)]) }
-    readonly property string cursorSig: [cursorHideTyping, cursorHideIdle, cursorFollowFocus, cursorWarpWs, cursorZoom].join("|")
+    readonly property string cursorSig: [cursorHideTyping, cursorHideIdle, cursorFollowFocus, cursorWarpWs, cursorZoom, cursorShake].join("|")
     onCursorSigChanged: if (settingsReady) cursorApplyT.restart()
     Timer { id: cursorApplyT; interval: 120; onTriggered: root.applyCursor() }
     function applyCursor() {
         function b(v) { return v ? "true" : "false"; }
         Quickshell.execDetached(["hyprctl", "eval", "hl.config({ cursor = { hide_on_key_press = " + b(cursorHideTyping) + ", inactive_timeout = " + cursorHideIdle.toFixed(1)
             + ", warp_on_change_workspace = " + (cursorWarpWs ? 1 : 0) + ", zoom_factor = " + Math.max(1, cursorZoom).toFixed(2)
-            + " }, input = { follow_mouse = " + (cursorFollowFocus ? 1 : 0) + ", focus_on_close = " + (cursorFollowFocus ? 1 : 0) + " } })"]);
+            + " }, input = { follow_mouse = " + (cursorFollowFocus ? 1 : 0) + ", focus_on_close = " + (cursorFollowFocus ? 1 : 0) + " } })"
+            + " if SHAKE_TO_FIND then SHAKE_TO_FIND(" + b(cursorShake) + ") end"]);
     }
     property int windowBorder: 1
     onAccentChanged: if (settingsReady) borderApplyT.restart()
@@ -399,7 +401,7 @@ Scope {
         "idleLockMins", "idleScreenMins", "kbLayout", "notifDnd", "dnd", "nightOn", "keepAwake", "notifBannerSecs", "notifMutedApps", "notifAppsSeen", "focusSchedule", "focusFrom", "focusTo",
         "focusFullscreen", "focusAllowUrgent", "lockShowNotifs", "lockWallpaper", "uiSoundVolume", "alertSound",
         "kbRepeatRate", "kbRepeatDelay", "mouseSens", "mouseNatural", "mouseAccel", "tpNatural", "tpTap", "tpDwt", "tpScroll",
-        "cursorTheme", "cursorSize", "cursorHideTyping", "cursorHideIdle", "cursorFollowFocus", "cursorWarpWs", "cursorZoom", "windowBorder", "floatNewWindows",
+        "cursorTheme", "cursorSize", "cursorHideTyping", "cursorHideIdle", "cursorFollowFocus", "cursorWarpWs", "cursorZoom", "cursorShake", "windowBorder", "floatNewWindows",
         "wsNumerals", "windowBar", "windowBarTitle"]
     property var barWidgets: ["appleMenu", "appMenus", "workspaces", "volume", "keyboard", "notifications", "privacy", "controlCenter", "clock", "wifi", "bluetooth"]
     function barWidgetEnabled(id) { return barWidgets.indexOf(id) >= 0; }
@@ -2542,7 +2544,7 @@ Scope {
                 var lay = d.substring(c + 1).trim();
                 root.kbSetActive(lay, undefined);
                 kbEventRefresh.restart();
-            } else if (event.name === "configreloaded") { root.refreshKeyboardLayout(); if (root.settingsReady) borderApplyT.restart(); }
+            } else if (event.name === "configreloaded") { root.refreshKeyboardLayout(); if (root.settingsReady) { borderApplyT.restart(); cursorApplyT.restart(); } }
             else if (event.name === "custom" && event.data.indexOf("yukidrag ") === 0) root.dragEvent(event.data.split(" "));
         }
     }

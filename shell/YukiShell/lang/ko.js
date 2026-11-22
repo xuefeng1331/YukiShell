@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Shake to find": "흔들어서 찾기",
+    "Shake the mouse quickly and the pointer grows for a moment, so you can spot it.": "마우스를 빠르게 흔들면 포인터가 잠시 커져서 쉽게 찾을 수 있습니다.",
     "Copy Text from Screen": "화면에서 텍스트 복사",
     "Copy Text from Screen…": "화면에서 텍스트 복사…",
     "Move & Resize": "이동 및 크기 조절",
