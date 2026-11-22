@@ -1219,6 +1219,7 @@ Scope {
                     property var item: null
                     title: I18n.tr("Rename")
                     backdrop: desktopGlassBackdrop
+                    glass: root.dock
                     dark: root.darkMode
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1
@@ -1268,6 +1269,7 @@ Scope {
                     property var item: null
                     title: I18n.tr("Quick Preview")
                     backdrop: desktopGlassBackdrop
+                    glass: root.dock
                     dark: root.darkMode
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1
@@ -1383,6 +1385,7 @@ Scope {
                     id: picSheet
                     z: 60
                     backdrop: desktopGlassBackdrop
+                    glass: root.dock
                     dark: root.darkMode
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1
@@ -1432,6 +1435,7 @@ Scope {
                     readonly property string tint: paths.length > 0 ? (root.folderColors[paths[0]] || "") : ""
                     title: I18n.tr("Folder Icon")
                     backdrop: desktopGlassBackdrop
+                    glass: root.dock
                     dark: root.darkMode
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1
@@ -1513,6 +1517,7 @@ Scope {
                     readonly property color pillBg: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.07)
                     title: I18n.tr("Folder Emoji")
                     backdrop: desktopGlassBackdrop
+                    glass: root.dock
                     dark: root.darkMode
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1
@@ -1748,6 +1753,7 @@ Scope {
                     property string error: ""
                     title: I18n.tr("Add Folder to Desktop")
                     backdrop: desktopGlassBackdrop
+                    glass: root.dock
                     dark: root.darkMode
                     fam: root.fam
                     k: root.dock ? root.dock.labelK : 1

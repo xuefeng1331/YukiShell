@@ -273,19 +273,60 @@ Scope {
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "yukishell-clock-alert"
+        Capture {   // the screen behind the banner, for its glass: this window is the banner's corner of it, so the capture sits offset
+            id: bannerSnap
+            x: banner.screen ? -(banner.screen.width - banner.width - 12) : 0
+            y: -38
+            width: banner.screen ? banner.screen.width : 0
+            height: banner.screen ? banner.screen.height : 0
+            opacity: 0
+            source: root.ringing !== null && banner.screen ? banner.screen : null
+            live: false
+            paintCursor: false
+        }
         Rectangle {
             id: bannerCard
             width: 356; height: 80; x: 8; y: 4
             radius: 20
             readonly property bool on: root.ringing !== null
             opacity: on ? 1 : 0
-            transform: Translate { x: bannerCard.on ? 0 : 60; Behavior on x { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } } }
+            transform: Translate { id: slide; x: bannerCard.on ? 0 : 60; Behavior on x { NumberAnimation { duration: 520; easing.type: Easing.OutQuint } } }
             Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
             readonly property real bgA: (root.bar && root.bar.barStyle === "normal") ? 0.94 : 0.82
-            color: root.darkMode ? Qt.rgba(0.17, 0.17, 0.18, bgA) : Qt.rgba(0.97, 0.97, 0.98, bgA)
-            border.width: 1; border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.10)
+            // Liquid Glass like the notification banners; the plain card when the glass is off
+            readonly property bool liquid: !!root.dock && root.dock.liquidActive && bannerSnap.hasContent
+            color: liquid ? "transparent" : (root.darkMode ? Qt.rgba(0.17, 0.17, 0.18, bgA) : Qt.rgba(0.97, 0.97, 0.98, bgA))
+            border.width: liquid ? 0 : 1; border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.10)
             layer.enabled: true
             layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.8; shadowOpacity: 0.35; shadowVerticalOffset: 6 }
+            LiquidPane {
+                visible: bannerCard.liquid
+                anchors.fill: parent
+                backdrop: bannerCard.liquid ? bannerSnap : null
+                shaderUrl: root.dock ? root.dock.glassShaderUrl : ""
+                liquid: bannerCard.liquid
+                dark: root.darkMode
+                bx: bannerCard.x + slide.x - bannerSnap.x; by: bannerCard.y - bannerSnap.y
+                shadowAmt: 0
+                flatInner: 1
+                rimTint: 1
+                ringW: 0
+                cornerR: bannerCard.radius
+                tint: root.dock ? root.dock.glassOpacity : 0.42
+                thickness: 22
+                strength: root.dock ? root.dock.glassLiquidEff : 1
+                rim: root.dock ? root.dock.glassRimEff : 0.45
+                grain: root.dock ? root.dock.glassGrain : 0.03
+                blur: root.dock ? root.dock.glassBlurEff : 5
+                accentTint: root.dock ? root.dock.accentTintVec : Qt.vector4d(0, 0, 0, 0)
+            }
+            MenuBorder {
+                visible: bannerCard.liquid
+                anchors.fill: parent
+                cornerR: bannerCard.radius
+                dark: root.darkMode
+                tint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
+            }
             readonly property color fg: root.darkMode ? "white" : "#1D1D1F"
             readonly property color fg2: root.darkMode ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(0, 0, 0, 0.55)
             ClockFace { x: 14; anchors.verticalCenter: parent.verticalCenter; width: 40; height: 40; night: true; date: new Date(root.nowMs); seconds: false }

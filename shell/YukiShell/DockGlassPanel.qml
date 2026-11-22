@@ -26,6 +26,12 @@ Item {
     property real blurAmount: 0.85
     property bool tinted: false
     property color accent: "#0A84FF"
+    // Liquid Glass, as the menus have it: give it the Dock (glassShaderUrl, liquidActive, glassOpacity ...). While that is on the
+    // bubble is the liquid pane over the same backdrop instead of the plain blur, and has no tail.
+    property var glass: null
+    readonly property bool liquidOn: glass !== null && glass !== undefined && glass.liquidActive === true && backdrop !== null && live
+    readonly property real tW: liquidOn ? 0 : tailW
+    readonly property real tH: liquidOn ? 0 : tailH
 
     default property alias content: body.data
 
@@ -36,7 +42,7 @@ Item {
     readonly property real hp: 2
     property real bx: 0
     property real by: 0
-    readonly property string shapeKey: [width, bodyH, tailW, tailH, tailTipR, tailX, radius, dark, live, k, tinted, accent].join("|")
+    readonly property string shapeKey: [width, bodyH, tailW, tailH, tailTipR, tailX, radius, dark, live, k, tinted, accent, liquidOn].join("|")
 
     function syncPos() {
         if (!gp.backdrop || gp.hold) return;
@@ -66,13 +72,13 @@ Item {
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 6 * gp.k;
             ctx.fillStyle = "#000000";
-            GS.build(ctx, gp.sp, gp.sp, gp.width, gp.bodyH, gp.radius, gp.tailX, gp.tailW, gp.tailH, gp.tailTipR);
+            GS.build(ctx, gp.sp, gp.sp, gp.width, gp.bodyH, gp.radius, gp.tailX, gp.tW, gp.tH, gp.tailTipR);
             ctx.fill();
             ctx.shadowColor = "rgba(0,0,0,0)";
             ctx.shadowBlur = 0;
             ctx.shadowOffsetY = 0;
             ctx.globalCompositeOperation = "destination-out";
-            GS.build(ctx, gp.sp, gp.sp, gp.width, gp.bodyH, gp.radius, gp.tailX, gp.tailW, gp.tailH, gp.tailTipR);
+            GS.build(ctx, gp.sp, gp.sp, gp.width, gp.bodyH, gp.radius, gp.tailX, gp.tW, gp.tH, gp.tailTipR);
             ctx.fill();
         }
         onWidthChanged: requestPaint()
@@ -83,7 +89,7 @@ Item {
 
     Loader {
         id: blurLoader
-        active: gp.live && gp.backdrop !== null
+        active: gp.live && gp.backdrop !== null && !gp.liquidOn
         x: -gp.m; y: -gp.m
         width: gp.width + 2 * gp.m
         height: gp.height + 2 * gp.m
@@ -124,8 +130,41 @@ Item {
         }
     }
 
+    LiquidPane {
+        visible: gp.liquidOn
+        width: gp.width
+        height: gp.bodyH
+        backdrop: gp.liquidOn ? gp.backdrop : null
+        shaderUrl: gp.glass ? gp.glass.glassShaderUrl : ""
+        liquid: gp.liquidOn
+        dark: gp.dark
+        bx: gp.bx; by: gp.by
+        shadowAmt: 0
+        flatInner: 1
+        rimTint: 1
+        ringW: 0
+        cornerR: gp.radius
+        tint: gp.glass ? gp.glass.glassOpacity : 0.42
+        thickness: 22
+        strength: gp.glass ? gp.glass.glassLiquidEff : 1
+        rim: gp.glass ? gp.glass.glassRimEff : 0.45
+        grain: gp.glass ? gp.glass.glassGrain : 0.03
+        blur: gp.glass ? gp.glass.glassBlurEff : 5
+        accentTint: gp.glass ? gp.glass.accentTintVec : Qt.vector4d(0, 0, 0, 0)
+    }
+    MenuBorder {
+        visible: gp.liquidOn
+        z: 2
+        width: gp.width
+        height: gp.bodyH
+        cornerR: gp.radius
+        dark: gp.dark
+        tint: gp.glass && gp.glass.bar ? gp.glass.bar.menuBorderColor : "#8A9AB5"
+    }
+
     Canvas {
         id: skin
+        visible: !gp.liquidOn
         x: -gp.hp; y: -gp.hp
         width: gp.width + 2 * gp.hp
         height: gp.height + 2 * gp.hp

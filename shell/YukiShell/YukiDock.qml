@@ -7123,6 +7123,7 @@ Scope {
                                         id: lp
                                         readonly property string title: cell.isSep ? "" : ((cell.modelData.kind === "win" && cell.modelData.tl && cell.modelData.tl.title) ? cell.modelData.tl.title : (cell.modelData.special ? I18n.tr(cell.modelData.name) : cell.modelData.name))
                                         backdrop: glassBackdrop.item
+                                        glass: root
                                         live: root.liquidActive && glassBackdrop.item !== null
                                         dark: root.darkMode
                                         tinted: root.accentUi

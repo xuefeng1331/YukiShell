@@ -20,6 +20,7 @@ Item {
     property string source: ""
     property bool dark: true
     property var backdrop: null             // desktop glass backdrop (frozen snapshot, not live)
+    property var glass: null                // the Dock, for Liquid Glass (DockGlassPanel)
     property string fam: "Open Runde"
     property real k: 1
     property real maxW: 900
@@ -58,6 +59,7 @@ Item {
     DockGlassPanel {
         id: panel
         backdrop: ps.backdrop
+        glass: ps.glass
         live: true              // the blur objects stay built (shaders compiled, textures allocated); the capture itself only runs while visible
         frozen: ps.visible
         dark: ps.dark

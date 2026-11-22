@@ -15,6 +15,7 @@ Item {
     property bool warm: false               // set briefly after start-up: builds the glass once, invisibly, so the first real open is not a hitch
     property string title: ""
     property var backdrop: null
+    property var glass: null                // the Dock, for Liquid Glass (DockGlassPanel)
     property bool dark: true
     property string fam: "Open Runde"
     property real k: 1
@@ -46,6 +47,7 @@ Item {
     DockGlassPanel {
         id: panel
         backdrop: sh.backdrop
+        glass: sh.glass
         live: true              // the blur objects stay built (shaders compiled, textures allocated); the capture itself only runs while visible
         frozen: sh.visible      // one blur snapshot when it opens, then no re-capture: not real-time
         dark: sh.dark

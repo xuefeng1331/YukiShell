@@ -388,13 +388,41 @@ Scope {
                             asynchronous: true
                         }
                         Rectangle {   // title, while the pointer is on the window
+                            id: pill
                             visible: wi.hot && !wi.dragging && wi.title !== ""
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.top: parent.bottom; anchors.topMargin: 32
                             width: Math.min(titleText.implicitWidth + 24, Math.max(160, parent.width + 80)); height: 26
                             radius: 13
-                            color: root.dark ? Qt.rgba(0.1, 0.1, 0.12, 0.82) : Qt.rgba(0.97, 0.97, 0.98, 0.9)
-                            border.width: 1; border.color: root.ink(0.35)
+                            color: "transparent"
+                            // where it is over the wallpaper (the window it belongs to moves while Mission Control opens)
+                            readonly property point at: (wi.x, wi.y, wi.scale, width, visible) ? mapToItem(wall, 0, 0) : Qt.point(0, 0)
+                            LiquidPane {   // Liquid Glass over the wallpaper, like the menus
+                                anchors.fill: parent
+                                backdrop: pill.visible ? wall : null
+                                shaderUrl: root.dock ? root.dock.glassShaderUrl : ""
+                                liquid: !!root.dock && root.dock.liquidActive && pill.visible
+                                dark: root.dark
+                                bx: pill.at.x; by: pill.at.y
+                                shadowAmt: 0
+                                flatInner: 1
+                                rimTint: 1
+                                ringW: 0
+                                cornerR: pill.radius
+                                tint: root.dock ? root.dock.glassOpacity : 0.42
+                                thickness: 12
+                                strength: root.dock ? root.dock.glassLiquidEff : 1
+                                rim: root.dock ? root.dock.glassRimEff : 0.45
+                                grain: root.dock ? root.dock.glassGrain : 0.03
+                                blur: root.dock ? root.dock.glassBlurEff + 6 : 11
+                                accentTint: root.dock ? root.dock.accentTintVec : Qt.vector4d(0, 0, 0, 0)
+                            }
+                            MenuBorder {
+                                anchors.fill: parent
+                                cornerR: pill.radius
+                                dark: root.dark
+                                tint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
+                            }
                             Text {
                                 id: titleText
                                 anchors.centerIn: parent

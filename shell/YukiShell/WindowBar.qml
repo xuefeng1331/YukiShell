@@ -158,6 +158,14 @@ Scope {
                 }
             }
 
+            Capture {   // what is behind the Move & Resize popover, for its glass: taken while the hover waits to open it
+                id: tileSnap
+                width: w.width; height: w.height
+                opacity: 0
+                source: openT.running || tileMenu.open || tileMenu.visible ? w.modelData : null
+                live: false
+                paintCursor: false
+            }
             // hover the green light: Move & Resize, like macOS
             Rectangle {
                 id: tileMenu
@@ -179,10 +187,36 @@ Scope {
                 y: cluster.y + cluster.height + 8
                 width: col.width + 20; height: col.height + 18
                 radius: 12
-                color: root.darkMode ? Qt.rgba(0.16, 0.16, 0.17, 0.97) : Qt.rgba(0.97, 0.97, 0.97, 0.97)
-                border.width: 1; border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.12)
+                color: "transparent"
                 readonly property color ink: root.darkMode ? "white" : "#1D1D1F"
                 property string hot: ""
+                LiquidPane {   // the menus' Liquid Glass
+                    anchors.fill: parent
+                    backdrop: tileSnap.hasContent ? tileSnap : null
+                    shaderUrl: root.dock ? root.dock.glassShaderUrl : ""
+                    liquid: !!root.dock && root.dock.liquidActive && tileSnap.hasContent
+                    dark: root.darkMode
+                    bx: tileMenu.x; by: tileMenu.y
+                    shadowAmt: 0
+                    flatInner: 1
+                    rimTint: 1
+                    ringW: 0
+                    cornerR: tileMenu.radius
+                    tint: root.dock ? root.dock.glassOpacity : 0.42
+                    thickness: 22
+                    strength: root.dock ? root.dock.glassLiquidEff : 1
+                    rim: root.dock ? root.dock.glassRimEff : 0.45
+                    grain: root.dock ? root.dock.glassGrain : 0.03
+                    blur: root.dock ? root.dock.glassBlurEff : 5
+                    accentTint: root.dock ? root.dock.accentTintVec : Qt.vector4d(0, 0, 0, 0)
+                }
+                MenuBorder {
+                    z: 2
+                    anchors.fill: parent
+                    cornerR: tileMenu.radius
+                    dark: root.darkMode
+                    tint: root.bar ? root.bar.menuBorderColor : "#8A9AB5"
+                }
 
                 Column {
                     id: col
