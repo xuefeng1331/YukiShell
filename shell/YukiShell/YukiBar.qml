@@ -7361,7 +7361,7 @@ Scope {
                                     Rectangle { anchors.fill:parent; radius:8; color:connMa.containsMouse?pp.hover:"transparent" }
                                     Glyph { x:8; anchors.verticalCenter:parent.verticalCenter; width:14; height:14; kind:modelData.type==="vpn"?"lock":"ethernet"; color:pp.fg }
                                     Text { x:30; anchors.verticalCenter:parent.verticalCenter; width:parent.width-42; elide:Text.ElideRight; text:modelData.name+(modelData.active?I18n.tr(" · Connected"):""); color:pp.fg; font.family: root.fontForWeight(Font.Normal, pp.fam); font.pixelSize:12 }
-                                    MouseArea { id:connMa; anchors.fill:parent; hoverEnabled:true; onClicked:root.toggleConnection(modelData) }
+                                    MouseArea { id:connMa; anchors.fill:parent; hoverEnabled:true; onClicked: { if (modelData.active && modelData.type !== "vpn") { ui.pop = ""; root.openSettings("network"); } else root.toggleConnection(modelData); } }
                                 }
                             }
                         }
