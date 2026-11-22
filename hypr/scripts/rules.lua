@@ -84,12 +84,34 @@ hl.layer_rule({ name = "yukibarbg", match = { namespace = "^yukibarbg$" }, blur 
 hl.layer_rule({ name = "yukicursor", match = { namespace = "^yukicursor$" }, no_anim = true })   -- shake to find: the big cursor
 hl.layer_rule({ name = "yukishell-clock-alert", match = { namespace = "^yukishell-clock-alert$" }, blur = true, ignore_alpha = 0.45 })
 
--- games keep out of the 900x560 floating size: they tile and can still go fullscreen
-hl.window_rule({
-    name  = "tile-games",
-    match = { class = "^(steam_app_[0-9]+|gamescope)$" },
-    tile = true,
-})
+-- Steam games keep out of the 900x560 floating size (a game can set itself up at the size it first gets and break): they open as
+-- Hyprland would open them. Steam starts every game, native or Proton, with SteamAppId / SteamGameId in its environment; Proton
+-- windows are also steam_app_<id>. A rule can't see that, and a tag dispatched now lands after the rules ran, so the float rule is
+-- switched off from the moment the game's window gets its class until the rules have run for it.
+local gameHeld = {}   -- game windows on their way to the screen
+local function isSteamGame(w)
+    if w.class:match("^steam_app_%d+$") or w.class == "gamescope" then return true end
+    local f = w.pid and w.pid > 0 and io.open("/proc/" .. w.pid .. "/environ", "rb")
+    if not f then return false end
+    local env = "\0" .. (f:read("a") or "")
+    f:close()
+    return env:find("\0SteamAppId=", 1, true) ~= nil or env:find("\0SteamGameId=", 1, true) ~= nil
+end
+local function releaseGame(addr)
+    if not gameHeld[addr] then return end
+    gameHeld[addr] = nil
+    if next(gameHeld) == nil then FLOAT_NEW_RULE:set_enabled(true) end
+end
+hl.on("window.class", function(w)
+    if w.mapped or gameHeld[w.address] then return end
+    if next(gameHeld) == nil and not FLOAT_NEW_RULE:is_enabled() then return end   -- "Open windows floating" is off
+    if not isSteamGame(w) then return end
+    gameHeld[w.address] = true
+    FLOAT_NEW_RULE:set_enabled(false)
+    hl.timer(function() releaseGame(w.address) end, { timeout = 1000, type = "oneshot" })   -- a window that never shows (Wine makes hidden ones)
+end)
+hl.on("window.open_early", function(w) releaseGame(w.address) end)
+hl.on("window.destroy", function(w) if w then releaseGame(w.address) end end)
 
 FLOAT_CHROMIUM_RULE = hl.window_rule({
     name  = "float-chromium-once",
