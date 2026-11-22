@@ -12,7 +12,7 @@ hl.config({
 
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
--- Shake the pointer to find it: it grows for a moment, as on macOS. Settings → Mouse switches it (SHAKE_TO_FIND).
+-- Shake the pointer to find it: it grows for a moment, as on macOS. Settings → Cursor switches it (SHAKE_TO_FIND).
 local Shake = require("scripts.shake")
 local shake = { x = Shake.new(), y = Shake.new(), t = 0, quiet = -1000, size = 0, base = 24, theme = "" }
 local function cursorLook()   -- what Settings last applied (assets/cursors.py writes it), as look.lua reads it
