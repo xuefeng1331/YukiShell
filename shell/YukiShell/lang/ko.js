@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "No downloads": "다운로드 없음",
+    "Open Downloads Folder": "다운로드 폴더 열기",
+    "Show suggested and recent apps in Dock": "Dock에 제안 및 최근 사용한 앱 보기",
+    "Show the Downloads stack": "다운로드 스택 보기",
     "%1 items": "%1개 항목",
     "1 item": "1개 항목",
     "Audio": "오디오",

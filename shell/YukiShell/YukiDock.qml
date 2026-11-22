@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
+import Qt.labs.folderlistmodel
 import "I18n.js" as I18n
 import "Version.js" as Version
 import "Launch.js" as Launch
@@ -123,6 +124,9 @@ Scope {
     property bool showLabels: true
     property bool showIndicators: true
     property bool bounceOnLaunch: true
+    property bool showRecents: true       // the last few apps you quit, after the running ones
+    property bool showDownloads: true     // the Downloads stack by the Settings button
+    property var recentApps: []           // desktop ids, newest first
     property bool showThumbs: true
     property int pickerThumb: 220
     property bool windowCapture: true
@@ -2704,6 +2708,16 @@ Scope {
                         title: I18n.tr("Animate opening applications")
                         subtitle: I18n.tr("Icons bounce while an app is launching")
                         SSwitch { t: pal; checked: root.bounceOnLaunch; onToggled: v => root.bounceOnLaunch = v }
+                    }
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Show suggested and recent apps in Dock")
+                        SSwitch { t: pal; checked: root.showRecents; onToggled: v => root.showRecents = v }
+                    }
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Show the Downloads stack")
+                        SSwitch { t: pal; checked: root.showDownloads; onToggled: v => root.showDownloads = v }
                     }
                     SRow {
                         t: pal
@@ -5402,6 +5416,77 @@ Scope {
     property int sepCount: 0
     readonly property real totalW0: Math.max(0, appCount * (iconSize + spacing) + sepCount * (sepWidth + spacing) - spacing)
     property var launching: ({})
+    // an app asking for attention (Hyprland's "urgent", or LauncherEntry urgent): its icon bounces until it is used, or for 6 s
+    property var attention: ({})
+    function setAttention(key, on) {
+        var A = {};
+        for (var k in attention) if (k !== key) A[k] = attention[k];
+        if (on) { A[key] = Date.now(); attentionTimer.restart(); }
+        attention = A;
+    }
+    Timer { id: attentionTimer; interval: 6000; onTriggered: root.attention = ({}) }
+    // a hidden Dock comes up while an app wants attention, as macOS pokes the icon out; not over fullscreen apps or in Do Not Disturb
+    readonly property bool attentionPeek: Object.keys(attention).length > 0 && !(bar && (bar.fullscreenNow || bar.dndActive))
+    function urgentWindow(addr) {
+        var a = String(addr).replace(/^0x/, ""), ts = Hyprland.toplevels.values;
+        for (var i = 0; i < ts.length; i++) {
+            if (String(ts[i].address).replace(/^0x/, "") !== a) continue;
+            var w = ts[i].wayland;
+            if (w && w.appId && !w.activated) setAttention(keyOf(appOf(w)), true);
+            return;
+        }
+    }
+    // unread counts and progress bars that apps send over D-Bus (com.canonical.Unity.LauncherEntry)
+    property var badges: ({})
+    function launcherEntry(line) {
+        var o;
+        try { o = JSON.parse(line); } catch (err) { return; }
+        var B = {};
+        for (var k in badges) if (!o.gone || badges[k].sender !== o.gone) B[k] = badges[k];
+        if (o.app) {
+            var key = keyOf(o.app), b = B[key] || { count: 0, countOn: false, progress: 0, progressOn: false };
+            B[key] = { sender: o.sender,
+                       count: o.count !== undefined ? o.count : b.count, countOn: o["count-visible"] !== undefined ? o["count-visible"] : b.countOn,
+                       progress: o.progress !== undefined ? o.progress : b.progress,
+                       progressOn: o["progress-visible"] !== undefined ? o["progress-visible"] : b.progressOn };
+            if (o.urgent === true) setAttention(key, true);
+        }
+        badges = B;
+    }
+    Process {
+        running: true
+        command: ["python3", "-I", Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-launcher-entry.py"]
+        stdout: SplitParser { onRead: line => root.launcherEntry(line) }
+    }
+    // the Downloads stack: newest first, watched by Qt
+    FolderListModel {
+        id: downloadsModel
+        folder: "file://" + (root.downloadsDir)
+        showDirs: true; showHidden: false; showDirsFirst: false
+        sortField: FolderListModel.Time
+    }
+    property string downloadsDir: Quickshell.env("HOME") + "/Downloads"
+    Process {
+        running: true
+        command: ["xdg-user-dir", "DOWNLOAD"]
+        stdout: StdioCollector { onStreamFinished: { var d = text.trim(); if (d.charAt(0) === "/") root.downloadsDir = d; } }
+    }
+    function downloadsMenu() {
+        var m = [], n = 0;
+        for (var i = 0; i < downloadsModel.count && n < 12; i++) {
+            var name = String(downloadsModel.get(i, "fileName")), path = String(downloadsModel.get(i, "filePath")), dir = downloadsModel.get(i, "fileIsDir");
+            if (/\.(part|crdownload|download|tmp)$/i.test(name)) continue;   // still downloading
+            n++;
+            (function (p, nm, d) {
+                m.push({ kind: "item", label: nm, raw: true, icon: root.bar && root.bar.fileIcon ? root.bar.fileIcon(p, d) : "",
+                         run: function () { Quickshell.execDetached(["xdg-open", p]); } });
+            })(path, name, dir === true);
+        }
+        if (n === 0) m.push({ kind: "item", label: I18n.tr("No downloads"), disabled: true });
+        m.push({ kind: "sep" });
+        m.push({ kind: "item", label: I18n.tr("Open Downloads Folder"), run: function () { Quickshell.execDetached(["xdg-open", root.downloadsDir]); } });
+        return m;
+    }
     property var knownKeys: ({})
     property var itemMap: ({})
     ListModel { id: dockModel }
@@ -5475,12 +5560,15 @@ Scope {
 
     readonly property string settingsSig: [dockEnabled, settingsEnabled, iconSize, magnification, magnificationEnabled, spacing, margin,
         cornerRadius, glassOpacity, glassBlur, glassLiquid, dockStyle, wallpaperPath, String(accent), accentUi, fontFamily, hideMode, hideDelay, monitor,
-        showSettings, showLabels, showIndicators, bounceOnLaunch, showThumbs, windowCapture, glassLive, iconTint, iconTintColor, iconTintStrength, pickerThumb].join("|")
+        showSettings, showLabels, showIndicators, bounceOnLaunch, showThumbs, windowCapture, glassLive, iconTint, iconTintColor, iconTintStrength, pickerThumb,
+        showRecents, showDownloads, recentApps.join(",")].join("|")
     property bool settingsReady: false
     onSettingsSigChanged: if (settingsReady) saveTimer.restart()
     onShowSettingsChanged: rebuild()
     onSettingsEnabledChanged: rebuild()
     onShowThumbsChanged: rebuild()
+    onShowRecentsChanged: rebuild()
+    onShowDownloadsChanged: rebuild()
     onWindowCaptureChanged: rebuild()
 
     function saveSettings() {
@@ -5493,7 +5581,8 @@ Scope {
             hideMode: hideMode, hideDelay: hideDelay, monitor: monitor,
             showSettings: showSettings, showLabels: showLabels, showIndicators: showIndicators,
             bounceOnLaunch: bounceOnLaunch, showThumbs: showThumbs, windowCapture: windowCapture, glassLive: glassLive,
-            iconTint: iconTint, iconTintColor: iconTintColor, iconTintStrength: iconTintStrength, pickerThumb: pickerThumb
+            iconTint: iconTint, iconTintColor: iconTintColor, iconTintStrength: iconTintStrength, pickerThumb: pickerThumb,
+            showRecents: showRecents, showDownloads: showDownloads, recentApps: recentApps
         };
         settingsStore.setText(JSON.stringify(o, null, 2));
     }
@@ -5502,7 +5591,8 @@ Scope {
         if (!o || typeof o !== "object") return;
         var keys = ["dockEnabled", "settingsEnabled", "iconSize", "magnification", "magnificationEnabled", "spacing", "margin", "cornerRadius",
                     "glassOpacity", "dockStyle", "wallpaperPath", "glassDebug", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "accent", "accentUi", "fontFamily", "hideMode", "hideDelay", "monitor",
-                    "showSettings", "showLabels", "showIndicators", "bounceOnLaunch", "showThumbs", "windowCapture", "glassLive", "iconTint", "iconTintColor", "iconTintStrength", "pickerThumb"];
+                    "showSettings", "showLabels", "showIndicators", "bounceOnLaunch", "showThumbs", "windowCapture", "glassLive", "iconTint", "iconTintColor", "iconTintStrength", "pickerThumb",
+                    "showRecents", "showDownloads", "recentApps"];
         for (var i = 0; i < keys.length; i++) {
             if (o[keys[i]] === undefined) continue;
             try { root[keys[i]] = o[keys[i]]; } catch (err) { }
@@ -5516,6 +5606,7 @@ Scope {
         onLoaded: {
             try { root.applySettings(JSON.parse(text())); } catch (err) { }
             root.settingsReady = true;
+            root.rebuild();   // the saved recents
             if (root.dockStyle !== "normal") root.startGlass();
         }
         onLoadFailed: root.settingsReady = true
@@ -5537,6 +5628,7 @@ Scope {
         return (e ? e.id : appId).toLowerCase();
     }
 
+    property var lastExtras: ({})   // key -> app id of the unpinned apps running at the last rebuild (for recents)
     property var winIdList: []
     property int winIdNext: 1
     function winIdFor(tl) {
@@ -5579,6 +5671,7 @@ Scope {
 
     function activate(item, forceNew, floating) {
         if (item.kind === "win") { if (item.tl) item.tl.activate(); return; }
+        if (item.key && attention[item.key] !== undefined) setAttention(item.key, false);
         if (item.special === "settings") { root.openPrefs("general"); return; }
         var wins = windowsFor(item.key);
         if (wins.length > 0 && !forceNew) {
@@ -5655,6 +5748,7 @@ Scope {
             m.push({ kind: "item", label: I18n.tr("Settings\u2026"), run: function() { root.openPrefs(); } });
             return m;
         }
+        if (item.special === "downloads") return downloadsMenu();
         if (item.special === "settings") {
             m.push({ kind: "item", label: I18n.tr("Open"), run: function () { activate(item, false); } });
             m.push({ kind: "item", label: I18n.tr("Desktop & Dock") + "\u2026", run: function () { root.openPrefs("dock"); } });
@@ -5726,7 +5820,19 @@ Scope {
 
         var extras = [];
         for (var r = 0; r < runOrder.length; r++) if (!seen[runOrder[r].key]) extras.push(runOrder[r]);
-        if (extras.length > 0 && list.length > 0) list.push({ kind: "sep", key: "sep:run" });
+        // recents: unpinned apps that were running at the last rebuild and are gone now, newest first, three at most
+        var rec = recentApps.slice(), nowRun = {};
+        for (var lr in lastExtras) if (!running[lr] && lookup(lastExtras[lr])) rec.unshift(lookup(lastExtras[lr]).id);
+        for (var x0 = 0; x0 < extras.length; x0++) nowRun[extras[x0].key] = extras[x0].appId;
+        lastExtras = nowRun;
+        rec = rec.filter(function (id, i) { var k = id.toLowerCase(); return rec.map(function (v) { return v.toLowerCase(); }).indexOf(k) === i && !seen[k] && !running[k]; }).slice(0, 3);
+        if (rec.join("|") !== recentApps.join("|")) recentApps = rec;
+        var recItems = [];
+        if (showRecents) for (var ri = 0; ri < rec.length; ri++) {
+            var re = lookup(rec[ri]);
+            if (re) recItems.push({ kind: "app", key: re.id.toLowerCase(), appId: re.id, name: re.name, icon: re.icon, entry: re, running: false, pinned: false, recent: true });
+        }
+        if ((extras.length > 0 || recItems.length > 0) && list.length > 0) list.push({ kind: "sep", key: "sep:run" });
         for (var x = 0; x < extras.length; x++) {
             var e2 = lookup(extras[x].appId);
             var own = isShellApp(extras[x].appId);
@@ -5735,6 +5841,7 @@ Scope {
                         icon: own ? logoPath : (e2 ? e2.icon : extras[x].appId.toLowerCase()),
                         entry: e2, running: true, pinned: false });
         }
+        for (var rj = 0; rj < recItems.length; rj++) list.push(recItems[rj]);
 
         var winItems = [], liveWins = [];
         if (showThumbs) {
@@ -5757,11 +5864,14 @@ Scope {
         for (var wi = 0; wi < winIdList.length; wi++) if (liveWins.indexOf(winIdList[wi].tl) >= 0) keep.push(winIdList[wi]);
         winIdList = keep;
 
-        if (showSettings || winItems.length > 0) {
+        if (showSettings || showDownloads || winItems.length > 0) {
             list.push({ kind: "sep", key: "sep:win" });
             for (var wj = 0; wj < winItems.length; wj++) list.push(winItems[wj]);
         }
-        if (showSettings && winItems.length > 0) list.push({ kind: "sep", key: "sep:settings" });
+        if ((showSettings || showDownloads) && winItems.length > 0) list.push({ kind: "sep", key: "sep:settings" });
+        if (showDownloads)
+            list.push({ kind: "app", key: "__downloads", name: I18n.tr("Downloads"), icon: "folder-download",
+                        entry: null, running: false, pinned: true, special: "downloads" });
         if (showSettings && settingsEnabled) {
             list.push({ kind: "app", key: "__settings", name: "YukiShell", icon: logoPath,
                         entry: null, running: false, pinned: true, special: "settings" });
@@ -5927,7 +6037,10 @@ Scope {
     readonly property var busyMonitors: computeBusy(hub ? hub.monData : [], hub ? hub.glassClients : [], hideMode === "windows")
     Connections {
         target: Hyprland
-        function onRawEvent(event) { tickDebounce.restart(); }
+        function onRawEvent(event) {
+            tickDebounce.restart();
+            if (event.name === "urgent") root.urgentWindow(event.data);
+        }
     }
 
     Component.onCompleted: {
@@ -6274,7 +6387,7 @@ Scope {
                     onFinished: { ui.tearItem = null; ui.tearAddr = ""; }
                 }
 
-                readonly property bool tucked: wantsHide && !revealed && !menuOpen && !dragging && !tearing
+                readonly property bool tucked: wantsHide && !revealed && !menuOpen && !dragging && !tearing && !root.attentionPeek
                 readonly property real refLeft: (width - root.totalW0) / 2
                 readonly property real activeTop: height - root.margin - root.bgHeight
                                                   - root.iconSize * (root.effMag - 1) - 12
@@ -6843,6 +6956,44 @@ Scope {
                                         mipmap: true
                                     }
 
+                                    // unread count (red, top right) and progress (bar across the bottom), from the app's LauncherEntry
+                                    Rectangle {
+                                        readonly property var b: cell.isSep || cell.modelData.kind !== "app" ? undefined : root.badges[cell.modelData.key]
+                                        visible: !!(b && b.countOn && b.count > 0)
+                                        height: Math.round(img.height * 0.38)
+                                        width: Math.max(height, cntText.implicitWidth + height * 0.55)
+                                        radius: height / 2
+                                        x: img.x + img.width - width * 0.8
+                                        y: img.y - height * 0.22
+                                        color: "#FF3B30"
+                                        border.width: 1; border.color: Qt.rgba(0, 0, 0, 0.15)
+                                        Text {
+                                            id: cntText
+                                            anchors.centerIn: parent
+                                            text: parent.b ? (parent.b.count > 99 ? "99+" : String(parent.b.count)) : ""
+                                            color: "white"
+                                            font.pixelSize: Math.round(parent.height * 0.62); font.weight: Font.DemiBold
+                                            font.family: root.fontForWeight(Font.DemiBold, root.fontFamily)
+                                        }
+                                    }
+                                    Rectangle {
+                                        readonly property var b: cell.isSep || cell.modelData.kind !== "app" ? undefined : root.badges[cell.modelData.key]
+                                        visible: !!(b && b.progressOn)
+                                        x: img.x + img.width * 0.12
+                                        width: img.width * 0.76
+                                        height: Math.max(5, Math.round(img.height * 0.11))
+                                        y: img.y + img.height * 0.82 - height / 2
+                                        radius: height / 2
+                                        color: Qt.rgba(0, 0, 0, 0.55)
+                                        border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.35)
+                                        Rectangle {
+                                            x: 1; y: 1
+                                            height: parent.height - 2; radius: height / 2
+                                            width: Math.max(height, (parent.width - 2) * Math.max(0, Math.min(1, parent.b ? parent.b.progress : 0)))
+                                            color: root.accent
+                                        }
+                                    }
+
                                     Rectangle {
                                         id: pill
                                         visible: !cell.isSep && cell.modelData.running && root.showIndicators
@@ -6864,7 +7015,9 @@ Scope {
                                     }
                                 }
 
-                                readonly property bool wantBounce: !cell.isSep && root.bounceOnLaunch && root.launching[cell.modelData.key] !== undefined
+                                readonly property bool wantBounce: !cell.isSep && ((root.bounceOnLaunch && root.launching[cell.modelData.key] !== undefined)
+                                                                                   || root.attention[cell.modelData.key] !== undefined)
+                                onIsActiveAppChanged: if (isActiveApp && root.attention[modelData.key] !== undefined) root.setAttention(modelData.key, false)
                                 property bool bounceShown: false
                                 function bounceStep() {
                                     if (ui.tucked) return;
@@ -6993,7 +7146,7 @@ Scope {
                                     }
                                     onClicked: mouse => {
                                         if (ui.justDragged) return;
-                                        if (mouse.button === Qt.RightButton) {
+                                        if (mouse.button === Qt.RightButton || cell.modelData.special === "downloads") {
                                             ui.menuCx = cell.mapToItem(ui, cell.width / 2, 0).x;
                                             ui.menuModel = root.menuFor(cell.modelData);
                                             ui.menuItem = cell.modelData;
@@ -7030,7 +7183,7 @@ Scope {
                     Behavior on opacity { NumberAnimation { duration: 90 } }
                     Behavior on scale { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
-                    width: 224
+                    width: ui.menuModel.some(function (m) { return !!m.icon; }) ? 300 : 224
                     height: menuCol.height + 12
                     x: Math.round(Math.max(8, Math.min(ui.width - width - 8, ui.menuCx - width / 2)))
                     y: Math.round(ui.height - root.margin - root.bgHeight - root.iconSize * (root.effMag - 1) - 12 - height)
@@ -7098,13 +7251,22 @@ Scope {
                                     opacity: mi.hot ? 1 : 0
                                     Behavior on opacity { NumberAnimation { duration: 90 } }
                                 }
+                                Image {
+                                    id: miIcon
+                                    visible: !mi.isSep && !!mi.modelData.icon
+                                    x: 8; anchors.verticalCenter: parent.verticalCenter
+                                    width: 20; height: 20
+                                    source: visible ? mi.modelData.icon : ""
+                                    sourceSize: Qt.size(40, 40)
+                                    asynchronous: true
+                                }
                                 Text {
                                     visible: !mi.isSep
-                                    x: 12
+                                    x: miIcon.visible ? 36 : 12
                                     y: Math.round((parent.height - height) / 2)
-                                    width: parent.width - 24
-                                    elide: Text.ElideRight
-                                    text: mi.isSep ? "" : (mi.armedNow ? I18n.tr("Click again to confirm") : I18n.tr(mi.modelData.label))
+                                    width: parent.width - x - 12
+                                    elide: Text.ElideMiddle
+                                    text: mi.isSep ? "" : (mi.armedNow ? I18n.tr("Click again to confirm") : (mi.modelData.raw ? mi.modelData.label : I18n.tr(mi.modelData.label)))
                                     color: mi.hot ? "white" : menu.ink
                                     opacity: mi.off ? 0.4 : 1
                                     font.pixelSize: 14

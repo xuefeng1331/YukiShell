@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "No downloads": "Нет загрузок",
+    "Open Downloads Folder": "Открыть папку «Загрузки»",
+    "Show suggested and recent apps in Dock": "Показывать предложенные и недавние приложения в Dock",
+    "Show the Downloads stack": "Показывать стопку «Загрузки»",
     "%1 items": "Объектов: %1",
     "1 item": "1 объект",
     "Audio": "Аудио",

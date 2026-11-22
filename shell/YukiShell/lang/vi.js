@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "No downloads": "Không có tệp tải về",
+    "Open Downloads Folder": "Mở thư mục Tải về",
+    "Show suggested and recent apps in Dock": "Hiện ứng dụng được gợi ý và gần đây trong Dock",
+    "Show the Downloads stack": "Hiện ngăn xếp Tải về",
     "%1 items": "%1 mục",
     "1 item": "1 mục",
     "Audio": "Âm thanh",

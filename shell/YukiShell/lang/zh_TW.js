@@ -1,6 +1,10 @@
 .pragma library
 
 var strings = {
+    "No downloads": "沒有下載項目",
+    "Open Downloads Folder": "打開「下載項目」檔案夾",
+    "Show suggested and recent apps in Dock": "在 Dock 中顯示建議和最近使用的 App",
+    "Show the Downloads stack": "顯示「下載項目」疊放",
     "%1 items": "%1 個項目",
     "1 item": "1 個項目",
     "Audio": "音訊",
