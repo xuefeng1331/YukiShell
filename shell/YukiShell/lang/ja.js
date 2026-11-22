@@ -1,6 +1,17 @@
 .pragma library
 
 var strings = {
+    "%1 items": "%1 項目",
+    "1 item": "1 項目",
+    "Audio": "オーディオ",
+    "Document": "書類",
+    "Folder": "フォルダ",
+    "Modified %1": "変更日 %1",
+    "PDF Document": "PDF 書類",
+    "Return to open · Ctrl+Return to show in folder": "Return で開く · Ctrl+Return でフォルダに表示",
+    "Text Document": "テキスト書類",
+    "Video": "ビデオ",
+    "bytes": "バイト",
     "Mission Control": "Mission Control",
     "App Exposé": "アプリケーションウインドウ",
     "No open windows": "開いているウインドウはありません",

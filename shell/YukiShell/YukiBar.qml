@@ -2826,7 +2826,7 @@ Scope {
     function pickColor() { sh("c=$(hyprpicker -a) && [ -n \"$c\" ] && notify-send -a yukibar 'Color copied' \"$c\""); }
     Process {
         id: fileSearchProc
-        command: ["sh", "-c", "find \"$HOME\" -type f -iname \"*$1*\" -not -path '*/.cache/*' -not -path '*/.local/share/Trash/*' 2>/dev/null | head -n 60", "sh", root.fileQuery]
+        command: ["sh", Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-findfiles.sh", root.fileQuery]
         stdout: StdioCollector { onStreamFinished: {
             var a=text.trim().split("\n").filter(function(x){return x!=="";});
             if (root.fileSearchFor === root.fileQuery) { root.fileHits=a; root.fileSearchPending=false; }
@@ -2837,7 +2837,27 @@ Scope {
     Timer { id: fileDebounce; interval: 260; onTriggered: {
         if (root.fileQuery.length > 0 && !fileSearchProc.running) { root.fileSearchFor=root.fileQuery; root.fileSearchPending=true; fileSearchProc.running=true; }
     } }
-    function updateFileSearch(q) { fileQuery=q; fileHits=[]; fileSearchPending=true; fileDebounce.restart(); }
+    function updateFileSearch(q) { fileQuery=q; fileSearchPending=true; fileDebounce.restart(); }   // old hits stay until new ones come: no blinking
+    function revealFile(path) {   // the file manager, with the file selected
+        var uri = "file://" + path.split("/").map(encodeURIComponent).join("/");
+        Quickshell.execDetached(["sh", "-c", "gdbus call --session --dest org.freedesktop.FileManager1 --object-path /org/freedesktop/FileManager1 "
+            + "--method org.freedesktop.FileManager1.ShowItems \"[\\\"$1\\\"]\" '' >/dev/null 2>&1 || xdg-open \"$(dirname \"$2\")\"", "sh", uri, path]);
+    }
+    function fileIcon(path, dir) {
+        var e = dir ? "" : path.substring(path.lastIndexOf(".") + 1).toLowerCase(), n = dir ? "folder" : "text-x-generic";
+        if (/^(png|jpe?g|gif|webp|bmp|svg|avif|heic|ico|tiff?)$/.test(e)) n = "image-x-generic";
+        else if (/^(mp4|mkv|webm|mov|avi|m4v|flv)$/.test(e)) n = "video-x-generic";
+        else if (/^(mp3|flac|ogg|opus|wav|m4a|aac)$/.test(e)) n = "audio-x-generic";
+        else if (e === "pdf") n = "application-pdf";
+        else if (/^(zip|tar|gz|xz|zst|7z|rar|bz2|tgz)$/.test(e)) n = "package-x-generic";
+        else if (/^(sh|py|js|qml|lua|c|cc|cpp|h|hpp|rs|go|java|ts|rb|pl)$/.test(e)) n = "text-x-script";
+        else if (/^(html?|css)$/.test(e)) n = "text-html";
+        else if (/^(docx?|odt|rtf)$/.test(e)) n = "x-office-document";
+        else if (/^(xlsx?|ods|csv)$/.test(e)) n = "x-office-spreadsheet";
+        else if (/^(pptx?|odp)$/.test(e)) n = "x-office-presentation";
+        else if (/^(appimage|exe|bin|run)$/.test(e)) n = "application-x-executable";
+        return Quickshell.iconPath(n, true) || Quickshell.iconPath(dir ? "folder" : "text-x-generic", true);
+    }
 
     property bool dnd: false
     onNotifDndChanged: if (dnd !== notifDnd) dnd = notifDnd
@@ -3414,8 +3434,23 @@ Scope {
         }
         return out;
     }
-    function fileItems(q) {
-        var out=[], home=Quickshell.env("HOME")||""; for(var i=0;i<fileHits.length&&out.length<60;i++){var path=fileHits[i];out.push({title:path.substring(path.lastIndexOf("/")+1)||path,sub:(home&&path.indexOf(home+"/")===0?"~"+path.substring(home.length):path),path:true,glyph:"folder",run:(function(p){return function(){Quickshell.execDetached(["xdg-open",p]);};})(path)});} return out;
+    function fmtSize(b) {
+        var u = [I18n.tr("bytes"), "KB", "MB", "GB", "TB"], i = 0;
+        while (b >= 1000 && i < 4) { b /= 1000; i++; }
+        return (i === 0 ? b : b.toFixed(b < 10 ? 1 : 0)) + " " + u[i];
+    }
+    function fileItems(q, max) {
+        var out = [], home = Quickshell.env("HOME") || "", s = (q || "").toLowerCase();
+        for (var i = 0; i < fileHits.length && out.length < (max || 60); i++) {
+            var raw = fileHits[i], dir = raw.charAt(raw.length - 1) === "/", path = dir ? raw.slice(0, -1) : raw;
+            var name = path.substring(path.lastIndexOf("/") + 1) || path;
+            if (s !== "" && name.toLowerCase().indexOf(s) < 0) continue;   // a hit from the query before this one
+            var where = path.substring(0, path.lastIndexOf("/"));
+            out.push({ title: name, sub: home && (where + "/").indexOf(home + "/") === 0 ? "~" + where.substring(home.length) : where,
+                       path: true, file: path, dir: dir, icon: fileIcon(path, dir), glyph: dir ? "folder" : "doc",
+                       run: (function (p) { return function () { Quickshell.execDetached(["xdg-open", p]); }; })(path) });
+        }
+        return out;
     }
     function homeItems(q) {
         var out = [], s = (q || "").trim().toLowerCase();
@@ -3429,7 +3464,9 @@ Scope {
         else { var expr=s.replace(/^=\s*/,""); var v=calcValue(expr); if(v!==null && (s.charAt(0)==="=" || /[+*/%xX×÷()]/.test(s))) out.unshift({title:String(Number(v.toPrecision(10))),sub:I18n.tr("Calculator · Return to copy"),glyph:"search",run:function(){Quickshell.execDetached(["wl-copy",String(v)]);}}); }
         var wins=windowItems(q); for(var j=0;j<wins.length&&out.length<6;j++)out.push(wins[j]);
         var acts=actionItems(q); for(var k=0;k<acts.length&&out.length<6;k++)if(acts[k].title.toLowerCase().indexOf(s)===0)out.push(acts[k]);
-        return out.slice(0,8);
+        out=out.slice(0,8);
+        if(s.length>=2 && !/^[=\d\s.+\-*\/%()xX×÷^]+$/.test(s)){ if(fileQuery!==s) updateFileSearch(s); out=out.concat(fileItems(s,5)); }   // and files, as macOS does
+        return out;
     }
 
     function menuModelFor(name) {
@@ -5158,7 +5195,9 @@ Scope {
                         ev.accepted = true;
                     }
                     else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
-                        if (spMode === "clip" && (ev.modifiers & Qt.ShiftModifier) && n > 0) {
+                        var cur = n > 0 ? spResults[Math.min(spSel, n - 1)] : null;
+                        if ((ev.modifiers & Qt.ControlModifier) && cur && cur.file) { pop = ""; root.revealFile(cur.file); }
+                        else if (spMode === "clip" && (ev.modifiers & Qt.ShiftModifier) && n > 0) {
                             var it = spResults[Math.min(spSel, n - 1)];
                             pop = "";
                             root.clipPick(it, false);
@@ -9852,14 +9891,34 @@ Scope {
                         opacity: (!ui.spFull && items.length > 0) ? 1 : 0
                         visible: opacity > 0
                         Behavior on opacity { NumberAnimation { duration: root.reduceMotion ? 0 : 160; easing.type: Easing.OutCubic } }
-                        readonly property int maxRows: /^(file|find)\s+/i.test(ui.spQuery) ? 5 : 99
-                        height: Math.min(items.length > 0 ? items.length : keep, maxRows) * 46 + 16
+                        readonly property int maxRows: /^(file|find)\s+/i.test(ui.spQuery) ? 7 : 99
+                        readonly property var selItem: items[selIdx] || null
+                        readonly property bool hasFiles: items.some(function (it) { return it && it.file; })
+                        readonly property int qlW: 250
+                        height: Math.max(Math.min(items.length > 0 ? items.length : keep, maxRows) * 46 + 16, hasFiles ? 340 : 0)
+                        // Quick Look: facts and a picture of the selected file, from yukishell-quicklook.sh
+                        readonly property string qlPath: hasFiles && selItem && selItem.file ? selItem.file : ""
+                        property var ql: null
+                        onQlPathChanged: qlTimer.restart()
+                        Timer { id: qlTimer; interval: 80; onTriggered: if (resPanel.qlPath !== "" && !qlProc.running) { qlProc.target = resPanel.qlPath; qlProc.running = true; } }
+                        Process {
+                            id: qlProc
+                            property string target: ""
+                            command: ["sh", Quickshell.env("HOME") + "/.config/hypr-yukishell/scripts/yukishell-quicklook.sh", target]
+                            stdout: StdioCollector { onStreamFinished: {
+                                var lines = text.split("\n"), f = (lines[0] || "").split("\t");
+                                if (qlProc.target === resPanel.qlPath)
+                                    resPanel.ql = { path: qlProc.target, kind: f[0] || "other", size: Number(f[2] || 0), mtime: Number(f[3] || 0),
+                                                    thumb: f[4] || "", count: Number(f[5] || 0), body: lines.slice(1).join("\n") };
+                            } }
+                            onExited: if (qlProc.target !== resPanel.qlPath) qlTimer.restart()
+                        }
                         Behavior on height { NumberAnimation { duration: root.reduceMotion ? 0 : 220; easing.type: Easing.OutCubic } }
                         GGlass { anchors.fill: parent; gx: spg; cornerR: 26; thickness: 26; strengthMul: 1.0; shadowAmt: 0.10 }
                         MenuBorder { amount: 0.5; anchors.fill: parent; cornerR: 26; dark: spotPal.dark; tint: root.menuBorderColor }
                         Item {
                             x: 8; y: 8
-                            width: parent.width - 16
+                            width: parent.width - 16 - (resPanel.hasFiles ? resPanel.qlW + 8 : 0)
                             height: parent.height - 16
                             clip: true
                         Flickable {
@@ -9960,6 +10019,102 @@ Scope {
                         }
                         }
                         LiquidScrollBar { flick: resFlick; compact: true; alwaysVisible: true; anchors.right: parent.right; anchors.rightMargin: 2; anchors.top: parent.top; anchors.topMargin: 6; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; dark: spotPal.dark }
+                        }
+                        Item {
+                            id: qlPane
+                            visible: resPanel.hasFiles
+                            x: parent.width - resPanel.qlW - 8; y: 8
+                            width: resPanel.qlW; height: parent.height - 16
+                            readonly property var it: resPanel.selItem   // an app or window: just its icon and name
+                            readonly property var q: it && it.file && resPanel.ql && resPanel.ql.path === it.file ? resPanel.ql : null
+                            readonly property string kindName: !q ? "" : ({ folder: I18n.tr("Folder"), image: I18n.tr("Image"), text: I18n.tr("Text Document"),
+                                                                            pdf: I18n.tr("PDF Document"), video: I18n.tr("Video"), audio: I18n.tr("Audio") })[q.kind] || I18n.tr("Document")
+                            Rectangle { x: -4; y: 6; width: 1; height: parent.height - 12; color: spotPal.fg; opacity: 0.12 }
+                            Item {
+                                id: qlPic
+                                x: 14; y: 14; width: parent.width - 28; height: 170
+                                visible: qlPane.it !== null
+                                Image {
+                                    id: qlImg
+                                    anchors.fill: parent
+                                    visible: status === Image.Ready
+                                    source: qlPane.q && qlPane.q.thumb ? root.fileUrl(qlPane.q.thumb) : ""
+                                    sourceSize: Qt.size(480, 340)
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    smooth: true
+                                }
+                                Rectangle {
+                                    anchors.fill: parent
+                                    visible: !!(qlPane.q && qlPane.q.kind === "text")
+                                    radius: 8
+                                    color: Qt.rgba(spotPal.dark ? 1 : 0, spotPal.dark ? 1 : 0, spotPal.dark ? 1 : 0, 0.06)
+                                    Text {
+                                        anchors.fill: parent; anchors.margins: 8
+                                        text: qlPane.q ? qlPane.q.body : ""
+                                        textFormat: Text.PlainText
+                                        wrapMode: Text.WrapAnywhere
+                                        clip: true
+                                        color: spotPal.fg2
+                                        font.family: "monospace"; font.pixelSize: 9
+                                    }
+                                }
+                                Image {
+                                    anchors.centerIn: parent
+                                    width: 96; height: 96
+                                    visible: !qlImg.visible && !(qlPane.q && qlPane.q.kind === "text") && source != ""
+                                    source: qlPane.it && qlPane.it.icon ? qlPane.it.icon : ""
+                                    sourceSize: Qt.size(192, 192)
+                                    asynchronous: true
+                                }
+                                Glyph {
+                                    anchors.centerIn: parent
+                                    width: 56; height: 56
+                                    visible: !!(qlPane.it && !qlPane.it.icon && qlPane.it.glyph)
+                                    kind: qlPane.it && qlPane.it.glyph ? qlPane.it.glyph : ""
+                                    color: spotPal.fg2
+                                }
+                            }
+                            Column {
+                                visible: qlPane.it !== null
+                                x: 14; y: qlPic.y + qlPic.height + 16
+                                width: parent.width - 28
+                                spacing: 4
+                                Text {
+                                    width: parent.width
+                                    text: qlPane.it ? qlPane.it.title : ""
+                                    wrapMode: Text.WrapAnywhere; maximumLineCount: 2; elide: Text.ElideRight
+                                    horizontalAlignment: Text.AlignHCenter
+                                    color: spotPal.fg
+                                    font.family: root.fontForWeight(Font.DemiBold, spotPal.fam); font.pixelSize: 13; font.weight: Font.DemiBold
+                                }
+                                Text {
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: !qlPane.q ? (qlPane.it && !qlPane.it.file ? qlPane.it.sub || "" : "") : qlPane.kindName + " \u00b7 " + (qlPane.q.kind === "folder"
+                                          ? (qlPane.q.count === 1 ? I18n.tr("1 item") : I18n.tr("%1 items").arg(qlPane.q.count)) : root.fmtSize(qlPane.q.size))
+                                    color: spotPal.fg2
+                                    font.family: root.fontForWeight(Font.Normal, spotPal.fam); font.pixelSize: 11
+                                }
+                                Text {
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    visible: !!(qlPane.q && qlPane.q.mtime > 0)
+                                    text: qlPane.q ? I18n.tr("Modified %1").arg(new Date(qlPane.q.mtime * 1000).toLocaleString(Qt.locale(), Locale.ShortFormat)) : ""
+                                    color: spotPal.fg2
+                                    font.family: root.fontForWeight(Font.Normal, spotPal.fam); font.pixelSize: 11
+                                }
+                                Text {
+                                    width: parent.width
+                                    topPadding: 6
+                                    horizontalAlignment: Text.AlignHCenter
+                                    wrapMode: Text.Wrap
+                                    visible: !!(qlPane.it && qlPane.it.file)
+                                    text: I18n.tr("Return to open \u00b7 Ctrl+Return to show in folder")
+                                    color: spotPal.fg2; opacity: 0.7
+                                    font.family: root.fontForWeight(Font.Normal, spotPal.fam); font.pixelSize: 10
+                                }
+                            }
                         }
                     }
 

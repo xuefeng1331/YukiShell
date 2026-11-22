@@ -1,6 +1,17 @@
 .pragma library
 
 var strings = {
+    "%1 items": "%1 mục",
+    "1 item": "1 mục",
+    "Audio": "Âm thanh",
+    "Document": "Tài liệu",
+    "Folder": "Thư mục",
+    "Modified %1": "Sửa đổi %1",
+    "PDF Document": "Tài liệu PDF",
+    "Return to open · Ctrl+Return to show in folder": "Return để mở · Ctrl+Return để hiện trong thư mục",
+    "Text Document": "Tài liệu văn bản",
+    "Video": "Video",
+    "bytes": "byte",
     "Mission Control": "Mission Control",
     "App Exposé": "Cửa sổ ứng dụng",
     "No open windows": "Không có cửa sổ nào đang mở",

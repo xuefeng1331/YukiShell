@@ -1,6 +1,17 @@
 .pragma library
 
 var strings = {
+    "%1 items": "Объектов: %1",
+    "1 item": "1 объект",
+    "Audio": "Аудио",
+    "Document": "Документ",
+    "Folder": "Папка",
+    "Modified %1": "Изменён %1",
+    "PDF Document": "Документ PDF",
+    "Return to open · Ctrl+Return to show in folder": "Return — открыть · Ctrl+Return — показать в папке",
+    "Text Document": "Текстовый документ",
+    "Video": "Видео",
+    "bytes": "байт",
     "Mission Control": "Mission Control",
     "App Exposé": "Окна приложения",
     "No open windows": "Нет открытых окон",

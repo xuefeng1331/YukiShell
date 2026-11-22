@@ -1,6 +1,17 @@
 .pragma library
 
 var strings = {
+    "%1 items": "%1개 항목",
+    "1 item": "1개 항목",
+    "Audio": "오디오",
+    "Document": "문서",
+    "Folder": "폴더",
+    "Modified %1": "수정일 %1",
+    "PDF Document": "PDF 문서",
+    "Return to open · Ctrl+Return to show in folder": "Return으로 열기 · Ctrl+Return으로 폴더에서 보기",
+    "Text Document": "텍스트 문서",
+    "Video": "비디오",
+    "bytes": "바이트",
     "Mission Control": "Mission Control",
     "App Exposé": "앱 윈도우",
     "No open windows": "열린 윈도우 없음",

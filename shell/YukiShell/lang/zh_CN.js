@@ -1,6 +1,17 @@
 .pragma library
 
 var strings = {
+    "%1 items": "%1 项",
+    "1 item": "1 项",
+    "Audio": "音频",
+    "Document": "文稿",
+    "Folder": "文件夹",
+    "Modified %1": "修改于 %1",
+    "PDF Document": "PDF 文稿",
+    "Return to open · Ctrl+Return to show in folder": "按 Return 打开 · Ctrl+Return 在文件夹中显示",
+    "Text Document": "文本文稿",
+    "Video": "视频",
+    "bytes": "字节",
     "Mission Control": "调度中心",
     "App Exposé": "应用程序窗口",
     "No open windows": "没有打开的窗口",
