@@ -58,6 +58,7 @@ ShellRoot {
         function sound(name) { }
         function setMediaSlot(v) { mediaSlot = v; }
         function checkCaps() { }
+        function capsSeen(v) { capsLock = v; }
         function poke() { engaged = true; idleTimer.restart(); }
         function submit() {
             if (busy || unlocking || pass.length === 0) return;
@@ -88,7 +89,7 @@ ShellRoot {
     }
     Timer {   // the lock screen's unlock animation, then the session
         id: launchTimer
-        interval: 430
+        interval: 600
         onTriggered: Greetd.launch(root.profile.session || ["start-hyprland"], ["XDG_SESSION_TYPE=wayland"], true)
     }
 

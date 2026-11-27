@@ -80,7 +80,10 @@ ShellRoot {
             saveProc.command = ["sh", "-c", "mkdir -p \"$HOME/.config/yukilock\" && printf '{\\n  \"mediaSlot\": \"%s\"\\n}\\n' \"$1\" > \"$HOME/.config/yukilock/settings.json\"", "sh", v];
             saveProc.running = true;
         }
-        function checkCaps() { if (!capsProc.running) capsProc.running = true; }
+        function checkCaps() { if (!capsProc.running) { capsProc.startedAt = Date.now(); capsProc.running = true; } }
+        // the screen saw it change (the key, or a typed letter): show it now, the next check confirms it
+        property real capsAt: 0
+        function capsSeen(v) { capsLock = v; capsAt = Date.now(); }
 
         function poke() {
             engaged = true;
@@ -109,9 +112,11 @@ ShellRoot {
     Process { id: saveProc }
     Process {
         id: capsProc
+        property real startedAt: 0
         command: ["sh", "-c", "hyprctl devices -j 2>/dev/null | jq -r '[.keyboards[] | select(.main) | .capsLock] | any'"]
         stdout: StdioCollector {
-            onStreamFinished: lockState.capsLock = text.trim() === "true"
+            // a check that started before the key was seen would undo it
+            onStreamFinished: if (capsProc.startedAt > lockState.capsAt) lockState.capsLock = text.trim() === "true"
         }
     }
     Timer { interval: 700; repeat: true; running: root.lockRequested || root.preview; triggeredOnStart: true; onTriggered: lockState.checkCaps() }
@@ -122,7 +127,7 @@ ShellRoot {
     Timer { id: msgTimer; interval: Math.max(3500, lockState.message.length * 70); onTriggered: lockState.message = "" }
     Timer {
         id: unlockTimer
-        interval: 430
+        interval: 600   // the lock opens, then the screen dissolves (LockScreen: gone + its fade)
         onTriggered: {
             if (root.preview) Qt.quit();
             else {

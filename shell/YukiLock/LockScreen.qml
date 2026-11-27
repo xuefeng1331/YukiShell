@@ -34,7 +34,15 @@ Item {
         function onStatusChanged() { if (wall.status === Image.Ready || wall.status === Image.Error) ls.shown = true; }
     }
 
-    opacity: shown && !leaving ? 1 : 0
+    // the entrance comes in order (clock, media, notifications, sign-in); later changes don't wait
+    property bool entered: false
+    Timer { running: ls.shown; interval: 1200; onTriggered: ls.entered = true }
+    function inDelay(ms) { return ls.entered || ls.leaving ? 0 : ms; }
+    // unlocking: everything but the clock clears while the lock opens, then the screen dissolves
+    property bool gone: false
+    Timer { running: ls.leaving; interval: 150; onTriggered: ls.gone = true }
+
+    opacity: shown && !gone ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: ls.leaving ? 420 : 650; easing.type: Easing.OutQuint } }
 
     Rectangle { anchors.fill: parent; color: "#0b0b10" }
@@ -178,7 +186,7 @@ Item {
         anchors.topMargin: 14 * ls.u; anchors.rightMargin: 22 * ls.u
         spacing: 12 * ls.u
         opacity: ls.shown && !ls.leaving ? 0.95 : 0
-        Behavior on opacity { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
+        Behavior on opacity { SequentialAnimation { PauseAnimation { duration: ls.inDelay(140) } NumberAnimation { duration: 650; easing.type: Easing.OutQuint } } }
 
         Glyph {
             anchors.verticalCenter: parent.verticalCenter
@@ -369,8 +377,14 @@ Item {
                 height: (gone ? 0 : 62 * ls.u)
                 Behavior on height { NumberAnimation { duration: 380; easing.type: Easing.OutQuint } }
                 property real appear: 0
-                Component.onCompleted: appearAnim.start()
-                NumberAnimation { id: appearAnim; target: nc; property: "appear"; from: 0; to: 1; duration: 560; easing.type: Easing.OutQuint }
+                property int enterDelay: 0
+                Component.onCompleted: if (ls.shown) appearAnim.start()
+                Connections { target: ls; function onShownChanged() { if (ls.shown) { nc.enterDelay = 140 + nc.index * 60; appearAnim.start(); } } }
+                SequentialAnimation {
+                    id: appearAnim
+                    PauseAnimation { duration: nc.enterDelay }
+                    NumberAnimation { target: nc; property: "appear"; from: 0; to: 1; duration: 560; easing.type: Easing.OutQuint }
+                }
                 property real dragX: 0
                 property bool gone: false
                 readonly property real far: Math.min(1, Math.abs(dragX) / (width * 0.75))
@@ -461,7 +475,7 @@ Item {
     Item {
         id: clock
         anchors.horizontalCenter: parent.horizontalCenter
-        y: (ls.shown && !ls.leaving ? 0.075 : 0.035) * ls.height
+        y: (ls.shown && !ls.gone ? 0.075 : 0.035) * ls.height
         width: Math.max(dateTxt.implicitWidth, timeItem.width)
         transform: [
             Translate {
@@ -477,9 +491,36 @@ Item {
             }
         ]
         height: dateTxt.implicitHeight + timeItem.y - dateTxt.height + timeItem.height
-        opacity: ls.shown && !ls.leaving ? 1 : 0
+        opacity: ls.shown && !ls.gone ? 1 : 0
         Behavior on y { NumberAnimation { duration: ls.leaving ? 420 : 650; easing.type: Easing.OutQuint } }
         Behavior on opacity { NumberAnimation { duration: ls.leaving ? 300 : 650; easing.type: Easing.OutQuint } }
+
+        // the lock: unlatches when the password is right
+        Item {
+            id: padlock
+            readonly property bool open: ls.leaving
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: dateTxt.top; anchors.bottomMargin: 10 * ls.u
+            width: 16 * ls.u; height: 21 * ls.u
+            layer.enabled: true
+            layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.6; shadowOpacity: 0.25; shadowVerticalOffset: 1 }
+            Rectangle {   // the shackle: lifts, then swings out to the right
+                x: 3 * ls.u; y: 1 * ls.u
+                width: 10 * ls.u; height: 15 * ls.u; radius: width / 2
+                color: "transparent"; border.color: Qt.rgba(1, 1, 1, 0.92); border.width: Math.max(1.5, 2 * ls.u)
+                transform: Translate {
+                    x: padlock.open ? 6.5 * ls.u : 0
+                    y: padlock.open ? -2 * ls.u : 0
+                    Behavior on x { SequentialAnimation { PauseAnimation { duration: 80 } NumberAnimation { duration: 260; easing.type: Easing.OutQuint } } }
+                    Behavior on y { SequentialAnimation { NumberAnimation { to: -4.5 * ls.u; duration: 80; easing.type: Easing.OutCubic } NumberAnimation { duration: 260; easing.type: Easing.OutQuint } } }
+                }
+            }
+            Rectangle {   // the body
+                anchors.bottom: parent.bottom
+                width: parent.width; height: 12 * ls.u; radius: 3.5 * ls.u
+                color: Qt.rgba(1, 1, 1, 0.92)
+            }
+        }
 
         MorphText {
             id: dateTxt
@@ -747,8 +788,8 @@ Item {
             duration: 650; easing.type: Easing.OutQuint
             onFinished: media.settling = false
         }
-        Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.OutQuint } }
-        Behavior on scale { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
+        Behavior on opacity { SequentialAnimation { PauseAnimation { duration: ls.inDelay(90) } NumberAnimation { duration: 500; easing.type: Easing.OutQuint } } }
+        Behavior on scale { SequentialAnimation { PauseAnimation { duration: ls.inDelay(90) } NumberAnimation { duration: 650; easing.type: Easing.OutQuint } } }
 
         property var pl: null
         Connections { target: ls; function onPlayerChanged() { if (ls.player) media.pl = ls.player; } }
@@ -1280,8 +1321,8 @@ Item {
         y: ls.height - height - (ls.shown && !ls.leaving ? 78 : 30) * ls.u
         opacity: ls.shown && !ls.leaving ? 1 : 0
         spacing: 10 * ls.u
-        Behavior on y { NumberAnimation { duration: ls.leaving ? 380 : 650; easing.type: Easing.OutQuint } }
-        Behavior on opacity { NumberAnimation { duration: ls.leaving ? 260 : 650; easing.type: Easing.OutQuint } }
+        Behavior on y { SequentialAnimation { PauseAnimation { duration: ls.inDelay(200) } NumberAnimation { duration: ls.leaving ? 380 : 650; easing.type: Easing.OutQuint } } }
+        Behavior on opacity { SequentialAnimation { PauseAnimation { duration: ls.inDelay(200) } NumberAnimation { duration: ls.leaving ? 260 : 650; easing.type: Easing.OutQuint } } }
 
         Item {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -1559,7 +1600,7 @@ Item {
         }
     }
 
-    Timer { id: capsSoon; interval: 60; onTriggered: ls.st.checkCaps() }
+    Timer { id: capsSoon; interval: 150; onTriggered: ls.st.checkCaps() }
     property bool enterHeld: false
     Keys.onReleased: event => { if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { if (!event.isAutoRepeat) ls.enterHeld = false; } }
     // typed while the password is being checked (a wrong one takes about 2 s): put in the field for the next try, not dropped
@@ -1575,7 +1616,13 @@ Item {
     Keys.onPressed: event => {
         ls.st.poke();
         event.accepted = true;
-        if (event.key === Qt.Key_CapsLock) capsSoon.restart();
+        if (event.key === Qt.Key_CapsLock && !event.isAutoRepeat) { ls.st.capsSeen(!ls.st.capsLock); capsSoon.restart(); }
+        // a letter tells: upper case without Shift (or lower case with it) means Caps Lock is on
+        var c = event.text;
+        if (c.length === 1 && c.toUpperCase() !== c.toLowerCase() && !(event.modifiers & Qt.ControlModifier)) {
+            var caps = (c === c.toUpperCase()) !== !!(event.modifiers & Qt.ShiftModifier);
+            if (caps !== ls.st.capsLock) ls.st.capsSeen(caps);
+        }
         if (ls.st.unlocking) return;
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (ls.st.busy) return;
