@@ -17,6 +17,15 @@ Item {
     readonly property string famDisplay: fam
     readonly property bool leaving: st.unlocking
 
+    // the Liquid Glass settings of the shell (Settings → Appearance); Acrylic and Normal get frosted glass without refraction
+    readonly property var gCfg: st.glassCfg || ({})
+    readonly property bool gFrosted: gCfg.s === "blur" || gCfg.s === "normal"
+    readonly property real gTint: typeof gCfg.o === "number" ? gCfg.o : 0.42
+    readonly property real gRim: gFrosted ? 0 : (typeof gCfg.r === "number" ? gCfg.r : 0.45)
+    readonly property real gStrength: gFrosted ? 0 : (typeof gCfg.l === "number" ? gCfg.l : 1.5)
+    // the sharp scene for Liquid Glass, as the shell's panels refract it; the blurred one for frosted glass
+    component LGlass: Glass { src: ls.gFrosted ? glassTex : sceneTex; frame: ls; tint: ls.gTint; rim: ls.gRim; strength: ls.gStrength }
+
     focus: true
 
     Timer { id: showTimer; interval: 450; running: true; onTriggered: ls.shown = true }
@@ -295,7 +304,7 @@ Item {
             Behavior on height { NumberAnimation { duration: 420; easing.type: Easing.OutQuint } }
             Behavior on opacity { NumberAnimation { duration: 320 } }
             clip: true
-            Glass { anchors.fill: parent; src: glassTex; frame: ls; cornerR: 22 * ls.u; thickness: 20; tint: 0.42; shadowAmt: 0.35 }
+            LGlass { anchors.fill: parent; cornerR: 22 * ls.u; thickness: 30; shadowAmt: 0.35 }
             readonly property var tm: ls.clockSt ? ls.clockSt.timer : null
             readonly property real remain: !tm ? 0 : (tm.state === "running" ? Math.max(0, tm.endAt - ls.nowMs) : tm.left)
             readonly property real swMs: (ls.clockSt && ls.clockSt.sw) ? ls.clockSt.sw.acc + (ls.clockSt.sw.running ? ls.nowMs - ls.clockSt.sw.startAt : 0) : 0
@@ -375,7 +384,7 @@ Item {
                     ScriptAction { script: { nc.gone = true; Quickshell.execDetached(["qs", "-c", "YukiShell", "ipc", "call", "notifications", "dismiss", String(nc.nid)]); } }
                 }
 
-                Glass { anchors.fill: parent; src: glassTex; frame: ls; cornerR: 20 * ls.u; thickness: 20; tint: 0.40; shadowAmt: 0.3 }
+                LGlass { anchors.fill: parent; cornerR: 20 * ls.u; thickness: 30; shadowAmt: 0.3 }
                 Rectangle { anchors.fill: parent; radius: 20 * ls.u; color: "white"; opacity: ncMa.pressed ? 0.12 : (ncMa.containsMouse ? 0.06 : 0); Behavior on opacity { NumberAnimation { duration: 140 } } }
                 Image {
                     x: 14 * ls.u; anchors.verticalCenter: parent.verticalCenter
@@ -434,7 +443,13 @@ Item {
         Item {
             visible: ls.lockNotifs.length > 4
             width: parent.width; height: 26 * ls.u
+            LGlass {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: moreTxt.implicitWidth + 24 * ls.u; height: parent.height
+                cornerR: height / 2; thickness: 12; shadowAmt: 0.2
+            }
             Text {
+                id: moreTxt
                 anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter
                 text: (ls.lockNotifs.length - 4) + (ls.lockNotifs.length - 4 === 1 ? I18n.tr(" more notification") : I18n.tr(" more notifications"))
                 color: Qt.rgba(1, 1, 1, 0.75); font.family: ls.fam; font.pixelSize: 12 * ls.u; font.weight: Font.Medium
@@ -739,10 +754,9 @@ Item {
         Connections { target: ls; function onPlayerChanged() { if (ls.player) media.pl = ls.player; } }
         Component.onCompleted: pl = ls.player
 
-        Glass {
+        LGlass {
             anchors.fill: parent
-            src: glassTex; frame: ls
-            cornerR: 28 * ls.u; thickness: 26; tint: 0.48; shadowAmt: 0.55
+            cornerR: 28 * ls.u; thickness: 26; tint: Math.max(ls.gTint, 0.48); shadowAmt: 0.55
         }
         HoverHandler { id: mediaHover }
         Rectangle {
@@ -1355,10 +1369,9 @@ Item {
                 PauseAnimation { duration: 220 }
                 NumberAnimation { target: pwGlow; property: "opacity"; to: 0; duration: 500; easing.type: Easing.InOutCubic }
             }
-            Glass {
+            LGlass {
                 anchors.fill: parent
-                src: glassTex; frame: ls
-                cornerR: height / 2; thickness: 18; tint: 0.50; shadowAmt: 0.4
+                cornerR: height / 2; thickness: 18; tint: Math.max(ls.gTint, 0.50); shadowAmt: 0.4
             }
             Rectangle {
                 anchors.fill: parent; radius: height / 2; color: "transparent"
@@ -1381,7 +1394,7 @@ Item {
             }
 
             Text {
-                anchors.left: parent.left; anchors.leftMargin: 16 * ls.u
+                anchors.left: parent.left; anchors.leftMargin: 21 * ls.u
                 anchors.verticalCenter: parent.verticalCenter
                 text: I18n.tr("Enter Password")
                 color: Qt.rgba(1, 1, 1, 0.62)
@@ -1400,6 +1413,7 @@ Item {
             }
             Connections { target: ls.st; function onPassChanged() { pwBox.syncDots(); } }
             Item {
+                id: dotsBox
                 anchors.left: parent.left; anchors.leftMargin: 16 * ls.u
                 anchors.right: ls.st.capsLock ? capsIcon.left : goBtn.left; anchors.rightMargin: 8 * ls.u
                 anchors.verticalCenter: parent.verticalCenter
@@ -1433,6 +1447,22 @@ Item {
                         }
                     }
                 }
+            }
+
+            // the text cursor, after the last dot: blinks while you wait, stays lit while you type
+            Rectangle {
+                id: caret
+                readonly property bool on: ls.activeFocus && !ls.st.busy && !ls.st.unlocking
+                property bool lit: true
+                x: dotsBox.x + Math.min(dotsBox.width - width, dotRow.x + dotRow.width + 1 * ls.u)
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(1.5, 2 * ls.u); height: 17 * ls.u; radius: width / 2
+                color: "white"
+                opacity: on && lit ? 0.9 : 0
+                Behavior on opacity { NumberAnimation { duration: 120 } }
+                Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Timer { id: blink; interval: 530; repeat: true; running: caret.on; onTriggered: caret.lit = !caret.lit }
+                Connections { target: ls.st; function onPassChanged() { caret.lit = true; blink.restart(); } }
             }
 
             Item {
@@ -1526,26 +1556,34 @@ Item {
     Timer { id: capsSoon; interval: 60; onTriggered: ls.st.checkCaps() }
     property bool enterHeld: false
     Keys.onReleased: event => { if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { if (!event.isAutoRepeat) ls.enterHeld = false; } }
+    // typed while the password is being checked (a wrong one takes about 2 s): put in the field for the next try, not dropped
+    property string ahead: ""
+    Connections { target: ls.st; function onFailsChanged() { if (ls.ahead !== "") { ls.st.pass = ls.ahead; ls.ahead = ""; } } }
+    // the text after this key, or null when the key doesn't edit it
+    function edited(s, event) {
+        if (event.key === Qt.Key_Escape || ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_U || event.key === Qt.Key_Backspace))) return "";
+        if (event.key === Qt.Key_Backspace) return s.slice(0, -1);
+        if (event.text !== "" && event.text.charCodeAt(0) >= 32 && !(event.modifiers & Qt.ControlModifier)) return s + event.text;
+        return null;
+    }
     Keys.onPressed: event => {
         ls.st.poke();
-        if (event.key === Qt.Key_CapsLock) capsSoon.restart();
-        if (ls.st.busy || ls.st.unlocking) { event.accepted = true; return; }
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            ls.enterHeld = true;
-            if (event.isAutoRepeat) { event.accepted = true; return; }
-            ls.st.submit();
-        } else if (event.key === Qt.Key_Escape) {
-            ls.st.pass = "";
-        } else if (event.key === Qt.Key_Backspace) {
-            if (event.modifiers & Qt.ControlModifier) ls.st.pass = "";
-            else ls.st.pass = ls.st.pass.slice(0, -1);
-        } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_U) {
-            ls.st.pass = "";
-        } else if (event.text !== "" && event.text.charCodeAt(0) >= 32 && !(event.modifiers & Qt.ControlModifier)) {
-            ls.st.pass += event.text;
-            ls.st.message = "";
-        }
         event.accepted = true;
+        if (event.key === Qt.Key_CapsLock) capsSoon.restart();
+        if (ls.st.unlocking) return;
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (ls.st.busy) return;
+            ls.enterHeld = true;
+            if (event.isAutoRepeat) return;
+            if (ls.st.pass.length === 0) pwPulse.restart();   // nothing to check yet: show where to type
+            else ls.st.submit();
+            return;
+        }
+        var s = ls.edited(ls.st.busy ? ls.ahead : ls.st.pass, event);
+        if (s === null) return;
+        if (ls.st.busy) { ls.ahead = s; return; }
+        if (s.length > ls.st.pass.length) ls.st.message = "";
+        ls.st.pass = s;
     }
 
     MouseArea {

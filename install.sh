@@ -228,6 +228,11 @@ if [ "$login" = greetd ] || grep -qs yukishell /etc/greetd/config.toml; then
         printf '[terminal]\nvt = 1\n\n[default_session]\ncommand = "start-hyprland -- --config %s/YukiLock/greeter.lua"\nuser = "greeter"\n' "$g" \
             | sudo tee /etc/greetd/config.toml >/dev/null
     fi
+    # signing in unlocks your keyring (saved Wi-Fi and browser passwords), as other login screens do
+    if [ -f /etc/pam.d/greetd ] && ! grep -qs pam_gnome_keyring /etc/pam.d/greetd; then
+        printf '%s\n' '-auth      optional     pam_gnome_keyring.so' '-session   optional     pam_gnome_keyring.so auto_start' \
+            | sudo tee -a /etc/pam.d/greetd >/dev/null
+    fi
     "$here/shell/bin/yuki-greeter-sync"
 fi
 

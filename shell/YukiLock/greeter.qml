@@ -26,6 +26,7 @@ ShellRoot {
             greetState.use24h = p.use24h !== false;
             greetState.artBg = p.artBg !== false;
             if (p.clock) greetState.clockCfg = p.clock;
+            if (p.glass) greetState.glassCfg = p.glass;
             Qt.uiLanguage = !p.language || p.language === "auto" ? "" : p.language;
         }
     }
@@ -50,6 +51,8 @@ ShellRoot {
         property bool use24h: true
         property var clockCfg: ({})
         property bool artBg: true
+        property var glassCfg: ({})
+        property string note: ""   // what PAM said besides asking for the password: why it refused, e.g. a locked account
         property string npMode: ""
         property string hint: "Enter your password to sign in"
         function sound(name) { }
@@ -61,6 +64,7 @@ ShellRoot {
             if (!root.profile.user) { fail("No user to sign in"); return; }
             busy = true;
             message = "";
+            note = "";
             Greetd.createSession(root.profile.user);
         }
         function fail(msg) {
@@ -76,8 +80,9 @@ ShellRoot {
         target: Greetd
         function onAuthMessage(message, error, responseRequired, echoResponse) {
             if (responseRequired) Greetd.respond(greetState.pass);
+            else if (message) greetState.note += (greetState.note ? " " : "") + message.trim();
         }
-        function onAuthFailure(message) { greetState.fail("Incorrect password"); }
+        function onAuthFailure(message) { greetState.fail(greetState.note || "Incorrect password"); }
         function onError(error) { console.warn("[yukigreet]", error); greetState.fail("Authentication error"); }
         function onReadyToLaunch() { greetState.unlocking = true; launchTimer.start(); }
     }
@@ -89,7 +94,7 @@ ShellRoot {
 
     Timer { interval: 1000; running: true; repeat: true; triggeredOnStart: true; onTriggered: greetState.now = new Date() }
     Timer { id: idleTimer; interval: 9000; onTriggered: if (greetState.pass.length === 0 && !greetState.busy) greetState.engaged = false }
-    Timer { id: msgTimer; interval: 3500; onTriggered: greetState.message = "" }
+    Timer { id: msgTimer; interval: Math.max(3500, greetState.message.length * 70); onTriggered: greetState.message = "" }
 
     Variants {
         model: Quickshell.screens

@@ -21,5 +21,6 @@ name=$(getent passwd "$me" | cut -d: -f5 | cut -d, -f1)
 { cat "$s" 2>/dev/null || echo '{}'; } | jq --arg user "$me" --arg name "${name:-$me}" --arg a "$a" --arg w "$w" '{
     user: $user, name: $name, avatar: $a, wallpaper: $w,
     use24h: (.use24h != false), artBg: (.lockArtBackground != false), language: (.language // "auto"),
-    clock: { f: .lockClockFont, w: .lockClockWeight, m: .lockClockMaterial, d: .lockClockDate, i: .lockClockIntensity, c: .lockClockTint }
+    clock: { f: .lockClockFont, w: .lockClockWeight, m: .lockClockMaterial, d: .lockClockDate, i: .lockClockIntensity, c: .lockClockTint },
+    glass: { o: .glassOpacity, r: .glassRim, l: .glassLiquid, s: .barStyle }
 }' > "$d/profile.json.tmp" && chmod 644 "$d/profile.json.tmp" && mv -f "$d/profile.json.tmp" "$d/profile.json"

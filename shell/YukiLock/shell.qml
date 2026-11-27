@@ -66,6 +66,8 @@ ShellRoot {
         property bool use24h: true
         property var clockCfg: { try { return JSON.parse(Quickshell.env("YUKILOCK_CLOCK") || "{}"); } catch (e) { return {}; } }
         property bool artBg: true
+        property var glassCfg: ({})
+        property string note: ""   // what PAM said besides asking for the password: why it refused, e.g. a locked account
         property bool sounds: false
         function sound(name) {
             if (sounds) Quickshell.execDetached(["pw-play", "--volume=0.7", Quickshell.env("HOME") + "/.local/share/sounds/yukishell/" + name + ".wav"]);
@@ -88,6 +90,7 @@ ShellRoot {
             if (busy || unlocking || pass.length === 0) return;
             busy = true;
             message = "";
+            note = "";
             if (!pam.start()) { busy = false; fail("Couldn't start authentication"); }
         }
         function fail(msg) {
@@ -116,7 +119,7 @@ ShellRoot {
     Timer { interval: 1000; running: root.lockRequested || root.preview; repeat: true; triggeredOnStart: true; onTriggered: lockState.now = new Date() }
     Timer { interval: 1500; repeat: true; running: root.preview && Quickshell.env("YUKILOCK_TEST_MORPH") === "1"; onTriggered: lockState.use24h = !lockState.use24h }
     Timer { id: idleTimer; interval: 9000; onTriggered: if (lockState.pass.length === 0 && !lockState.busy) lockState.engaged = false }
-    Timer { id: msgTimer; interval: 3500; onTriggered: lockState.message = "" }
+    Timer { id: msgTimer; interval: Math.max(3500, lockState.message.length * 70); onTriggered: lockState.message = "" }
     Timer {
         id: unlockTimer
         interval: 430
@@ -138,11 +141,12 @@ ShellRoot {
         config: "login"   // what /etc/pam.d/hyprlock includes, and that file only exists with hyprlock installed
         onPamMessage: {
             if (this.responseRequired) this.respond(lockState.pass);
+            else if (this.message) lockState.note += (lockState.note ? " " : "") + this.message.trim();
         }
         onCompleted: result => {
             lockState.busy = false;
             if (result === PamResult.Success) lockState.unlock();
-            else lockState.fail(result === PamResult.MaxTries ? "Too many attempts, try again shortly" : "Incorrect password");
+            else lockState.fail(lockState.note || (result === PamResult.MaxTries ? "Too many attempts, try again shortly" : "Incorrect password"));
         }
         onError: err => {
             lockState.busy = false;
@@ -185,7 +189,8 @@ ShellRoot {
             + "jq -r '.lockArtBackground' \"$HOME/.config/yukibar/settings.json\" 2>/dev/null || echo true; "
             + "jq -r '.use24h' \"$HOME/.config/yukibar/settings.json\" 2>/dev/null || echo true; "
             + "jq -r '.language // \"auto\"' \"$HOME/.config/yukibar/settings.json\" 2>/dev/null || echo auto; "
-            + "jq -c '{f: .lockClockFont, w: .lockClockWeight, m: .lockClockMaterial, d: .lockClockDate, i: .lockClockIntensity, c: .lockClockTint}' \"$HOME/.config/yukibar/settings.json\" 2>/dev/null || echo '{}'"]
+            + "jq -c '{f: .lockClockFont, w: .lockClockWeight, m: .lockClockMaterial, d: .lockClockDate, i: .lockClockIntensity, c: .lockClockTint}' \"$HOME/.config/yukibar/settings.json\" 2>/dev/null || echo '{}'; "
+            + "jq -c '{o: .glassOpacity, r: .glassRim, l: .glassLiquid, s: .barStyle}' \"$HOME/.config/yukibar/settings.json\" 2>/dev/null || echo '{}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var l = text.split("\n");
@@ -201,6 +206,7 @@ ShellRoot {
                 var lang = (l[8] || "auto").trim();
                 Qt.uiLanguage = (lang === "auto" || lang === "null") ? "" : lang;
                 if (!Quickshell.env("YUKILOCK_CLOCK")) { try { lockState.clockCfg = JSON.parse((l[9] || "{}").trim() || "{}"); } catch (e) { } }
+                try { lockState.glassCfg = JSON.parse((l[10] || "{}").trim() || "{}"); } catch (e) { }
                 if (!root.preview && root.lockRequested) lockState.sound("lock");
             }
         }
