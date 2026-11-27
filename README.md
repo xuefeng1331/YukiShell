@@ -47,8 +47,9 @@ What you get:
 
 Mauve and pink accents, a lot of glass, and an animated wallpaper if you want one.
 
-The current version is **v2.0**, the quality-of-life update: lock and display-off timers, a keyboard layout picker, one-click updates,
-a clean uninstall and a few new shortcuts. See [what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v2.0).
+The current version is **v2.1**, the big update: Mission Control, desktop icons with folder pictures, Spotlight file search, a busier
+Dock, window tiling, Live Text, a matching login screen and Liquid Glass on many more menus. See
+[what's new](https://github.com/xuefeng1331/YukiShell/releases/tag/v2.1).
 
 ## Contents
 
