@@ -1415,15 +1415,17 @@ Item {
             Item {
                 id: dotsBox
                 anchors.left: parent.left; anchors.leftMargin: 16 * ls.u
-                anchors.right: ls.st.capsLock ? capsIcon.left : goBtn.left; anchors.rightMargin: 8 * ls.u
+                // makes room for the Caps Lock sign smoothly, so a long password doesn't jump when it comes and goes
+                anchors.right: goBtn.left; anchors.rightMargin: (ls.st.capsLock ? capsIcon.width + 14 : 8) * ls.u
+                Behavior on anchors.rightMargin { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
                 anchors.verticalCenter: parent.verticalCenter
                 height: 12 * ls.u
                 clip: true
                 Row {
                     id: dotRow
                     anchors.verticalCenter: parent.verticalCenter
-                    x: Math.min(0, parent.width - width)
-                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    // a long password scrolls, leaving room for the text cursor; no animation of its own, the dots already grow
+                    x: Math.min(0, parent.width - width - 4 * ls.u)
                     Repeater {
                         model: dotModel
                         delegate: Item {
@@ -1436,8 +1438,8 @@ Item {
                             Component.onCompleted: grow = 1
                             onDyingChanged: if (dying) { grow = 0; dotGone.start(); }
                             Behavior on grow { NumberAnimation { duration: dotCell.dying ? 200 : 240; easing.type: Easing.OutCubic } }
-                            Rectangle {
-                                x: 2.5 * ls.u; anchors.verticalCenter: parent.verticalCenter
+                            Rectangle {   // keeps to the right end of its growing slot, so it never shows past the text cursor
+                                x: dotCell.width - 9.5 * ls.u; anchors.verticalCenter: parent.verticalCenter
                                 width: 7 * ls.u; height: width; radius: width / 2
                                 color: "white"
                                 opacity: dotCell.grow
@@ -1449,20 +1451,24 @@ Item {
                 }
             }
 
-            // the text cursor, after the last dot: blinks while you wait, stays lit while you type
+            // the text cursor, after the last dot: blinks while you wait, stays lit while you type.
+            // Shown whatever screen holds the keyboard (typing reaches the field from every screen), hidden while checking.
             Rectangle {
                 id: caret
-                readonly property bool on: ls.activeFocus && !ls.st.busy && !ls.st.unlocking
+                readonly property bool on: login.visible && (ls.st.engaged || ls.st.pass.length > 0) && !ls.st.busy && !ls.st.unlocking
                 property bool lit: true
-                x: dotsBox.x + Math.min(dotsBox.width - width, dotRow.x + dotRow.width + 1 * ls.u)
+                function wake() { lit = true; if (on) blink.restart(); }
+                // rides on the dots, which grow and shrink smoothly: an animation of its own would trail behind them.
+                // Whole pixels, or a thin line shimmers while it moves.
+                x: Math.round(dotsBox.x + Math.min(dotsBox.width - width, dotRow.x + dotRow.width + 1 * ls.u))
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(1.5, 2 * ls.u); height: 17 * ls.u; radius: width / 2
+                width: Math.max(1.5, Math.round(2 * ls.u)); height: Math.round(17 * ls.u); radius: width / 2
                 color: "white"
                 opacity: on && lit ? 0.9 : 0
                 Behavior on opacity { NumberAnimation { duration: 120 } }
-                Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                onOnChanged: wake()
                 Timer { id: blink; interval: 530; repeat: true; running: caret.on; onTriggered: caret.lit = !caret.lit }
-                Connections { target: ls.st; function onPassChanged() { caret.lit = true; blink.restart(); } }
+                Connections { target: ls.st; function onPassChanged() { caret.wake(); } }
             }
 
             Item {
