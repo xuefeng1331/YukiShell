@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8d939b"/>
+      <stop offset="0.14" stop-color="#d3d7dc"/>
+      <stop offset="0.38" stop-color="#f6f7f8"/>
+      <stop offset="0.62" stop-color="#e4e7ea"/>
+      <stop offset="0.88" stop-color="#bfc4ca"/>
+      <stop offset="1" stop-color="#868c94"/>
+    </linearGradient>
+    <linearGradient id="foot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.7" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#e9ecef"/>
+      <stop offset="1" stop-color="#a9aeb5"/>
+    </linearGradient>
+    <radialGradient id="hole" cx="0.5" cy="0.15" r="0.9">
+      <stop offset="0" stop-color="#9aa0a8"/>
+      <stop offset="0.6" stop-color="#5d636b"/>
+      <stop offset="1" stop-color="#3f444a"/>
+    </radialGradient>
+    <clipPath id="bodyclip"><path d="M106,104 L142,452 A114,26 0 0 0 370,452 L406,104 Z"/></clipPath>
+    <clipPath id="open"><rect x="0" y="0" width="512" height="106"/><ellipse cx="256" cy="106" rx="136" ry="27"/></clipPath>
+  </defs>
+  <path d="M106,104 L142,452 A114,26 0 0 0 370,452 L406,104 Z" fill="url(#body)"/>
+  <g clip-path="url(#bodyclip)"><path d="M126.1,152.0 L157.3,427.0" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M159.6,152.0 L182.7,432.9" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M204.7,152.0 L217.0,436.7" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M256.0,152.0 L256.0,438.0" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M307.3,152.0 L295.0,436.7" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M352.4,152.0 L329.3,432.9" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M385.9,152.0 L354.7,427.0" stroke="#6f757d" stroke-opacity="0.42" stroke-width="9" stroke-linecap="round"/><path d="M132.1,152.0 L162.3,427.0" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><path d="M165.6,152.0 L187.7,432.9" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><path d="M210.7,152.0 L222.0,436.7" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><path d="M262.0,152.0 L261.0,438.0" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><path d="M313.3,152.0 L300.0,436.7" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><path d="M358.4,152.0 L334.3,432.9" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><path d="M391.9,152.0 L359.7,427.0" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><rect x="0" y="0" width="512" height="512" fill="url(#foot)"/></g>
+  <ellipse cx="256" cy="104" rx="158" ry="40" fill="url(#rim)"/>
+  <ellipse cx="256" cy="106" rx="136" ry="27" fill="url(#hole)"/>
+  <g clip-path="url(#open)">
+    <path d="M150,112 L168,66 L204,58 L222,30 L262,44 L284,22 L318,40 L352,46 L364,82 L376,112 Z" fill="#f7f7f5"/>
+    <path d="M168,66 L204,58 L214,96 L176,104 Z" fill="#e2e2de"/>
+    <path d="M222,30 L262,44 L246,86 L214,96 L204,58 Z" fill="#ffffff"/>
+    <path d="M262,44 L284,22 L318,40 L296,80 L246,86 Z" fill="#ebebe7"/>
+    <path d="M318,40 L352,46 L364,82 L330,98 L296,80 Z" fill="#d8d8d3"/>
+    <path d="M214,96 L246,86 L296,80 L330,98 L300,112 L230,112 Z" fill="#cfcfca"/>
+    <path d="M168,66 L222,30 M262,44 L246,86 M318,40 L296,80" stroke="#b9b9b3" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+  <path d="M98,104 A158,40 0 0 0 414,104" fill="none" stroke="#7d838b" stroke-opacity="0.35" stroke-width="2"/>
+</svg>

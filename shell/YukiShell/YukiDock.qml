@@ -5759,12 +5759,9 @@ Scope {
         if (icon.charAt(0) === "/") return "file://" + icon;
         return Quickshell.iconPath(icon, "application-x-executable");
     }
-    // the Trash shows its "full" icon while there is something in it
+    // the Trash is our own drawing (icon themes' are wide boxes next to the app icons); full while there is something in it
     function cellIconSrc(it) {
-        if (it && it.special === "trash" && trashFull) {
-            var p = Quickshell.iconPath("user-trash-full", true);
-            if (p !== "") return p;
-        }
+        if (it && it.special === "trash") return Qt.resolvedUrl(trashFull ? "assets/trash-full.svg" : "assets/trash.svg");
         return iconSrc(it ? it.icon : "");
     }
 
