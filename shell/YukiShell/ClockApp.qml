@@ -11,7 +11,9 @@ import "Fonts.js" as Fonts
 Scope {
     id: root
     property var hub: null
-    property bool appEnabled: true
+    // settings.json clockAppEnabled; components.json clockEnabled wins when it is set
+    property var manualEnabled: undefined
+    readonly property bool appEnabled: manualEnabled !== undefined ? manualEnabled : (bar ? bar.clockAppEnabled : true)
     readonly property var dock: hub ? hub.dock : null
     readonly property var bar: hub ? hub.bar : null
     readonly property bool darkMode: dock ? dock.darkMode : true
@@ -91,7 +93,7 @@ Scope {
     FileView {
         path: root.home + "/.config/yukishell/components.json"
         printErrors: false
-        onLoaded: { try { var o = JSON.parse(text()); if (o.clockEnabled !== undefined) root.appEnabled = !!o.clockEnabled; } catch (e) {} }
+        onLoaded: { try { var o = JSON.parse(text()); if (o.clockEnabled !== undefined) root.manualEnabled = !!o.clockEnabled; } catch (e) {} }
     }
     Timer { id: saveLater; interval: 150; onTriggered: root.saveNow() }
     function save() { if (loaded) saveLater.restart(); }
@@ -265,7 +267,7 @@ Scope {
             for (var i = 0; i < Quickshell.screens.length; i++) if (Quickshell.screens[i].name === n) return Quickshell.screens[i];
             return Quickshell.screens[0];
         }
-        visible: root.appEnabled && (root.ringing !== null || bannerCard.opacity > 0.01)
+        visible: root.ringing !== null || bannerCard.opacity > 0.01   // even with the app off: the only way to stop a ringing alarm
         anchors { top: true; right: true }
         margins { top: 38; right: 12 }
         implicitWidth: 372; implicitHeight: 96
