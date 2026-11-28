@@ -1,50 +1,80 @@
 #!/usr/bin/env bash
-rt="${XDG_RUNTIME_DIR:-/tmp}"; cache="$rt/yuki-brightness.val"; busf="$rt/yuki-brightness.bus"; lock="$rt/yuki-brightness.lock"
+# yuki-brightness: screen brightness for the shell (Control Center slider, brightness keys).
+#   get | getm | set N | sync N | step +N|-N        (N in percent, 1..100)
+# A laptop panel goes through brightnessctl; every external monitor that speaks DDC/CI goes through ddcutil, each one
+# scaled to its own maximum (not every monitor counts to 100). `get` reads the laptop panel when there is one, else the
+# first monitor.
+rt="${XDG_RUNTIME_DIR:-/tmp}/yuki-brightness"; mkdir -p "$rt" 2>/dev/null
+cache="$rt/val"; busf="$rt/buses"
 
 backlight() {
     local d; for d in /sys/class/backlight/*/; do [ -e "${d}brightness" ] && { brightnessctl -c backlight -m 2>/dev/null | head -n1; return; }; done
 }
-bus() {
-    [ -s "$busf" ] || ddcutil detect --brief 2>/dev/null | sed -n 's#.*I2C bus: */dev/i2c-\([0-9]*\).*#\1#p' | head -n1 > "$busf"
-    cat "$busf"
+# the monitors' I2C buses, worked out again whenever a monitor is plugged in or out
+buses() {
+    command -v ddcutil >/dev/null 2>&1 || return 0
+    local sig f; sig=$(for f in /sys/class/drm/card*-*/status; do [ -e "$f" ] && printf '%s=%s;' "${f%/status}" "$(cat "$f")"; done)
+    if [ "$(head -n1 "$busf" 2>/dev/null)" != "$sig" ]; then
+        { printf '%s\n' "$sig"
+          ddcutil detect --brief 2>/dev/null | awk '/^Display/ { ok = 1 } /^Invalid display/ { ok = 0 } ok && /I2C bus:/ { sub(/.*i2c-/, ""); print }'
+        } > "$busf.$$" && mv -f "$busf.$$" "$busf"
+    fi
+    tail -n +2 "$busf"
 }
+# "<current> <max>" of one monitor
+vcp() { ddcutil --bus "$1" getvcp 10 --brief 2>/dev/null | awk '$1=="VCP" && $3=="C" && $5 > 0 { print $4, $5; exit }'; }
+maxof() { cat "$rt/max.$1" 2>/dev/null || echo 100; }
+raw() { echo $(( ($2 * $(maxof "$1") + 50) / 100 )); }    # percent -> this monitor's own scale
+clamp() { local p=$1; [ "$p" -lt 1 ] && p=1; [ "$p" -gt 100 ] && p=100; echo "$p"; }
 fresh() { [ -s "$cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$cache") )) -lt 30 ]; }
 
 get() {
-    if [ -n "$(backlight)" ]; then backlight | cut -d, -f4 | tr -d %; return; fi
+    local l; l=$(backlight)
+    if [ -n "$l" ]; then echo "$l" | cut -d, -f4 | tr -d %; return; fi
     if fresh; then cat "$cache"; return; fi
-    local b; b=$(bus); [ -n "$b" ] || return 1
-    ddcutil --bus "$b" getvcp 10 --brief 2>/dev/null | awk '$1=="VCP" && $3=="C" { print $4; exit }' | tee "$cache"
+    local b v; b=$(buses | head -n1); [ -n "$b" ] || return 1
+    v=$(vcp "$b"); [ -n "$v" ] || { : > "$busf"; return 1; }    # a monitor that stopped answering: detect again next time
+    set -- $v; echo "$2" > "$rt/max.$b"
+    echo $(( ($1 * 100 + $2 / 2) / $2 )) | tee "$cache"
 }
 set_() {
-    local p=$1; [ "$p" -lt 1 ] && p=1; [ "$p" -gt 100 ] && p=100
-    if [ -n "$(backlight)" ]; then brightnessctl -c backlight -q set "${p}%"; return; fi
+    local p b; p=$(clamp "$1")
+    [ -n "$(backlight)" ] && brightnessctl -c backlight -q set "${p}%"
     echo "$p" > "$cache"
-    local b; b=$(bus); [ -n "$b" ] || return 1
-    flock "$lock" sh -c 'ddcutil --bus "$1" --noverify --skip-ddc-checks --sleep-multiplier 0.1 setvcp 10 "$2" || ddcutil --bus "$1" --noverify setvcp 10 "$2"' _ "$b" "$p" >/dev/null 2>&1
-}
-
-sync_() {
-    local p=$1; [ "$p" -lt 1 ] && p=1; [ "$p" -gt 100 ] && p=100
-    if [ -n "$(backlight)" ]; then return 0; fi
-    local b; b=$(bus); [ -n "$b" ] || return 1
-    exec 9>"$lock"; flock 9
-    local cur="" i
-    for i in 1 2 3 4; do
-        cur=$(ddcutil --bus "$b" getvcp 10 --brief 2>/dev/null | awk '$1=="VCP" && $3=="C" { print $4; exit }')
-        [ "$cur" = "$p" ] && break
-        ddcutil --bus "$b" --sleep-multiplier 0.5 setvcp 10 "$p" >/dev/null 2>&1
-        sleep 0.12
+    # every monitor at once; one write per monitor at a time (DDC/CI garbles overlapping writes)
+    for b in $(buses); do
+        flock "$rt/lock.$b" ddcutil --bus "$b" --noverify --skip-ddc-checks --sleep-multiplier 0.1 setvcp 10 "$(raw "$b" "$p")" >/dev/null 2>&1 \
+            || flock "$rt/lock.$b" ddcutil --bus "$b" --noverify setvcp 10 "$(raw "$b" "$p")" >/dev/null 2>&1 &
     done
-    [ -n "$cur" ] && echo "$cur" > "$cache"
-    [ "$cur" = "$p" ]
+    wait
+}
+# after a slider drag: make sure every monitor really took the last value (a quick write can get lost)
+sync_() {
+    local p b; p=$(clamp "$1")
+    for b in $(buses); do
+        (
+            exec 9>"$rt/lock.$b"; flock 9
+            want=$(raw "$b" "$p")
+            for i in 1 2 3 4; do
+                cur=$(vcp "$b" | cut -d' ' -f1)
+                [ "$cur" = "$want" ] && exit 0
+                ddcutil --bus "$b" --sleep-multiplier 0.5 setvcp 10 "$want" >/dev/null 2>&1
+                sleep 0.12
+            done
+            exit 1
+        ) &
+    done
+    local ok=0; for b in $(jobs -p); do wait "$b" || ok=1; done
+    echo "$p" > "$cache"
+    return $ok
 }
 
 case "${1:-get}" in
     get)  get ;;
-    getm) v=$(get) && echo "yuki,monitor,$v,${v}%" ;;
+    # for the bar: a laptop panel's own line (polled fast), else a monitor
+    getm) l=$(backlight); if [ -n "$l" ]; then echo "$l"; else v=$(get) && echo "yuki,monitor,$v,${v}%"; fi ;;
     set)  set_ "$2" ;;
     sync) sync_ "$2" ;;
     step) cur=$(get) || exit 1; set_ $(( cur + $2 )) ;;
-    *)    echo "usage: yuki-brightness get|set N|sync N|step +N|-N" >&2; exit 2 ;;
+    *)    echo "usage: yuki-brightness get|getm|set N|sync N|step +N|-N" >&2; exit 2 ;;
 esac
