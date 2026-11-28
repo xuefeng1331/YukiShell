@@ -8078,6 +8078,57 @@ Scope {
                     }
                 }
 
+                // Control Center glow: the backdrop around the open panel blurs softly, fading out to the left and below it
+                Item {
+                    id: ccHalo
+                    z: 9
+                    readonly property real s: root.barPopupScale
+                    readonly property real feather: 130
+                    x: Math.max(0, cc.x + cc.width * (1 - s) - feather)
+                    y: cc.y - 6
+                    width: ui.width - x
+                    height: Math.min(ui.height - y, cc.height * s + 6 + feather)
+                    opacity: cc.opacity * 0.9
+                    visible: cc.visible && ui.glassSrc !== null && width > 1 && height > 1
+                    ShaderEffectSource {
+                        id: haloSrc
+                        sourceItem: ccHalo.visible ? ui.glassSrc : null
+                        sourceRect: Qt.rect(ccHalo.x, ccHalo.y, ccHalo.width, ccHalo.height)
+                        live: true
+                        visible: false
+                    }
+                    // the shape: solid next to the panel, a blurred edge makes the long rounded fade (top and right run off the screen)
+                    Item {
+                        id: haloShape
+                        width: ccHalo.width; height: ccHalo.height
+                        visible: false
+                        Rectangle {
+                            x: ccHalo.feather * 0.5; y: -100
+                            width: parent.width - x + 100; height: parent.height - ccHalo.feather * 0.5 + 100
+                            radius: ccHalo.feather * 0.5
+                            color: "black"
+                        }
+                    }
+                    MultiEffect {
+                        id: haloShapeFx
+                        source: haloShape
+                        width: ccHalo.width; height: ccHalo.height
+                        autoPaddingEnabled: false
+                        blurEnabled: true; blurMax: 64; blur: 1.0
+                        visible: false
+                    }
+                    ShaderEffectSource { id: haloMask; sourceItem: haloShapeFx; live: ccHalo.visible; visible: false }
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: haloSrc
+                        autoPaddingEnabled: false
+                        blurEnabled: true; blurMax: 48; blur: 0.75
+                        saturation: 0.12
+                        maskEnabled: true; maskSource: haloMask
+                        maskThresholdMin: 0.5; maskSpreadAtMin: 1.0   // the mask's alpha as a smooth ramp, not a cut-out
+                    }
+                }
+
                 Item {
                     id: cc
                     z: 10
