@@ -2054,13 +2054,14 @@ Scope {
     property bool hasBt: true
     property string wifiSsid: ""
     property int wifiSignal: 0
+    property string wifiIp: ""
     property bool ethernetUp: false
     readonly property bool showEthernet: ethernetUp && wifiSsid === ""
     readonly property int wifiLevel: !wifiOn ? 0 : (wifiSsid === "" ? 0 : (wifiSignal > 66 ? 3 : (wifiSignal > 33 ? 2 : 1)))
     function refreshWifi() { if (!wifiProc.running) wifiProc.running = true; }
     Process {
         id: wifiProc
-        command: ["sh", "-c", "nmcli radio wifi 2>/dev/null; nmcli -t -f IN-USE,SSID,SIGNAL dev wifi 2>/dev/null | grep '^\\*' | head -n1; echo; nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected$' && echo eth || echo -; { [ -n \"$(ls /sys/class/ieee80211 2>/dev/null)\" ] || nmcli -t -f TYPE dev 2>/dev/null | grep -qx wifi; } && echo hw || echo nohw"]
+        command: ["sh", "-c", "nmcli radio wifi 2>/dev/null; nmcli -t -f IN-USE,SSID,SIGNAL dev wifi 2>/dev/null | grep '^\\*' | head -n1; echo; nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected$' && echo eth || echo -; { [ -n \"$(ls /sys/class/ieee80211 2>/dev/null)\" ] || nmcli -t -f TYPE dev 2>/dev/null | grep -qx wifi; } && echo hw || echo nohw; c=$(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | awk -F: '$2==\"wifi\" && $3==\"connected\" {print $1; exit}'); [ -n \"$c\" ] && { ip -4 -o addr show dev \"$c\" scope global; ip -6 -o addr show dev \"$c\" scope global; } 2>/dev/null | awk '{print \"IP:\" $4; exit}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var l = text.split("\n");
@@ -2069,10 +2070,12 @@ Scope {
                 root.ethernetUp = l.some(function (x) { return x.trim() === "eth"; });
                 var a = (l[1] || "").trim();
                 if (a !== "") {
-                    var parts = a.split(":");
+                    var parts = root.splitNm(a);   // keeps a "\\" or ":" that is part of the name
                     root.wifiSignal = parseInt(parts[parts.length - 1]) || 0;
-                    root.wifiSsid = parts.slice(1, parts.length - 1).join(":").replace(/\\/g, "");
+                    root.wifiSsid = parts.slice(1, parts.length - 1).join(":");
                 } else { root.wifiSsid = ""; root.wifiSignal = 0; }
+                var ip = l.filter(function (x) { return x.indexOf("IP:") === 0; })[0] || "";
+                root.wifiIp = root.wifiSsid !== "" ? ip.slice(3).split("/")[0] : "";
             }
         }
     }
@@ -2169,24 +2172,28 @@ Scope {
         }
     }
     function disconnectWifi() {
-        sh("nmcli -t -f DEVICE,TYPE dev | grep ':wifi$' | cut -d: -f1 | head -n1 | xargs -r nmcli dev disconnect");
+        sh("nmcli -t -f DEVICE,TYPE,STATE dev | grep ':wifi:connected$' | cut -d: -f1 | head -n1 | xargs -r nmcli dev disconnect");
         wifiAfter.restart();
     }
     Timer { id: wifiAfter; interval: 1200; onTriggered: { root.scanWifi(); root.refreshWifi(); root.refreshConnections(); } }
     function refreshConnections() { if (!connProc.running) connProc.running = true; }
     Process {
         id: connProc
-        command: ["sh", "-c", "nmcli -t -f NAME,TYPE,DEVICE connection show 2>/dev/null"]
+        command: ["sh", "-c", "nmcli -t -f NAME,TYPE,DEVICE connection show 2>/dev/null; ip -o addr show scope global 2>/dev/null | awk '{print \"@IP \" $2 \" \" $3 \" \" $4}'"]
         stdout: StdioCollector {
             onStreamFinished: {
-                var rows = [], lines = text.split("\n");
-                for (var i = 0; i < lines.length; i++) {
-                    if (!lines[i]) continue;
+                var rows = [], lines = text.split("\n"), ips = {};
+                for (var i = 0; i < lines.length; i++) {   // an interface's address: IPv4 first, else IPv6
+                    var m = /^@IP (\S+) (inet6?) (\S+)/.exec(lines[i]);
+                    if (m && (!ips[m[1]] || (m[2] === "inet" && ips[m[1]].indexOf(":") >= 0))) ips[m[1]] = m[3].split("/")[0];
+                }
+                for (i = 0; i < lines.length; i++) {
+                    if (!lines[i] || lines[i].indexOf("@IP ") === 0) continue;
                     var f = root.splitNm(lines[i]);
                     if (f.length < 3) continue;
                     var type = f[1];
                     if (type !== "vpn" && type !== "802-3-ethernet") continue;
-                    rows.push({ name: f[0], type: type, device: f[2] === "--" ? "" : f[2], active: f[2] !== "--" });
+                    rows.push({ name: f[0], type: type, device: f[2] === "--" ? "" : f[2], active: f[2] !== "--", ip: f[2] !== "--" ? (ips[f[2]] || "") : "" });
                 }
                 rows.sort(function (a,b) { return (b.active?1:0)-(a.active?1:0); });
                 root.otherConnections = rows;
@@ -7350,6 +7357,14 @@ Scope {
                             }
                         }
                         Rectangle { width: parent.width; height: 1; color: pp.sep }
+                        Text {
+                            visible: root.wifiOn && root.wifiSsid !== ""
+                            width: parent.width; leftPadding: 6; rightPadding: 6
+                            text: root.wifiSsid + " · " + root.wifiSignal + "%" + (root.wifiIp !== "" ? " · " + root.wifiIp : "")
+                            color: pp.fg2
+                            font.family: root.fontForWeight(Font.Normal, pp.fam); font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
                         Text { visible: root.otherConnections.length>0; width:parent.width; leftPadding:6; text:I18n.tr("Ethernet & VPN"); color:pp.fg2; font.family: root.fontForWeight(Font.DemiBold, pp.fam); font.pixelSize:11; font.weight:Font.DemiBold }
                         Column {
                             width: parent.width
@@ -7360,7 +7375,8 @@ Scope {
                                     width: parent.width; height: 30
                                     Rectangle { anchors.fill:parent; radius:8; color:connMa.containsMouse?pp.hover:"transparent" }
                                     Glyph { x:8; anchors.verticalCenter:parent.verticalCenter; width:14; height:14; kind:modelData.type==="vpn"?"lock":"ethernet"; color:pp.fg }
-                                    Text { x:30; anchors.verticalCenter:parent.verticalCenter; width:parent.width-42; elide:Text.ElideRight; text:modelData.name+(modelData.active?I18n.tr(" · Connected"):""); color:pp.fg; font.family: root.fontForWeight(Font.Normal, pp.fam); font.pixelSize:12 }
+                                    Text { x:30; anchors.verticalCenter:parent.verticalCenter; width:parent.width-42-(connIp.text!==""?connIp.implicitWidth+8:0); elide:Text.ElideRight; text:modelData.name+(modelData.active&&!modelData.ip?I18n.tr(" · Connected"):""); color:pp.fg; font.family: root.fontForWeight(Font.Normal, pp.fam); font.pixelSize:12 }
+                                    Text { id:connIp; anchors.right:parent.right; anchors.rightMargin:10; anchors.verticalCenter:parent.verticalCenter; text:modelData.ip||""; color:pp.fg2; font.family: root.fontForWeight(Font.Normal, pp.fam); font.pixelSize:11 }
                                     MouseArea { id:connMa; anchors.fill:parent; hoverEnabled:true; onClicked: { if (modelData.active && modelData.type !== "vpn") { ui.pop = ""; root.openSettings("network"); } else root.toggleConnection(modelData); } }
                                 }
                             }
