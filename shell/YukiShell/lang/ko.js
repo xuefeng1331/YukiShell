@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "Trash": "휴지통",
+    "Empty Trash": "휴지통 비우기",
+    "Show Trash in the Dock": "Dock에 휴지통 표시",
     "From This Folder": "이 폴더에서",
     "No files in this folder": "이 폴더에 파일이 없음",
     "Choose Picture…": "사진 선택…",

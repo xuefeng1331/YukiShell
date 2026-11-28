@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "Trash": "Корзина",
+    "Empty Trash": "Очистить корзину",
+    "Show Trash in the Dock": "Показывать «Корзину» в Dock",
     "From This Folder": "Из этой папки",
     "No files in this folder": "В этой папке нет файлов",
     "Choose Picture…": "Выбрать изображение…",

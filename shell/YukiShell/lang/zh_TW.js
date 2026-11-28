@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "Trash": "垃圾桶",
+    "Empty Trash": "清空垃圾桶",
+    "Show Trash in the Dock": "在 Dock 中顯示「垃圾桶」",
     "From This Folder": "來自此檔案夾",
     "No files in this folder": "此檔案夾中沒有檔案",
     "Choose Picture…": "選擇圖片…",

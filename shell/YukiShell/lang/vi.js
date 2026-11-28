@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "Trash": "Thùng rác",
+    "Empty Trash": "Dọn sạch thùng rác",
+    "Show Trash in the Dock": "Hiện Thùng rác trong Dock",
     "From This Folder": "Từ thư mục này",
     "No files in this folder": "Thư mục này không có tệp nào",
     "Choose Picture…": "Chọn ảnh…",

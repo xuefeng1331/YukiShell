@@ -128,6 +128,7 @@ Scope {
     property int desktopIconSize: 48
     property bool showRecents: true       // the last few apps you quit, after the running ones
     property bool showDownloads: true     // the Downloads stack by the Settings button
+    property bool showTrash: true         // the Trash, last in the Dock
     property var recentApps: []           // desktop ids, newest first
     property bool showThumbs: true
     property int pickerThumb: 220
@@ -2725,6 +2726,11 @@ Scope {
                         t: pal
                         title: I18n.tr("Show Settings in the Dock")
                         SSwitch { t: pal; checked: root.showSettings; onToggled: v => root.showSettings = v }
+                    }
+                    SRow {
+                        t: pal
+                        title: I18n.tr("Show Trash in the Dock")
+                        SSwitch { t: pal; checked: root.showTrash; onToggled: v => root.showTrash = v }
                     }
                 }
             }
@@ -5604,10 +5610,11 @@ Scope {
     readonly property string settingsSig: [dockEnabled, settingsEnabled, iconSize, magnification, magnificationEnabled, spacing, margin,
         cornerRadius, glassOpacity, glassBlur, glassLiquid, dockStyle, wallpaperPath, String(accent), accentUi, fontFamily, hideMode, hideDelay, monitor,
         showSettings, showLabels, showIndicators, bounceOnLaunch, showThumbs, windowCapture, glassLive, iconTint, iconTintColor, iconTintStrength, pickerThumb,
-        showRecents, showDownloads, recentApps.join(","), desktopIcons, desktopIconSize].join("|")
+        showRecents, showDownloads, showTrash, recentApps.join(","), desktopIcons, desktopIconSize].join("|")
     property bool settingsReady: false
     onSettingsSigChanged: if (settingsReady) saveTimer.restart()
     onShowSettingsChanged: rebuild()
+    onShowTrashChanged: { rebuild(); if (showTrash) trashCheck(); }
     onSettingsEnabledChanged: rebuild()
     onShowThumbsChanged: rebuild()
     onShowRecentsChanged: rebuild()
@@ -5625,7 +5632,7 @@ Scope {
             showSettings: showSettings, showLabels: showLabels, showIndicators: showIndicators,
             bounceOnLaunch: bounceOnLaunch, showThumbs: showThumbs, windowCapture: windowCapture, glassLive: glassLive,
             iconTint: iconTint, iconTintColor: iconTintColor, iconTintStrength: iconTintStrength, pickerThumb: pickerThumb,
-            showRecents: showRecents, showDownloads: showDownloads, recentApps: recentApps,
+            showRecents: showRecents, showDownloads: showDownloads, showTrash: showTrash, recentApps: recentApps,
             desktopIcons: desktopIcons, desktopIconSize: desktopIconSize
         };
         settingsStore.setText(JSON.stringify(o, null, 2));
@@ -5636,7 +5643,7 @@ Scope {
         var keys = ["dockEnabled", "settingsEnabled", "iconSize", "magnification", "magnificationEnabled", "spacing", "margin", "cornerRadius",
                     "glassOpacity", "dockStyle", "wallpaperPath", "glassDebug", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "accent", "accentUi", "fontFamily", "hideMode", "hideDelay", "monitor",
                     "showSettings", "showLabels", "showIndicators", "bounceOnLaunch", "showThumbs", "windowCapture", "glassLive", "iconTint", "iconTintColor", "iconTintStrength", "pickerThumb",
-                    "showRecents", "showDownloads", "recentApps", "desktopIcons", "desktopIconSize"];
+                    "showRecents", "showDownloads", "showTrash", "recentApps", "desktopIcons", "desktopIconSize"];
         for (var i = 0; i < keys.length; i++) {
             if (o[keys[i]] === undefined) continue;
             try { root[keys[i]] = o[keys[i]]; } catch (err) { }
@@ -5692,7 +5699,98 @@ Scope {
         if (icon.charAt(0) === "/") return "file://" + icon;
         return Quickshell.iconPath(icon, "application-x-executable");
     }
-    function cellIconSrc(it) { return iconSrc(it ? it.icon : ""); }
+    // the Trash shows its "full" icon while there is something in it
+    function cellIconSrc(it) {
+        if (it && it.special === "trash" && trashFull) {
+            var p = Quickshell.iconPath("user-trash-full", true);
+            if (p !== "") return p;
+        }
+        return iconSrc(it ? it.icon : "");
+    }
+
+    // ── the Trash ──
+    // Drops from other surfaces (the desktop's icons): every Dock window registers its `ui` under its screen's name.
+    property var trashProbes: ({})
+    function trashHit(screenName, x, y) { var u = trashProbes[screenName]; return u ? u.trashHit(x, y) === true : false; }
+    function trashCenter(screenName) { var u = trashProbes[screenName]; return u ? u.trashCenter() : null; }   // screen point, or null
+    function trashArm(screenName, on) { var u = trashProbes[screenName]; if (u) u.trashArmed = on === true; }  // held over it: it lifts
+    function trashPulse(screenName) { var u = trashProbes[screenName]; if (u) u.trashKick++; }                // something landed: it hops
+    function trashReveal(screenName, on) { var u = trashProbes[screenName]; if (u) u.dragReveal(on === true); } // auto-hidden Dock comes up
+    function trashPulseAll() { for (var nm in trashProbes) trashPulse(nm); }
+    function trashEmptyAnimAll() { for (var nm in trashProbes) { var u = trashProbes[nm]; if (u) u.trashEmptyKick++; } }
+    // State: the standard XDG trash, what Dolphin's trash:/ shows. inotifywait reports changes at once; without it, a check every 3 s.
+    // shortcut: only the home trash is counted (Empty Trash also clears other drives' through ktrash), count .Trash-UID too if it matters
+    property bool trashFull: false
+    property bool trashReady: false
+    property bool trashPoll: false
+    property int trashCount: 0
+    property bool trashCountKnown: false
+    property real trashExpectAt: 0
+    function trashExpect() { trashExpectAt = Date.now(); }   // the desktop animates its own throw: no second hop
+    readonly property string trashDir: {
+        var x = Quickshell.env("XDG_DATA_HOME");
+        return ((x && x !== "") ? x : Quickshell.env("HOME") + "/.local/share") + "/Trash/files";
+    }
+    function trashCheck() { if (!trashCheckProc.running) trashCheckProc.running = true; }
+    Process {
+        id: trashCheckProc
+        command: ["sh", "-c", "mkdir -p \"$1\"; n=$(ls -A \"$1\" 2>/dev/null | wc -l); if [ \"$n\" -gt 0 ]; then s=1; else s=0; fi; "
+                              + "if command -v inotifywait >/dev/null 2>&1; then w=w; else w=p; fi; echo \"$s $w $n\"", "sh", root.trashDir]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var t = text.trim().split(" ");
+                root.trashFull = t[0] === "1";
+                root.trashPoll = t[1] === "p";
+                var n = Number(t[2]);
+                if (!isNaN(n)) {
+                    // something new landed (file manager, terminal, another app): hop, unless the desktop just threw it itself
+                    if (root.trashCountKnown && n > root.trashCount && Date.now() - root.trashExpectAt > 2500) root.trashPulseAll();
+                    root.trashCount = n; root.trashCountKnown = true;
+                }
+                root.trashReady = true;
+            }
+        }
+    }
+    readonly property bool trashWatchWanted: showTrash && trashReady && !trashPoll
+    onTrashWatchWantedChanged: trashWatch.running = trashWatchWanted
+    Process {
+        id: trashWatch
+        command: ["inotifywait", "-m", "-q", "-e", "create", "-e", "delete", "-e", "moved_to", "-e", "moved_from", "-e", "delete_self", root.trashDir]
+        stdout: SplitParser { onRead: data => trashDebounce.restart() }
+        // the folder itself went away (a cleaner removed the whole Trash): check (which makes it again) and watch anew
+        onRunningChanged: if (!running && root.trashWatchWanted) trashRewatch.restart()
+    }
+    Timer { id: trashRewatch; interval: 1000; onTriggered: { root.trashCheck(); if (root.trashWatchWanted) trashWatch.running = true; } }
+    Timer { id: trashDebounce; interval: 150; onTriggered: root.trashCheck() }
+    Timer { interval: 3000; repeat: true; running: root.showTrash && root.trashPoll; onTriggered: root.trashCheck() }
+    // Empty Trash: KDE's ktrash when there is one (it also clears other drives' trashes and keeps Dolphin in step), else the XDG folders.
+    // (Not gio: without gvfs `gio trash --empty` reports success and does nothing.)
+    function emptyTrash() {
+        Quickshell.execDetached(["sh", "-c",
+            "command -v ktrash6 >/dev/null 2>&1 && ktrash6 --empty && exit 0; "
+            + "command -v ktrash5 >/dev/null 2>&1 && ktrash5 --empty && exit 0; "
+            + "d=\"${XDG_DATA_HOME:-$HOME/.local/share}/Trash\"; "
+            + "chmod -R u+w \"$d/files\" 2>/dev/null; "
+            + "find \"$d/files\" \"$d/info\" -mindepth 1 -delete 2>/dev/null; "
+            + "rm -f \"$d/directorysizes\""]);
+        trashAfterEmpty.restart();
+        trashEmptyAnimAll();
+        if (bar) bar.playSound("trash", 0.8);
+    }
+    // the icon turns empty as the hop starts; the real check follows and corrects it if needed
+    Timer { id: trashAfterEmpty; interval: 520; onTriggered: { root.trashFull = false; root.trashCheck(); } }
+    // files dropped on the Trash from a file manager
+    function trashUrls(urls) {
+        var paths = [];
+        for (var i = 0; i < urls.length; i++) {
+            var u = String(urls[i]);
+            if (u.indexOf("file://") === 0) paths.push(decodeURIComponent(u.slice(7)));
+        }
+        if (paths.length === 0) return false;
+        Quickshell.execDetached(["sh", "-c", "for f in \"$@\"; do gio trash -- \"$f\"; done", "sh"].concat(paths));
+        if (bar) bar.playSound("trash", 0.8);
+        return true;
+    }
 
     property int windowTick: 0
     Timer { id: tickDebounce; interval: 120; onTriggered: root.windowTick++ }
@@ -5717,6 +5815,14 @@ Scope {
         if (item.kind === "win") { if (item.tl) item.tl.activate(); return; }
         if (item.key && attention[item.key] !== undefined) setAttention(item.key, false);
         if (item.special === "settings") { root.openPrefs("general"); return; }
+        if (item.special === "trash") {
+            // the file manager first (Dolphin understands trash:/ itself); xdg-open only as the last resort
+            Quickshell.execDetached(["sh", "-c",
+                "if command -v dolphin >/dev/null 2>&1; then exec dolphin trash:/; fi; "
+                + "for fm in nautilus thunar nemo pcmanfm-qt; do if command -v $fm >/dev/null 2>&1; then exec $fm trash:///; fi; done; "
+                + "exec xdg-open trash:///"]);
+            return;
+        }
         var wins = windowsFor(item.key);
         if (wins.length > 0 && !forceNew) {
             var idx = -1;
@@ -5793,6 +5899,13 @@ Scope {
             return m;
         }
         if (item.special === "downloads") return downloadsMenu();
+        if (item.special === "trash") {
+            m.push({ kind: "item", label: I18n.tr("Open"), run: function () { activate(item, false); } });
+            m.push({ kind: "item", label: I18n.tr("Empty Trash"), confirm: true, disabled: !trashFull, run: function () { root.emptyTrash(); } });
+            m.push({ kind: "sep" });
+            m.push({ kind: "item", label: I18n.tr("Remove from Dock"), run: function () { root.showTrash = false; } });
+            return m;
+        }
         if (item.special === "settings") {
             m.push({ kind: "item", label: I18n.tr("Open"), run: function () { activate(item, false); } });
             m.push({ kind: "item", label: I18n.tr("Desktop & Dock") + "\u2026", run: function () { root.openPrefs("dock"); } });
@@ -5908,11 +6021,12 @@ Scope {
         for (var wi = 0; wi < winIdList.length; wi++) if (liveWins.indexOf(winIdList[wi].tl) >= 0) keep.push(winIdList[wi]);
         winIdList = keep;
 
-        if (showSettings || showDownloads || winItems.length > 0) {
+        var tail = showSettings || showDownloads || showTrash;
+        if (tail || winItems.length > 0) {
             list.push({ kind: "sep", key: "sep:win" });
             for (var wj = 0; wj < winItems.length; wj++) list.push(winItems[wj]);
         }
-        if ((showSettings || showDownloads) && winItems.length > 0) list.push({ kind: "sep", key: "sep:settings" });
+        if (tail && winItems.length > 0) list.push({ kind: "sep", key: "sep:settings" });
         if (showDownloads)
             list.push({ kind: "app", key: "__downloads", name: I18n.tr("Downloads"), icon: "folder-download",
                         entry: null, running: false, pinned: true, special: "downloads" });
@@ -5920,6 +6034,9 @@ Scope {
             list.push({ kind: "app", key: "__settings", name: "YukiShell", icon: logoPath,
                         entry: null, running: false, pinned: true, special: "settings" });
         }
+        if (showTrash)
+            list.push({ kind: "app", key: "__trash", name: I18n.tr("Trash"), icon: "user-trash",
+                        entry: null, running: false, pinned: true, special: "trash" });
 
         var firstBuild = (lastSig === "");
         var liveKeys = {};
@@ -6090,6 +6207,7 @@ Scope {
     Component.onCompleted: {
         Quickshell.execDetached(["mkdir", "-p", configDir]);
         rebuild();
+        trashCheck();
     }
 
     FileView {
@@ -6244,6 +6362,28 @@ Scope {
                 readonly property real mx: mxSpring.value
                 Spring { id: mxSpring; target: ui.mxT; response: 0.13; damping: 0.92; epsilon: 0.05 }
                 property bool revealed: false
+                // ── the Trash, for the desktop's drags (screen coordinates; the Dock's surface covers only the bottom of the screen) ──
+                property int trashKick: 0
+                property int trashEmptyKick: 0
+                property bool trashArmed: false
+                function trashCell() {
+                    for (var i = 0; i < rep.count; i++) { var c = rep.itemAt(i); if (c && c.modelData && c.modelData.special === "trash") return c; }
+                    return null;
+                }
+                function trashHit(sx, sy) {
+                    if (!root.showTrash || tucked) return false;
+                    var c = trashCell(); if (!c) return false;
+                    var ly = sy - (win.modelData.height - win.height), p = c.mapToItem(ui, 0, 0), pad = 18;
+                    return sx >= p.x - pad && sx <= p.x + c.width + pad && ly >= p.y - 44 && ly <= p.y + c.height + pad;
+                }
+                function trashCenter() {
+                    var c = trashCell(); if (!c || tucked) return null;
+                    var p = c.mapToItem(ui, c.width / 2, c.height / 2);
+                    return Qt.point(p.x, p.y + (win.modelData.height - win.height));
+                }
+                function dragReveal(on) { if (on) { hideTimer.stop(); revealed = true; } else hideTimer.restart(); }
+                Component.onCompleted: { var m = root.trashProbes; m[win.modelData.name] = ui; root.trashProbes = m; }
+                Component.onDestruction: { var m = root.trashProbes; delete m[win.modelData.name]; root.trashProbes = m; }
                 property var menuItem: null
                 property var menuModel: []
                 property string armed: ""
@@ -6910,11 +7050,15 @@ Scope {
                                         id: img
                                         visible: false
                                         property real lift: 0
+                                        property real wob: 0   // Empty Trash shake, degrees about the icon's bottom
+                                        // lifted while an icon from the desktop is held over the Trash: "let go to throw it away"
+                                        property real armLift: (ui.trashArmed && cell.modelData.special === "trash") ? root.iconSize * 0.22 : 0
+                                        Behavior on armLift { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                                         width: root.iconSize * 0.99 * cell.s * cell.appear
                                         height: width
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: lift + cell.hoverUp
+                                        anchors.bottomMargin: lift + armLift + cell.hoverUp
                                         source: cell.isSep ? "" : root.cellIconSrc(cell.modelData)
                                         sourceSize: Qt.size(Math.ceil(root.iconSize * root.magnification * 1.25),
                                                             Math.ceil(root.iconSize * root.magnification * 1.25))
@@ -6927,6 +7071,8 @@ Scope {
                                         visible: !cell.isSep && !cell.thumbReady
                                         source: img
                                         anchors.fill: img
+                                        transformOrigin: Item.Bottom
+                                        rotation: img.wob
                                         shadowEnabled: true
                                         shadowColor: "black"
                                         shadowOpacity: 0.32
@@ -7085,6 +7231,37 @@ Scope {
                                                       duration: 260; easing.type: Easing.OutBounce }
                                 }
                                 function hop() { if (!ui.tucked && !bounceAnim.running && !settleAnim.running && !cell.wantBounce) hopAnim.restart(); }
+                                // the Trash: a hop when something lands in it, a short shake and a hop when it is emptied
+                                Connections {
+                                    target: ui
+                                    enabled: !cell.isSep && cell.modelData.special === "trash"
+                                    function onTrashKickChanged() { if (!ui.tucked) trashHop.restart(); }
+                                    function onTrashEmptyKickChanged() { if (!ui.tucked) trashEmpty.restart(); }
+                                }
+                                SequentialAnimation {
+                                    id: trashHop
+                                    NumberAnimation { target: img; property: "lift"; to: root.iconSize * 0.30; duration: 150; easing.type: Easing.OutCubic }
+                                    NumberAnimation { target: img; property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBounce }
+                                }
+                                SequentialAnimation {
+                                    id: trashEmpty
+                                    NumberAnimation { target: img; property: "wob"; to: -7; duration: 70 }
+                                    NumberAnimation { target: img; property: "wob"; to: 7; duration: 110 }
+                                    NumberAnimation { target: img; property: "wob"; to: 0; duration: 80 }
+                                    NumberAnimation { target: img; property: "lift"; to: root.iconSize * 0.34; duration: 160; easing.type: Easing.OutCubic }
+                                    NumberAnimation { target: img; property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBounce }
+                                }
+                                // files dragged from a file manager onto the Trash are thrown away
+                                DropArea {
+                                    anchors.fill: parent
+                                    enabled: !cell.isSep && cell.modelData.special === "trash"
+                                    onEntered: drag => { if (drag.hasUrls) { drag.accept(Qt.MoveAction); ui.trashArmed = true; } }
+                                    onExited: ui.trashArmed = false
+                                    onDropped: drop => {
+                                        ui.trashArmed = false;
+                                        if (drop.hasUrls && root.trashUrls(drop.urls)) { root.trashExpect(); ui.trashKick++; drop.accept(Qt.MoveAction); }
+                                    }
+                                }
                                 SequentialAnimation {
                                     id: bounceAnim
                                     NumberAnimation { target: img; property: "lift"; to: root.iconSize * 0.42

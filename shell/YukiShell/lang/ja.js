@@ -1,6 +1,9 @@
 .pragma library
 
 var strings = {
+    "Trash": "ゴミ箱",
+    "Empty Trash": "ゴミ箱を空にする",
+    "Show Trash in the Dock": "Dock に「ゴミ箱」を表示",
     "From This Folder": "このフォルダから",
     "No files in this folder": "このフォルダにファイルはありません",
     "Choose Picture…": "ピクチャを選択…",
