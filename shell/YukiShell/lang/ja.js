@@ -1,6 +1,13 @@
 .pragma library
 
 var strings = {
+    "Login screen": "ログイン画面",
+    "Shows your picture, wallpaper, clock and keyboard layout": "ピクチャ、壁紙、時計、キーボードレイアウトを表示します",
+    "Sync Now": "今すぐ同期",
+    "Syncing…": "同期中…",
+    "Updating…": "アップデート中…",
+    "Up to date": "最新の状態です",
+    "Update available": "アップデートがあります",
     "Trash": "ゴミ箱",
     "Empty Trash": "ゴミ箱を空にする",
     "Show Trash in the Dock": "Dock に「ゴミ箱」を表示",

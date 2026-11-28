@@ -4466,6 +4466,53 @@ Scope {
                     }
                     SButton { t: pal; text: I18n.tr("Lock Screen Now"); onClicked: { prefsWindow.visible = false; Quickshell.execDetached(["sh", "-c", "pgrep -f -- \"-c [Y]ukiLock\" >/dev/null 2>&1 || qs -c YukiLock"]); } }
                 }
+                // the login screen (greeter.qml run by greetd): whether it's on, whether the installed copy is this version
+                SCard {
+                    id: loginCard
+                    t: pal
+                    visible: loginCard.on
+                    property bool on: false
+                    property bool current: true
+                    property string busy: ""
+                    readonly property string src: Quickshell.shellDir + "/../YukiLock"
+                    function check() { if (!loginCheck.running) loginCheck.running = true; }
+                    Component.onCompleted: check()
+                    Process {
+                        id: loginCheck
+                        command: ["sh", "-c", "grep -qs yukishell /etc/greetd/config.toml || { echo off; exit; }; "
+                                  + "diff -rq -x __pycache__ \"$1/\" /usr/local/share/yukishell/YukiLock/ >/dev/null 2>&1 && echo same || echo old", "sh", loginCard.src]
+                        stdout: StdioCollector { onStreamFinished: { var s = text.trim(); loginCard.on = s !== "off"; loginCard.current = s !== "old"; } }
+                    }
+                    Process {
+                        id: loginRun
+                        onExited: { loginCard.busy = ""; loginCard.check(); }
+                    }
+                    SRow {
+                        t: pal; title: I18n.tr("Login screen")
+                        subtitle: loginCard.busy !== "" ? loginCard.busy
+                                : I18n.tr("Shows your picture, wallpaper, clock and keyboard layout") + " · " + (loginCard.current ? I18n.tr("Up to date") : I18n.tr("Update available"))
+                        Row {
+                            spacing: 8
+                            SButton {
+                                t: pal; text: I18n.tr("Sync Now"); enabled: loginCard.busy === ""
+                                onClicked: { loginCard.busy = I18n.tr("Syncing…"); loginRun.command = ["yuki-greeter-sync"]; loginRun.running = true; }
+                            }
+                            // the login screen runs a copy only root can change: copy this version over it (asks for your password)
+                            SButton {
+                                t: pal; text: I18n.tr("Update"); prominent: !loginCard.current; enabled: loginCard.busy === ""
+                                onClicked: {
+                                    loginCard.busy = I18n.tr("Updating…");
+                                    loginRun.command = ["pkexec", "sh", "-c",
+                                        "set -e; g=/usr/local/share/yukishell; rm -rf \"$g/YukiLock.new\"; cp -r \"$1/.\" \"$g/YukiLock.new\"; "
+                                        + "rm -rf \"$g/YukiLock.new/__pycache__\"; chmod -R a+rX \"$g/YukiLock.new\"; "
+                                        + "rm -rf \"$g/YukiLock\"; mv \"$g/YukiLock.new\" \"$g/YukiLock\"; install -d -m 1777 /var/lib/yukigreet/users",
+                                        "sh", loginCard.src];
+                                    loginRun.running = true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

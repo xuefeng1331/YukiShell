@@ -24,7 +24,10 @@ var dicts = {
         "Couldn't start authentication": "Не удалось начать проверку",
         "Too many attempts, try again shortly": "Слишком много попыток, повторите позже",
         "Incorrect password": "Неверный пароль",
-        "Authentication error": "Ошибка аутентификации"
+        "Authentication error": "Ошибка аутентификации",
+        "Sleep": "Сон",
+        "Restart": "Перезагрузить",
+        "Shut Down": "Выключить"
     },
     zh_CN: {
         " more notification": " 条更多通知",
@@ -49,7 +52,10 @@ var dicts = {
         "Couldn't start authentication": "无法启动身份验证",
         "Too many attempts, try again shortly": "尝试次数过多，请稍后再试",
         "Incorrect password": "密码不正确",
-        "Authentication error": "身份验证出错"
+        "Authentication error": "身份验证出错",
+        "Sleep": "睡眠",
+        "Restart": "重新启动",
+        "Shut Down": "关机"
     },
     zh_TW: {
         " more notification": " 則其他通知",
@@ -74,7 +80,10 @@ var dicts = {
         "Couldn't start authentication": "無法啟動驗證",
         "Too many attempts, try again shortly": "嘗試次數過多，請稍後再試",
         "Incorrect password": "密碼不正確",
-        "Authentication error": "驗證錯誤"
+        "Authentication error": "驗證錯誤",
+        "Sleep": "睡眠",
+        "Restart": "重新啟動",
+        "Shut Down": "關機"
     },
     ja: {
         " more notification": " 件の通知",
@@ -99,7 +108,10 @@ var dicts = {
         "Couldn't start authentication": "認証を開始できませんでした",
         "Too many attempts, try again shortly": "試行回数が多すぎます。しばらくしてからもう一度お試しください",
         "Incorrect password": "パスワードが正しくありません",
-        "Authentication error": "認証エラー"
+        "Authentication error": "認証エラー",
+        "Sleep": "スリープ",
+        "Restart": "再起動",
+        "Shut Down": "システム終了"
     },
     ko: {
         " more notification": "개의 추가 알림",
@@ -124,7 +136,10 @@ var dicts = {
         "Couldn't start authentication": "인증을 시작할 수 없습니다",
         "Too many attempts, try again shortly": "시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요",
         "Incorrect password": "암호가 올바르지 않습니다",
-        "Authentication error": "인증 오류"
+        "Authentication error": "인증 오류",
+        "Sleep": "잠자기",
+        "Restart": "재시동",
+        "Shut Down": "시스템 종료"
     },
     vi: {
         " more notification": " thông báo khác",
@@ -149,7 +164,10 @@ var dicts = {
         "Couldn't start authentication": "Không thể bắt đầu xác thực",
         "Too many attempts, try again shortly": "Quá nhiều lần thử, hãy thử lại sau ít phút",
         "Incorrect password": "Mật khẩu không đúng",
-        "Authentication error": "Lỗi xác thực"
+        "Authentication error": "Lỗi xác thực",
+        "Sleep": "Ngủ",
+        "Restart": "Khởi động lại",
+        "Shut Down": "Tắt máy"
     }
 };
 

@@ -23,8 +23,10 @@ Item {
     readonly property real gTint: typeof gCfg.o === "number" ? gCfg.o : 0.42
     readonly property real gRim: gFrosted ? 0 : (typeof gCfg.r === "number" ? gCfg.r : 0.45)
     readonly property real gStrength: gFrosted ? 0 : (typeof gCfg.l === "number" ? gCfg.l : 1.5)
-    // the sharp scene for Liquid Glass, as the shell's panels refract it; the blurred one for frosted glass
-    component LGlass: Glass { src: ls.gFrosted ? glassTex : sceneTex; frame: ls; tint: ls.gTint; rim: ls.gRim; strength: ls.gStrength }
+    // the sharp scene for Liquid Glass, as the shell's panels refract it; the blurred one for frosted glass (also for the
+    // login screen's own controls, greeter.qml)
+    readonly property Item glassSrc: gFrosted ? glassTex : sceneTex
+    component LGlass: Glass { src: ls.glassSrc; frame: ls; tint: ls.gTint; rim: ls.gRim; strength: ls.gStrength }
 
     focus: true
 

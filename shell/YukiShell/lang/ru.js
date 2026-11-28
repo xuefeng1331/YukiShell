@@ -1,6 +1,13 @@
 .pragma library
 
 var strings = {
+    "Login screen": "Экран входа",
+    "Shows your picture, wallpaper, clock and keyboard layout": "Показывает ваше фото, обои, часы и раскладку клавиатуры",
+    "Sync Now": "Синхронизировать",
+    "Syncing…": "Синхронизация…",
+    "Updating…": "Обновление…",
+    "Up to date": "Обновлено",
+    "Update available": "Доступно обновление",
     "Trash": "Корзина",
     "Empty Trash": "Очистить корзину",
     "Show Trash in the Dock": "Показывать «Корзину» в Dock",

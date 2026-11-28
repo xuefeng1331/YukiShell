@@ -1,6 +1,13 @@
 .pragma library
 
 var strings = {
+    "Login screen": "Màn hình đăng nhập",
+    "Shows your picture, wallpaper, clock and keyboard layout": "Hiện ảnh, hình nền, đồng hồ và bố cục bàn phím của bạn",
+    "Sync Now": "Đồng bộ ngay",
+    "Syncing…": "Đang đồng bộ…",
+    "Updating…": "Đang cập nhật…",
+    "Up to date": "Đã cập nhật",
+    "Update available": "Có bản cập nhật",
     "Trash": "Thùng rác",
     "Empty Trash": "Dọn sạch thùng rác",
     "Show Trash in the Dock": "Hiện Thùng rác trong Dock",

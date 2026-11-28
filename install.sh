@@ -3,7 +3,8 @@
 #   curl -LO https://github.com/xuefeng1331/YukiShell/raw/main/install.sh
 #   bash install.sh
 # It asks a couple of questions, then installs every package, links the configs, sets the themes and offers to restart.
-# Safe to run again. --yes answers every question with the default and never restarts; --uninstall undoes the links.
+# Safe to run again. --yes answers every question with the default and never restarts; --uninstall undoes the links;
+# --remove-login-screen puts back the login screen you had before YukiShell's.
 set -euo pipefail
 
 [ "$(id -u)" != 0 ] || { echo "Run this as your normal user, not root (it asks for your password when it needs it)." >&2; exit 1; }
@@ -32,6 +33,22 @@ if [ "${1:-}" = "--uninstall" ]; then
         if [ -s "$f" ] || [ -d "$f" ]; then mv -f "$f" "${f%.pre-rice}"; else rm -f "$f" "${f%.pre-rice}"; fi
     done
     echo "YukiShell's links are gone and your old files are back. Log out to leave the session."
+    grep -qs yukishell /etc/greetd/config.toml && echo "The login screen stays: bash install.sh --remove-login-screen takes it away too."
+    exit 0
+fi
+
+if [ "${1:-}" = "--remove-login-screen" ]; then
+    grep -qs yukishell /etc/greetd/config.toml || { echo "YukiShell's login screen isn't in use."; exit 0; }
+    if [ -f /etc/greetd/config.toml.pre-yukishell ]; then
+        sudo mv -f /etc/greetd/config.toml.pre-yukishell /etc/greetd/config.toml
+        echo "greetd's own settings are back."
+    else
+        printf '[terminal]\nvt = 1\n\n[default_session]\ncommand = "agreety --cmd /bin/sh"\nuser = "greeter"\n' | sudo tee /etc/greetd/config.toml >/dev/null
+        echo "greetd shows its text login now. For a graphical one: sudo pacman -S sddm && sudo systemctl enable -f sddm"
+    fi
+    # the keyring lines in /etc/pam.d/greetd stay: they unlock it for any greetd login screen
+    sudo rm -rf /usr/local/share/yukishell /var/lib/yukigreet
+    echo "It takes effect at the next restart."
     exit 0
 fi
 
@@ -223,6 +240,9 @@ if [ "$login" = greetd ] || grep -qs yukishell /etc/greetd/config.toml; then
     g=/usr/local/share/yukishell
     sudo mkdir -p "$g" && sudo rm -rf "$g/YukiLock" && sudo cp -r "$here/shell/YukiLock" "$g/YukiLock" && sudo chmod -R a+rX "$g"
     sudo install -d -m 755 -o "$(id -un)" /var/lib/yukigreet
+    # the other accounts' pictures and settings: each one may make its own folder here (yuki-greeter-sync), and the
+    # login screen only believes a folder its own account made
+    sudo install -d -m 1777 /var/lib/yukigreet/users
     if ! grep -qs yukishell /etc/greetd/config.toml; then
         [ -f /etc/greetd/config.toml ] && sudo cp -n /etc/greetd/config.toml /etc/greetd/config.toml.pre-yukishell
         printf '[terminal]\nvt = 1\n\n[default_session]\ncommand = "start-hyprland -- --config %s/YukiLock/greeter.lua"\nuser = "greeter"\n' "$g" \

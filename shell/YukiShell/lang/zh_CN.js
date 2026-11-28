@@ -1,6 +1,13 @@
 .pragma library
 
 var strings = {
+    "Login screen": "登录屏幕",
+    "Shows your picture, wallpaper, clock and keyboard layout": "显示你的头像、墙纸、时钟和键盘布局",
+    "Sync Now": "立即同步",
+    "Syncing…": "正在同步…",
+    "Updating…": "正在更新…",
+    "Up to date": "已是最新",
+    "Update available": "有可用更新",
     "Trash": "废纸篓",
     "Empty Trash": "清倒废纸篓",
     "Show Trash in the Dock": "在程序坞中显示“废纸篓”",

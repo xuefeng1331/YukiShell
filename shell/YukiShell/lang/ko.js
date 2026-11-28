@@ -1,6 +1,13 @@
 .pragma library
 
 var strings = {
+    "Login screen": "로그인 화면",
+    "Shows your picture, wallpaper, clock and keyboard layout": "사진, 배경화면, 시계 및 키보드 레이아웃을 표시합니다",
+    "Sync Now": "지금 동기화",
+    "Syncing…": "동기화 중…",
+    "Updating…": "업데이트 중…",
+    "Up to date": "최신 상태",
+    "Update available": "업데이트 있음",
     "Trash": "휴지통",
     "Empty Trash": "휴지통 비우기",
     "Show Trash in the Dock": "Dock에 휴지통 표시",
