@@ -10,7 +10,9 @@ Item {
     property string source: ""           // resolved icon image
     property string fam: "Open Runde"
     property int iconSize: 48
-    property int labelLines: 2           // 1 when the grid is tight (2 x 2 icons in a widget cell)
+    property int labelLines: 2           // 1 when the grid is too tight for two
+    property bool expanded: false        // the only selected icon: its whole name shows, like Finder's
+    property color accent: "#0A84FF"
     property bool selected: false
     property bool dropTarget: false      // another icon is being dragged over this one
     property bool dragging: false
@@ -19,7 +21,7 @@ Item {
     property bool failed: false
     onSourceChanged: failed = false
 
-    readonly property int pad: 10
+    readonly property int pad: 6
     readonly property int boxSize: iconSize + 2 * pad
     // pictures (screenshots) are shown as a short landscape thumbnail instead of a square one
     readonly property bool isPicture: item !== null && item.kind === "Image"
@@ -39,7 +41,7 @@ Item {
         // soft dark hairline just outside the rim, so the highlight stays readable on bright wallpapers
         Rectangle {
             anchors.fill: parent; anchors.margins: -1
-            radius: 19
+            radius: 15
             color: "transparent"
             border.width: 1
             border.color: Qt.rgba(0, 0, 0, 0.16)
@@ -47,7 +49,7 @@ Item {
         // frosted grey body
         Rectangle {
             anchors.fill: parent
-            radius: 18
+            radius: 14
             color: ic.selected ? Qt.rgba(0.80, 0.82, 0.82, 0.32) : Qt.rgba(0.80, 0.82, 0.82, 0.22)
             border.width: 1.5
             border.color: Qt.rgba(1, 1, 1, ic.selected ? 0.42 : 0.30)
@@ -81,15 +83,57 @@ Item {
         renderType: Text.QtRendering
     }
 
-    // ── name ──
-    Text {
+    // ── name, like Finder's: wrapped onto the lines there are, the last one cut in the middle so the end (the extension) stays;
+    //    the only selected icon shows its whole name. Selected names sit on an accent pill. ──
+    readonly property string label: item ? (item.isApp ? item.name.replace(/\.desktop$/i, "") : item.name) : ""
+    readonly property real labelW: width - 6
+    FontMetrics { id: fm; font.family: ic.fam; font.pixelSize: 11 }
+    // the first line: the longest start that fits, broken after a space, "-", "_" or "." when there is one in its second half
+    readonly property var lines: {
+        var s = label, w = labelW - 2;
+        if (labelLines < 2 || fm.advanceWidth(s) <= w) return [s];
+        var k = 1;
+        while (k < s.length && fm.advanceWidth(s.slice(0, k + 1)) <= w) k++;
+        var head = s.slice(0, k), b = Math.max(head.lastIndexOf(" "), head.lastIndexOf("-"), head.lastIndexOf("_"), head.lastIndexOf("."));
+        if (b >= k / 2) k = b + 1;
+        return [s.slice(0, k).replace(/ +$/, ""), s.slice(k).replace(/^ +/, "")];
+    }
+    Rectangle {
+        visible: ic.selected
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: ic.boxH + 2
+        width: (ic.expanded ? fullName.contentWidth : shortName.width) + 10
+        height: (ic.expanded ? fullName.contentHeight : shortName.height) + 2
+        radius: 5
+        color: Qt.darker(ic.accent, 1.3)   // white text stays readable on light accents
+    }
+    Column {
+        id: shortName
+        visible: !ic.expanded
         anchors.horizontalCenter: parent.horizontalCenter
         y: ic.boxH + 3
-        width: parent.width - 8
+        Repeater {
+            model: ic.lines
+            Text {
+                required property string modelData
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.min(implicitWidth, ic.labelW)
+                elide: Text.ElideMiddle
+                text: modelData
+                color: "white"; font.family: ic.fam; font.pixelSize: 11
+                style: ic.selected ? Text.Normal : Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.55)
+            }
+        }
+    }
+    Text {
+        id: fullName
+        visible: ic.expanded
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: ic.boxH + 3
+        width: ic.labelW
         horizontalAlignment: Text.AlignHCenter
-        maximumLineCount: ic.labelLines; wrapMode: Text.Wrap; elide: Text.ElideMiddle
-        text: ic.item ? (ic.item.isApp ? ic.item.name.replace(/\.desktop$/i, "") : ic.item.name) : ""
+        wrapMode: Text.Wrap
+        text: ic.label.replace(/([_-])/g, "$1\u200B")   // may also break after _ and -, not mid-word (never before the extension)
         color: "white"; font.family: ic.fam; font.pixelSize: 11
-        style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.55)
     }
 }

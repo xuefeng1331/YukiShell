@@ -69,7 +69,7 @@ Scope {
     readonly property int perCell: (iconSize + 32 <= basePitchX / 2 && iconSize + 38 <= basePitchY / 2) ? 2 : 1
     readonly property int cellW: Math.floor(basePitchX / perCell)
     readonly property int cellH: Math.floor(basePitchY / perCell)
-    readonly property int labelLines: cellH - iconSize - 23 >= 30 ? 2 : 1
+    readonly property int labelLines: cellH - iconSize - 15 >= 28 ? 2 : 1   // under the highlight box (icon + 12) and a 3 px gap, 14 px a line
 
     // is the widgets host in edit mode? Then it must receive the pointer, not us.
     readonly property bool widgetsEditing: hub && hub.widgets ? hub.widgets.editing : false
@@ -166,7 +166,7 @@ Scope {
             for (var row = 0; row < g.rows * k; row++) {
                 var sx = g.left + col * g.pitchX / k, sy = g.top + row * g.pitchY / k, hit = false;
                 for (var i = 0; i < wr.length && !hit; i++) hit = rectanglesOverlap(sx, sy, sw, sh, wr[i], 0);
-                var x = Math.round(sx + sw / 2 - cellW / 2), y = Math.round(sy + sh / 2 - (iconSize + 37) / 2);
+                var x = Math.round(sx + sw / 2 - cellW / 2), y = Math.round(sy + sh / 2 - (iconSize + 15 + 14 * labelLines) / 2);
                 if (!hit && !collidesWithDock(x, y, screenName, screenW, screenH)) cells.push({ key: col + ":" + row, x: x, y: y });
             }
         return cells;
@@ -654,7 +654,7 @@ Scope {
             // the centre of an icon, where a sheet grows out of
             function iconCenter(it) {
                 var p = it ? layoutMap[it.name] : null;
-                return p ? Qt.point(p.x + root.cellW / 2, p.y + (root.iconSize + 20) / 2) : Qt.point(width / 2, height / 2);
+                return p ? Qt.point(p.x + root.cellW / 2, p.y + (root.iconSize + 12) / 2) : Qt.point(width / 2, height / 2);
             }
 
             // ── interaction state of this screen ──
@@ -702,7 +702,7 @@ Scope {
                 for (var i = 0; i < root.items.length; i++) {
                     var p = layoutMap[root.items[i].name];
                     if (!p) continue;
-                    var bx = p.x + (root.cellW - (root.iconSize + 20)) / 2, bw = root.iconSize + 20;
+                    var bx = p.x + (root.cellW - (root.iconSize + 12)) / 2, bw = root.iconSize + 12;
                     if (bx < r && bx + bw > l && p.y < b && p.y + root.cellH - 8 > t) out.push(root.items[i]);
                 }
                 return out;
@@ -737,7 +737,7 @@ Scope {
                     var p = layoutMap[list[i].name];
                     if (!p) continue;
                     flyComp.createObject(flyLayer, { src: root.iconSourceFor(list[i]), size: root.iconSize,
-                                                     sx: p.x + dx + root.cellW / 2, sy: p.y + dy + 10 + root.iconSize / 2,
+                                                     sx: p.x + dx + root.cellW / 2, sy: p.y + dy + 6 + root.iconSize / 2,
                                                      tx: tx, ty: ty, delay: Math.min(i, 8) * 55 });
                 }
                 pulseT.interval = 380 + Math.min(list.length - 1, 8) * 55;
@@ -887,7 +887,9 @@ Scope {
                         Behavior on y { enabled: !icon.moving; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                         width: root.cellW; height: root.cellH
                         labelLines: root.labelLines
-                        z: moving ? 10 : 1
+                        expanded: selected && root.selectionCount === 1
+                        accent: root.accent
+                        z: moving ? 10 : (selected ? 2 : 1)
                         item: modelData
                         fam: root.fam
                         iconSize: root.iconSize
