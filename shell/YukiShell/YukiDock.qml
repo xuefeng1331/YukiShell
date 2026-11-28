@@ -5813,9 +5813,9 @@ Scope {
     }
     readonly property bool trashWatchWanted: showTrash && trashReady && !trashPoll
     onTrashWatchWantedChanged: trashWatch.running = trashWatchWanted
-    Process {
+    OwnedProcess {   // dies with the shell (a killed shell used to leave the watcher running)
         id: trashWatch
-        command: ["inotifywait", "-m", "-q", "-e", "create", "-e", "delete", "-e", "moved_to", "-e", "moved_from", "-e", "delete_self", root.trashDir]
+        cmd: ["inotifywait", "-m", "-q", "-e", "create", "-e", "delete", "-e", "moved_to", "-e", "moved_from", "-e", "delete_self", root.trashDir]
         stdout: SplitParser { onRead: data => trashDebounce.restart() }
         // the folder itself went away (a cleaner removed the whole Trash): check (which makes it again) and watch anew
         onRunningChanged: if (!running && root.trashWatchWanted) trashRewatch.restart()
