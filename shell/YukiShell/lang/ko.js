@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Save on Desktop": "데스크탑에 저장",
+    "New screenshots show up as icons on the desktop": "새 스크린샷이 데스크탑에 아이콘으로 표시됩니다",
     "Login screen": "로그인 화면",
     "Shows your picture, wallpaper, clock and keyboard layout": "사진, 배경화면, 시계 및 키보드 레이아웃을 표시합니다",
     "Sync Now": "지금 동기화",

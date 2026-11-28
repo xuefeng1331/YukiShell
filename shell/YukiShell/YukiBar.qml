@@ -361,6 +361,7 @@ Scope {
     property var emojiRecent: []
     property string screenshotDir: Quickshell.env("HOME") + "/Screenshots"
     property bool screenshotSave: true
+    property bool screenshotDesktop: false   // save in the Desktop folder (they show up as icons there); off = screenshotDir
     property bool screenshotClipboard: true
     property bool screenshotNotify: true
     property int spotRequest: 0
@@ -396,7 +397,7 @@ Scope {
         "barStyle", "barGlass", "glassRim", "glassGrain", "glassLiquid", "glassBlur", "barBgOpacity", "glassRealtime", "liveWallGlass", "wallPauseCovered", "wallUserPaused", "showWallButton", "glassDebug", "wallpaperPath", "use24h", "language", "showDate",
         "showSeconds", "showBatteryPercent", "showTray", "showSearch",
         "spotlightEnabled", "reduceMotion", "ccEnabled", "notificationsEnabled", "clockAppEnabled", "ccStyle", "barLogoMode", "barCustomLogoPath", "barWidgets", "weekStartsMonday", "terminal", "launcher",
-        "filesCmd", "clipboardCmd", "appUsage", "clipHistory", "clipAutoPaste", "emojiRecent", "screenshotDir", "screenshotSave", "screenshotClipboard", "screenshotNotify", "nightTemp", "ccControls", "ccSizes", "ccPos", "ccRowH", "ccGapPx", "ccOnColor", "ccMigRec", "visOn", "visStyle", "visColor", "visGain", "visCount", "visWidth", "visInCC", "mwGlow", "mwMotion", "mwBar", "mwVisMode", "wallpaperDir", "wallpaperDirs", "wallpaperFavs", "wallpaperCmd", "wallpaperVideo", "wpRestorePath", "uiSounds", "gamingMode", "gamingAuto", "ccMigGame", "lockArtBackground",
+        "filesCmd", "clipboardCmd", "appUsage", "clipHistory", "clipAutoPaste", "emojiRecent", "screenshotDir", "screenshotDesktop", "screenshotSave", "screenshotClipboard", "screenshotNotify", "nightTemp", "ccControls", "ccSizes", "ccPos", "ccRowH", "ccGapPx", "ccOnColor", "ccMigRec", "visOn", "visStyle", "visColor", "visGain", "visCount", "visWidth", "visInCC", "mwGlow", "mwMotion", "mwBar", "mwVisMode", "wallpaperDir", "wallpaperDirs", "wallpaperFavs", "wallpaperCmd", "wallpaperVideo", "wpRestorePath", "uiSounds", "gamingMode", "gamingAuto", "ccMigGame", "lockArtBackground",
         "lockClockStyle", "switcherStyle", "lockClockFont", "lockClockWeight", "lockClockMaterial", "lockClockIntensity", "lockClockTint", "lockClockDate", "autoContrast", "wallpaperAppearance", "wpPairLight", "wpPairDark",
         "idleLockMins", "idleScreenMins", "kbLayout", "notifDnd", "dnd", "nightOn", "keepAwake", "notifBannerSecs", "notifMutedApps", "notifAppsSeen", "focusSchedule", "focusFrom", "focusTo",
         "focusFullscreen", "focusAllowUrgent", "lockShowNotifs", "lockWallpaper", "uiSoundVolume", "alertSound",
@@ -3725,14 +3726,17 @@ Scope {
     property int shotId: 0
     readonly property string shotTmp: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
     readonly property string shotFinishScript: [
-        "d=\"$1\"; sv=\"$2\"; cl=\"$3\"; nt=\"$4\"; tmp=\"$5\"; g=\"$6\"",
+        "d=\"$1\"; sv=\"$2\"; cl=\"$3\"; nt=\"$4\"; tmp=\"$5\"; g=\"$6\"; dk=\"$7\"",
         "if [ \"$g\" = '@' ]; then :; elif [ -n \"$g\" ]; then grim -g \"$g\" \"$tmp\"; else grim \"$tmp\"; fi || exit 1",
         "[ -s \"$tmp\" ] || exit 1",
         "f=\"$tmp\"",
         "if [ \"$sv\" = 1 ]; then",
+        // the Desktop folder by its real name (it's translated on some systems), as Desktop.qml finds it
+        "  if [ \"$dk\" = 1 ]; then d=$(xdg-user-dir DESKTOP 2>/dev/null); { [ -z \"$d\" ] || [ \"$d\" = \"$HOME\" ]; } && d=\"$HOME/Desktop\"; fi",
         "  [ -z \"$d\" ] && d=\"$HOME/Pictures/Screenshots\"",
         "  case \"$d\" in '~') d=\"$HOME\";; '~/'*) d=\"$HOME/${d#'~/'}\";; esac",
-        "  n=\"$d/Screenshot-$(date +%F_%H-%M-%S).png\"",
+        // two shots in the same second get -2, -3 (the second one used to replace the first)
+        "  b=\"$d/Screenshot-$(date +%F_%H-%M-%S)\"; n=\"$b.png\"; i=2; while [ -e \"$n\" ]; do n=\"$b-$i.png\"; i=$((i+1)); done",
         "  mkdir -p \"$d\" && mv -f \"$tmp\" \"$n\" && f=\"$n\"",
         "fi",
         "[ \"$cl\" = 1 ] && wl-copy --type image/png < \"$f\"",
@@ -3745,7 +3749,7 @@ Scope {
         var tmp = tmpPath || (shotTmp + "/yukishot-out-" + Date.now() + ".png");
         var save = screenshotSave || !screenshotClipboard;
         Quickshell.execDetached(["sh", "-c", shotFinishScript, "sh", screenshotDir, save ? "1" : "0", screenshotClipboard ? "1" : "0",
-                                 screenshotNotify ? "1" : "0", tmp, geom]);
+                                 screenshotNotify ? "1" : "0", tmp, geom, screenshotDesktop ? "1" : "0"]);
     }
     function shotStart() {
         if (shotOpen) { shotClose(); return; }

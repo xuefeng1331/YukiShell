@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Save on Desktop": "デスクトップに保存",
+    "New screenshots show up as icons on the desktop": "新しいスクリーンショットがデスクトップにアイコンとして表示されます",
     "Login screen": "ログイン画面",
     "Shows your picture, wallpaper, clock and keyboard layout": "ピクチャ、壁紙、時計、キーボードレイアウトを表示します",
     "Sync Now": "今すぐ同期",

@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Save on Desktop": "存储到桌面",
+    "New screenshots show up as icons on the desktop": "新截屏会以图标形式出现在桌面上",
     "Login screen": "登录屏幕",
     "Shows your picture, wallpaper, clock and keyboard layout": "显示你的头像、墙纸、时钟和键盘布局",
     "Sync Now": "立即同步",

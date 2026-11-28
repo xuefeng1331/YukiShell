@@ -2253,6 +2253,18 @@ Scope {
                     }
                     SRow {
                         t: pal
+                        visible: root.bar ? root.bar.screenshotSave : true
+                        title: I18n.tr("Save on Desktop")
+                        subtitle: I18n.tr("New screenshots show up as icons on the desktop")
+                        SSwitch {
+                            t: pal
+                            checked: root.bar ? root.bar.screenshotDesktop : false
+                            onToggled: v => { if (root.bar) root.bar.screenshotDesktop = v; }
+                        }
+                    }
+                    SRow {
+                        t: pal
+                        visible: !(root.bar && root.bar.screenshotDesktop)
                         title: I18n.tr("Save location")
                         subtitle: I18n.tr("Leave empty for ~/Pictures/Screenshots")
                         Row {
@@ -2291,6 +2303,7 @@ Scope {
                     }
                     SRow {
                         t: pal
+                        visible: !(root.bar && root.bar.screenshotDesktop)
                         title: I18n.tr("Quick folders")
                         SSegmented {
                             t: pal

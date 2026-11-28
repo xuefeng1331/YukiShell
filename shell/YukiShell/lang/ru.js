@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Save on Desktop": "Сохранять на рабочий стол",
+    "New screenshots show up as icons on the desktop": "Новые снимки появляются значками на рабочем столе",
     "Login screen": "Экран входа",
     "Shows your picture, wallpaper, clock and keyboard layout": "Показывает ваше фото, обои, часы и раскладку клавиатуры",
     "Sync Now": "Синхронизировать",

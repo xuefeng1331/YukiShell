@@ -1,6 +1,8 @@
 .pragma library
 
 var strings = {
+    "Save on Desktop": "Lưu trên màn hình nền",
+    "New screenshots show up as icons on the desktop": "Ảnh chụp mới hiện thành biểu tượng trên màn hình nền",
     "Login screen": "Màn hình đăng nhập",
     "Shows your picture, wallpaper, clock and keyboard layout": "Hiện ảnh, hình nền, đồng hồ và bố cục bàn phím của bạn",
     "Sync Now": "Đồng bộ ngay",
