@@ -136,13 +136,17 @@ and after the restart YukiShell is ready. Along the way it:
    were still on bash.
 7. If you have no login screen, asks how you want to get in: **YukiShell's login screen** (the lock screen, to sign in; installs
    greetd), **SDDM**, or **Hyprland starting by itself** when you log in on the first text console, or none of them. With a login screen you already have, pick Hyprland in its session menu once.
+   YukiShell's login screen lists every account and desktop session when there is more than one, has Sleep, Restart and
+   Shut Down, and types in each account's own keyboard layout. *Settings → Lock Screen → Login screen* syncs it and updates it
+   after you pull changes.
 8. Runs `tools/doctor` and offers to restart. If you're in Hyprland already, the shell starts straight away.
 
 It's safe to run again whenever you pull new changes, and it only asks for your password when something is missing.
 `./install.sh --yes` asks nothing (no login screen changes, no restart). Only want to see what's missing without touching anything? `./install.sh --doctor`.
 
 To undo it, run `./install.sh --uninstall`: it removes the links and the text-console autostart and puts your `*.pre-rice` files back
-(packages and settings stay).
+(packages and settings stay). `./install.sh --remove-login-screen` takes YukiShell's login screen away and puts greetd's own
+settings back.
 
 ### Updating
 
