@@ -3102,6 +3102,10 @@ Scope {
     }
     function spotOpen(mode) { if (!spotlightEnabled) return; spotWant = mode; spotRequest++; }
     signal ccRequest(bool open)
+    // the screen whose bar has a menu open ("" = none) and whether it is Spotlight; a click anywhere else closes it (closePops)
+    property string popScreen: ""
+    property bool popSpot: false
+    signal closePops()
     IpcHandler {
         target: "controlcenter"
         function toggle(): void { root.ccRequest(true); }
@@ -5156,6 +5160,23 @@ Scope {
             }
         }
 
+        // While a bar menu is open, a click its own window can't catch closes it too: below that window (it stops popRoom under the
+        // bar) and on the other screens. Overlay, so it also works over a fullscreen window there. Spotlight covers its own screen.
+        PanelWindow {
+            readonly property bool own: root.popScreen === perScreen.modelData.name
+            screen: perScreen.modelData
+            visible: root.popScreen !== "" && implicitHeight > 0
+            anchors { left: true; right: true; bottom: true }
+            implicitHeight: own ? (root.popSpot ? 0 : Math.max(0, perScreen.modelData.height - root.barH - root.popRoom)) : perScreen.modelData.height
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.namespace: "yukibarcatch"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            // clears popScreen itself too: if that screen went away with its menu open, nothing else would
+            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onPressed: { root.popScreen = ""; root.closePops(); } }
+        }
+
         PanelWindow {
             id: win
             property var modelData: perScreen.modelData
@@ -5195,6 +5216,7 @@ Scope {
                 readonly property bool toastScreen: Quickshell.screens.length === 1 || (Hyprland.focusedMonitor !== null && Hyprland.focusedMonitor.name === win.modelData.name)
                 Connections {
                     target: root
+                    function onClosePops() { ui.pop = ""; }
                     function onCcRequest(open) {
                         if (!ui.toastScreen || !root.ccEnabled) return;
                         ui.pop = (open && ui.pop !== "cc") ? "cc" : "";
@@ -5349,6 +5371,8 @@ Scope {
                 readonly property bool anyVisible: menuPop.visible || cc.visible || cal.visible || wifiPop.visible || btPop.visible || trayPop.visible || notifPop.visible || toastArea.visible || volPop.visible || kbPop.visible
                 onAnyVisibleChanged: root.popCount += (anyVisible ? 1 : -1)
                 onPopChanged: {
+                    if (pop !== "") { root.popScreen = win.modelData.name; root.popSpot = pop === "spot"; }
+                    else if (root.popScreen === win.modelData.name) root.popScreen = "";
                     if (pop !== "" && pop !== "spot") toneT.restart();
                     if (pop === "spot" && ui.toastScreen) root.measureTone(win.modelData.x + ui.width / 2 - 320, win.modelData.y + ui.height * 0.4 - 30, 640, 60);
                     armed = "";
