@@ -5794,7 +5794,7 @@ Scope {
     function trashCheck() { if (!trashCheckProc.running) trashCheckProc.running = true; }
     Process {
         id: trashCheckProc
-        command: ["sh", "-c", "mkdir -p \"$1\"; n=$(ls -A \"$1\" 2>/dev/null | wc -l); if [ \"$n\" -gt 0 ]; then s=1; else s=0; fi; "
+        command: ["sh", "-c", "mkdir -p \"$1\"; n=$(find \"$1\" -mindepth 1 -maxdepth 1 -printf x 2>/dev/null | wc -c); if [ \"$n\" -gt 0 ]; then s=1; else s=0; fi; "
                               + "if command -v inotifywait >/dev/null 2>&1; then w=w; else w=p; fi; echo \"$s $w $n\"", "sh", root.trashDir]
         stdout: StdioCollector {
             onStreamFinished: {

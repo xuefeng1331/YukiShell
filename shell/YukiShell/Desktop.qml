@@ -593,7 +593,15 @@ Scope {
         var th = {}; for (var hk in trashHidden) th[hk] = true;
         for (var hi = 0; hi < paths.length; hi++) th[paths[hi]] = true;
         trashHidden = th; trashHiddenClear.restart();
-        Quickshell.execDetached(["sh", "-c", "for f in \"$@\"; do gio trash \"$f\" 2>/dev/null || { mkdir -p \"$HOME/.local/share/Trash/files\" && mv -- \"$f\" \"$HOME/.local/share/Trash/files/\"; }; done", "sh"].concat(paths));
+        // gio first (it knows other drives' trash folders). Without it, the XDG trash by hand: a free name (a plain mv used to
+        // replace an older trashed file of the same name) and the .trashinfo file managers need to list and restore it
+        Quickshell.execDetached(["sh", "-c",
+            "t=\"${XDG_DATA_HOME:-$HOME/.local/share}/Trash\"; for f in \"$@\"; do f=${f%/}; gio trash -- \"$f\" 2>/dev/null && continue; "
+            + "mkdir -p \"$t/files\" \"$t/info\" || continue; b=${f##*/}; n=$b; i=2; "
+            + "while [ -e \"$t/files/$n\" ] || [ -e \"$t/info/$n.trashinfo\" ]; do n=\"$b.$i\"; i=$((i+1)); done; "
+            + "p=$(jq -rn --arg p \"$(realpath -s -- \"$f\")\" '$p | @uri | gsub(\"%2F\"; \"/\")'); "
+            + "printf '[Trash Info]\\nPath=%s\\nDeletionDate=%s\\n' \"$p\" \"$(date +%Y-%m-%dT%H:%M:%S)\" > \"$t/info/$n.trashinfo\" "
+            + "&& { mv -- \"$f\" \"$t/files/$n\" || rm -f \"$t/info/$n.trashinfo\"; }; done", "sh"].concat(paths));
         clearSelection();
         rescan.restart();
     }
