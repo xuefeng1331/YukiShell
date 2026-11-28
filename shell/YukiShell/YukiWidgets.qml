@@ -36,6 +36,13 @@ Scope {
     readonly property int widgetCount: wmodel.count
     property bool anyLiquid: false
     property int rev: 0
+    // the widget being dragged or resized and where it would land ({ id, x, y, span }), so the desktop icons make room as it moves
+    property var dragGhost: null
+    function setGhost(id, p, span) {
+        var g = dragGhost;
+        if (!p) { if (g) dragGhost = null; return; }
+        if (!g || g.id !== id || g.x !== p[0] || g.y !== p[1] || g.span !== span) dragGhost = { id: id, x: p[0], y: p[1], span: span };
+    }
 
     readonly property var styleNames: ({ liquid: "Liquid Glass", normal: "Normal", light: "Light", dark: "Dark" })
     readonly property var typeNames: ({ weather: "Weather", calendar: "Calendar", clock: "Clock", player: "Player", image: "Image" })
@@ -244,11 +251,6 @@ Scope {
                 break;
             }
         recount(); scheduleSave();
-    }
-    function canSpan(id, c, r) {
-        for (var i = 0; i < wmodel.count; i++)
-            if (wmodel.get(i).wid === id) return nearestFreeSlot(id, wmodel.get(i).wx, wmodel.get(i).wy, [c, r]) !== null;
-        return false;
     }
     function setSpan(id, c, r) {
         for (var i = 0; i < wmodel.count; i++) {
@@ -759,11 +761,14 @@ Scope {
                                 var ny = Math.max(0, Math.min(ui.height - ww.height, ww.wy + (p.y - py)));
                                 ww.dragDX = nx - ww.wx;
                                 ww.dragDY = ny - ww.wy;
+                                root.setGhost(ww.wid, root.nearestFreeSlot(ww.wid, nx, ny, ww.wspan), ww.wspan);
                             }
                             onReleased: {
                                 root.moveWidget(ww.wid, ww.wx + ww.dragDX, ww.wy + ww.dragDY);
                                 ww.dragDX = 0; ww.dragDY = 0;
+                                root.dragGhost = null;
                             }
+                            onCanceled: { ww.dragDX = 0; ww.dragDY = 0; root.dragGhost = null; }
                         }
                         Rectangle {
                             visible: root.editing && ww.wtype === "image"
@@ -809,8 +814,10 @@ Scope {
                                     var r = Math.max(1, Math.min(root.maxRows, Math.ceil((p.y - ww.wy + root.gridGapY / 2) / g.pitchY)));
                                     var sp = root.spanStr(c, r);
                                     if (sp === ww.liveSpan) return;
-                                    ww.liveFits = root.canSpan(ww.wid, c, r);
+                                    var gp = root.nearestFreeSlot(ww.wid, ww.wx, ww.wy, [c, r]);
+                                    ww.liveFits = gp !== null;
                                     ww.liveSpan = sp;
+                                    root.setGhost(ww.wid, gp, sp);
                                 }
                                 onReleased: {
                                     if (ww.liveSpan !== "" && ww.liveFits) {
@@ -818,8 +825,9 @@ Scope {
                                         root.setSpan(ww.wid, sp[0], sp[1]);
                                     }
                                     ww.liveSpan = ""; ww.liveFits = true;
+                                    root.dragGhost = null;
                                 }
-                                onCanceled: { ww.liveSpan = ""; ww.liveFits = true; }
+                                onCanceled: { ww.liveSpan = ""; ww.liveFits = true; root.dragGhost = null; }
                             }
                         }
                         Rectangle {

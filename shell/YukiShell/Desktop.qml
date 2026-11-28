@@ -61,11 +61,15 @@ Scope {
         if (changed) selection = m;
     }
 
-    readonly property int cellW: Math.max(96, iconSize + 32)
-    readonly property int cellH: iconSize + 56      // highlight box (icon + padding) + two label lines
-    readonly property int gridTop: 42
-    readonly property int gridBottom: 24
-    readonly property int gridSide: 16
+    // One grid for the icons and the widgets, like a phone's home screen: each widget cell holds 2 x 2 icons (one when the icons are
+    // too big for that), so icons line up with the widgets' edges and a widget simply takes the icon places it covers.
+    readonly property var wgrid: hub && hub.widgets ? hub.widgets : null
+    readonly property int basePitchX: wgrid ? wgrid.gridCell + wgrid.gridGapX : 186
+    readonly property int basePitchY: wgrid ? wgrid.gridCell + wgrid.gridGapY : 182
+    readonly property int perCell: (iconSize + 32 <= basePitchX / 2 && iconSize + 38 <= basePitchY / 2) ? 2 : 1
+    readonly property int cellW: Math.floor(basePitchX / perCell)
+    readonly property int cellH: Math.floor(basePitchY / perCell)
+    readonly property int labelLines: cellH - iconSize - 23 >= 30 ? 2 : 1
 
     // is the widgets host in edit mode? Then it must receive the pointer, not us.
     readonly property bool widgetsEditing: hub && hub.widgets ? hub.widgets.editing : false
@@ -92,17 +96,13 @@ Scope {
         var w = hub ? hub.widgets : null, screens = Quickshell.screens, out = [];
         // Widgets are currently hosted on the primary screen; other monitors have no widget footprint to reserve.
         if (!w || !w.model || screens.length === 0 || screenName !== screens[0].name) return out;
+        // a widget being dragged or resized counts where it will land, so the icons make room while it moves
+        var gh = w.dragGhost;
         for (var i = 0; i < w.model.count; i++) {
-            var m = w.model.get(i), d = w.dims(m.wsize);
-            out.push({ x: m.wx, y: m.wy, width: d[0], height: d[1] });
+            var m = w.model.get(i), g = gh && gh.id === m.wid ? gh : null, d = w.dims(g ? g.span : m.wspan);
+            out.push({ x: g ? g.x : m.wx, y: g ? g.y : m.wy, width: d[0], height: d[1] });
         }
         return out;
-    }
-    function collidesWithWidget(x, y, screenName) {
-        var rects = widgetRects(screenName);
-        for (var i = 0; i < rects.length; i++)
-            if (rectanglesOverlap(x, y, cellW, cellH, rects[i], 8)) return true;
-        return false;
     }
     // the Dock's footprint on a screen (null when it is off or on another monitor), and the strip the top bar takes
     function dockRect(screenName, screenW, screenH) {
@@ -151,31 +151,28 @@ Scope {
         return { x: bx, y: by, score: best };
     }
     function collidesWithDock(x, y, screenName, screenW, screenH) {
-        var d = dock;
-        if (!d || !d.dockEnabled || (d.monitor && d.monitor !== "" && d.monitor !== screenName)) return false;
-        var dw = Math.min(screenW, Math.max(440, d.bgWidth || 540));
-        var dh = Math.max(76, d.bgHeight || 88);
-        return rectanglesOverlap(x, y, cellW, cellH,
-            { x: (screenW - dw) / 2, y: screenH - dh - 10, width: dw, height: dh + 10 }, 4);
+        var r = dockRect(screenName, screenW, screenH);
+        return !!r && rectanglesOverlap(x, y, cellW, cellH, r, 4);
     }
-    function gridCells(screenW, screenH) {
-        var cols = Math.max(0, Math.floor((screenW - 2 * gridSide) / cellW));
-        var rows = Math.max(0, Math.floor((screenH - gridTop - gridBottom) / cellH));
-        var left = screenW - gridSide - cols * cellW, cells = [];
-        // Fill rightmost column first, top to bottom, like the familiar macOS desktop layout.
-        for (var col = cols - 1; col >= 0; col--)
-            for (var row = 0; row < rows; row++)
-                cells.push({ x: left + col * cellW, y: gridTop + row * cellH });
+    // the icon places of a screen that no widget and no Dock covers; x/y is where the icon item goes, key names the place
+    function gridCells(screenName, screenW, screenH) {
+        var g = wgrid ? wgrid.gridInfo(screenW, screenH) : null, cells = [];
+        if (!g) return cells;   // shortcut: no icons until the widgets host is up (made right after the desktop); add a fallback grid if it can ever fail to load
+        var k = perCell, h1 = wgrid.dims("1x1")[1], wr = widgetRects(screenName);
+        // a widget cell split into k places with the same gap between them as between widget cells
+        var sw = (k * g.cellW - (k - 1) * g.pitchX) / k, sh = (k * h1 - (k - 1) * g.pitchY) / k;
+        // rightmost column first, top to bottom, like the macOS desktop
+        for (var col = g.cols * k - 1; col >= 0; col--)
+            for (var row = 0; row < g.rows * k; row++) {
+                var sx = g.left + col * g.pitchX / k, sy = g.top + row * g.pitchY / k, hit = false;
+                for (var i = 0; i < wr.length && !hit; i++) hit = rectanglesOverlap(sx, sy, sw, sh, wr[i], 0);
+                var x = Math.round(sx + sw / 2 - cellW / 2), y = Math.round(sy + sh / 2 - (iconSize + 37) / 2);
+                if (!hit && !collidesWithDock(x, y, screenName, screenW, screenH)) cells.push({ key: col + ":" + row, x: x, y: y });
+            }
         return cells;
     }
-    function isCellFree(cell, screenName, screenW, screenH, occupied) {
-        if (collidesWithWidget(cell.x, cell.y, screenName) || collidesWithDock(cell.x, cell.y, screenName, screenW, screenH)) return false;
-        for (var i = 0; i < occupied.length; i++)
-            if (rectanglesOverlap(cell.x, cell.y, cellW, cellH, occupied[i], 0)) return false;
-        return true;
-    }
     function computeLayout(screenName, screenW, screenH) {
-        var cells = gridCells(screenW, screenH), result = ({}), occupied = [];
+        var cells = gridCells(screenName, screenW, screenH), result = ({}), taken = ({});
         var legacyAllowed = Quickshell.screens.length > 0 && screenName === Quickshell.screens[0].name;
         for (var i = 0; i < items.length; i++) {
             var name = items[i].name, wanted = places[positionKey(screenName, name)];
@@ -183,26 +180,23 @@ Scope {
             var best = null, bestDistance = Infinity;
             for (var j = 0; j < cells.length; j++) {
                 var c = cells[j];
-                if (!isCellFree(c, screenName, screenW, screenH, occupied)) continue;
+                if (taken[c.key]) continue;
                 if (!wanted) { best = c; break; }
                 var wantedX = Number(wanted.x) < 0 ? screenW + Number(wanted.x) : Number(wanted.x);
                 var dx = c.x - wantedX, dy = c.y - Number(wanted.y), dist = dx * dx + dy * dy;
                 if (dist < bestDistance) { bestDistance = dist; best = c; }
             }
             result[name] = best;
-            if (best) occupied.push({ x: best.x, y: best.y, width: cellW, height: cellH });
+            if (best) taken[best.key] = true;
         }
         return result;
     }
     function nearestFreePlace(name, screenName, x, y, screenW, screenH, layout) {
-        var cells = gridCells(screenW, screenH), occupied = [], best = null, bestDistance = Infinity;
-        for (var key in layout) {
-            var p = layout[key];
-            if (key !== name && p) occupied.push({ x: p.x, y: p.y, width: cellW, height: cellH });
-        }
+        var cells = gridCells(screenName, screenW, screenH), taken = ({}), best = null, bestDistance = Infinity;
+        for (var key in layout) if (key !== name && layout[key]) taken[layout[key].key] = true;
         for (var i = 0; i < cells.length; i++) {
             var c = cells[i];
-            if (!isCellFree(c, screenName, screenW, screenH, occupied)) continue;
+            if (taken[c.key]) continue;
             var dx = c.x - x, dy = c.y - y, dist = dx * dx + dy * dy;
             if (dist < bestDistance) { bestDistance = dist; best = c; }
         }
@@ -892,6 +886,7 @@ Scope {
                         Behavior on x { enabled: !icon.moving; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                         Behavior on y { enabled: !icon.moving; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                         width: root.cellW; height: root.cellH
+                        labelLines: root.labelLines
                         z: moving ? 10 : 1
                         item: modelData
                         fam: root.fam

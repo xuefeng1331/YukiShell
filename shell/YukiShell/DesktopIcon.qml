@@ -10,6 +10,7 @@ Item {
     property string source: ""           // resolved icon image
     property string fam: "Open Runde"
     property int iconSize: 48
+    property int labelLines: 2           // 1 when the grid is tight (2 x 2 icons in a widget cell)
     property bool selected: false
     property bool dropTarget: false      // another icon is being dragged over this one
     property bool dragging: false
@@ -86,7 +87,7 @@ Item {
         y: ic.boxH + 3
         width: parent.width - 8
         horizontalAlignment: Text.AlignHCenter
-        maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideMiddle
+        maximumLineCount: ic.labelLines; wrapMode: Text.Wrap; elide: Text.ElideMiddle
         text: ic.item ? (ic.item.isApp ? ic.item.name.replace(/\.desktop$/i, "") : ic.item.name) : ""
         color: "white"; font.family: ic.fam; font.pixelSize: 11
         style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.55)
